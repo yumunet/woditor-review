@@ -1,9 +1,16 @@
 import unittest
 from pathlib import Path
-from review_parser import pair_file, render_file, decode
+from review_parser import pair_file, render_file, decode, translation_warnings
 from woditor_translation_tool import command_display_pairs, COMMAND, fields, META
 
 ROOT = Path('.reference')
+
+
+class WarningTests(unittest.TestCase):
+    def test_newlines_only_are_not_control_warnings(self):
+        self.assertEqual(translation_warnings(r'a<\n>b','ab'),['改行が異なります'])
+        self.assertEqual(translation_warnings(r'a\c[1]<\n>b',r'ab\c[1]'),['改行が異なります'])
+        self.assertEqual(translation_warnings(r'a\c[1]<\n>b',r'ab\c[2]'),['制御文字・置換文字列が原文と異なります'])
 
 
 @unittest.skipUnless((ROOT / 'ja-JP/texts').exists(), 'Private corpus not installed')

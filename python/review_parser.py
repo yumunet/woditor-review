@@ -33,6 +33,16 @@ def digest(value: str) -> str:
     return hashlib.sha256(value.encode('utf-8')).hexdigest()
 
 
+def translation_warnings(source: str, translation: str) -> list[str]:
+    before, after = tokens(source), tokens(translation)
+    if before == after:
+        return []
+    newlines = {r'<\n>', r'<<\n>>', r'\n', r'\r', r'\r\n'}
+    if [t for t in before if t not in newlines] == [t for t in after if t not in newlines]:
+        return ['改行が異なります']
+    return ['制御文字・置換文字列が原文と異なります']
+
+
 def command_info(line: str, parent: int | None = None) -> dict:
     m = COMMAND.fullmatch(line)
     if not m:
@@ -159,9 +169,7 @@ def pair_file(path: str, ja_raw: bytes, en_raw: bytes) -> dict:
                 raise ValueError(f'文字列スロットが一致しません（行 {s["line"]}）')
             start, end = spans[s['position'] - 1]
             translation = m['args'][start:end]
-        issues = []
-        if tokens(s['source']) != tokens(translation):
-            issues.append('制御文字・置換文字列が原文と異なります')
+        issues = translation_warnings(s['source'], translation)
         structure = command_mask(a[s['line'] - 1]) if s['command'] else s['key']
         slots.append({**s, 'enLine': en_line, 'translation': translation, 'warnings': issues,
                       'fingerprint': digest(s['key'] + '\0' + s['source'] + '\0' + (structure or ''))})
