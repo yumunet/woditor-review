@@ -46,7 +46,12 @@ function openSheet(name: string) {lastFocus = document.activeElement as HTMLElem
 function closeSheet() {sheet = null; replyTarget = null; editTarget = null; render(); lastFocus?.focus();}
 function persist(changedPath?: string) {void saveWorkspace(workspace, changedPath).catch(error => toast(`保存できませんでした。バックアップしてください：${String(error)}`));}
 function ask(question: string, run: () => void | Promise<void>) {confirmation = {question, run}; render(); root.querySelector<HTMLElement>('[data-action="confirm-cancel"]')?.focus();}
-function reconcileCurrent() {if (!targets().some(i => i.id === currentId)) {currentId = targets()[0]?.id ?? null; if (!currentId && sheet === 'comments') sheet = null;}}
+function reconcileCurrent() {
+  // A resolved comment item stays available for inspection until the user
+  // navigates away. The live targets() list still drives counts and movement.
+  if(itemFilter==='comment' && currentItem()) return;
+  if (!targets().some(i => i.id === currentId)) {currentId = targets()[0]?.id ?? null; if (!currentId && sheet === 'comments') sheet = null;}
+}
 function selectItem(id: string) {currentId = id; before = after = 3; usageIndex = 0; contextOpen = true;}
 function move(delta: number) {
   if(!path) return;
@@ -150,7 +155,7 @@ root.addEventListener('click', event => {
   if (action === 'home') {path = null; currentId = null; sheet = null;}
   else if (action === 'folder') {if (expanded.has(value!)) expanded.delete(value!); else expanded.add(value!);}
   else if (action === 'file') {path = value!; itemFilter = homeFilter; itemQuery=''; selectItem(targets()[0]?.id ?? '');}
-  else if (action === 'filter') {if (scope === 'home') homeFilter = value as Filter; else {itemFilter = value as Filter; if (!targets().some(i => i.id === currentId)) currentId = targets()[0]?.id ?? null;}}
+  else if (action === 'filter') {if (scope === 'home') homeFilter = value as Filter; else {const retaining=itemFilter==='comment' && value==='comment' && !!currentItem();itemFilter = value as Filter; if (!retaining && !targets().some(i => i.id === currentId)) currentId = targets()[0]?.id ?? null;}}
   else if (action === 'pick') {selectItem(value!); closeSheet(); return;}
   else if (action === 'close') {closeSheet(); return;}
   else if (action === 'prev') {move(-1); return;}
@@ -160,7 +165,7 @@ root.addEventListener('click', event => {
   else if (action === 'usage') {usageIndex += Number(value); before = after = 3;}
   else if (action === 'approve') {
     const item = currentItem(), file = currentFile(); if (!item || !file) return;
-    const approve = () => {approveItem(item, file.slots, true); selectItem(nextAfterApproval(file.items, item.id, i => matches(i, itemFilter))); persist(file.path); render();};
+    const approve = () => {approveItem(item, file.slots, true); if(itemFilter!=='comment') selectItem(nextAfterApproval(file.items, item.id, i => matches(i, itemFilter))); persist(file.path); render();};
     if (isDone(item)) {ask('確認済みを未確認に戻しますか？', () => {undoApproval(item); persist(file.path);}); return;}
     if (unresolved(item).length) {ask('未解決コメントを解決にしますか？', approve); return;}
     try {approve();} catch(error) {toast(String(error));} return;

@@ -496,3 +496,33 @@ test('cross-file navigation applies the folder filter and distinguishes folder c
   await page.getByRole('button',{name:'前の項目',exact:true}).click();await expect(page.getByRole('alertdialog')).toContainText('前のフォルダ「BasicData/CommonEvent」');
   await page.getByRole('button',{name:'確定',exact:true}).click();await expect(page.locator('h1')).toHaveText('002.txt');
 });
+
+async function postReviewComment(page:Page,text:string) {
+  await page.locator('.comment-trigger').click();await page.getByLabel('コメント内容').fill(text);await page.getByRole('button',{name:'送信',exact:true}).click();await page.getByRole('button',{name:'閉じる',exact:true}).click();
+}
+async function resolveCurrentComment(page:Page) {
+  await page.locator('.comment-trigger').click();await page.getByRole('button',{name:'解決',exact:true}).click();await page.getByRole('button',{name:'閉じる',exact:true}).click();
+}
+test('resolved comment-filter items stay visible while counters update until arrow navigation',async({page})=>{
+  test.skip(!corpus,'Private reference files not available');await loadReal(page);
+  await postReviewComment(page,'First issue');await page.getByRole('button',{name:'次の項目',exact:true}).click();await postReviewComment(page,'Second issue');
+  await page.getByRole('button',{name:'前の項目',exact:true}).click();await page.locator('.entry-open').click();await page.getByRole('button',{name:'コメントあり',exact:true}).click();await page.getByRole('button',{name:'閉じる',exact:true}).click();
+  await expect(page.locator('.counter')).toHaveText('1 / 2');await resolveCurrentComment(page);
+  await expect(page.locator('.entry-title')).toHaveText('イベント名');await expect(page.locator('.counter')).toHaveText('0 / 1');await expect(page.locator('.float-comment')).toHaveCount(0);
+  await page.getByRole('button',{name:'承認',exact:true}).click();await expect(page.locator('.entry-title')).toHaveText('イベント名');await expect(page.locator('.status')).toHaveText('確認済み');
+  await page.locator('.entry-open').click();await page.getByRole('button',{name:'コメントあり',exact:true}).click();await page.getByRole('button',{name:'閉じる',exact:true}).click();await expect(page.locator('.entry-title')).toHaveText('イベント名');
+  await page.locator('.comment-trigger').click();await page.getByRole('button',{name:'すべてのコメント',exact:true}).click();await page.getByRole('button',{name:'編集',exact:true}).click();await page.getByLabel('コメント内容').fill('Updated first issue');await page.getByRole('button',{name:'保存',exact:true}).click();await page.getByRole('button',{name:'閉じる',exact:true}).click();
+  await expect(page.locator('.entry-title')).toHaveText('イベント名');await expect(page.locator('.counter')).toHaveText('0 / 1');
+  await page.getByRole('button',{name:'次の項目',exact:true}).click();await expect(page.locator('.entry-title')).toHaveText('文章の表示 1');await expect(page.locator('.counter')).toHaveText('1 / 1');
+  await resolveCurrentComment(page);await expect(page.locator('.entry-title')).toHaveText('文章の表示 1');await expect(page.locator('.counter')).toHaveText('0 / 0');
+  await expect(page.getByRole('button',{name:'次の項目',exact:true})).toBeDisabled();await expect(page.getByRole('button',{name:'前の項目',exact:true})).toBeDisabled();
+});
+test('resolved last comment stays until confirming a move to the next filtered file',async({page})=>{
+  test.skip(!corpus,'Private reference files not available');await loadNavigationFiles(page);
+  for(const path of [navigationPaths[0],navigationPaths[2]]) {await openTreeFile(page,path);await postReviewComment(page,'Review '+path);}
+  await page.getByRole('button',{name:'戻る',exact:true}).click();await page.getByRole('button',{name:'コメントあり',exact:true}).click();await openTreeFile(page,navigationPaths[0]);
+  await resolveCurrentComment(page);await expect(page.locator('h1')).toHaveText('000.txt');await expect(page.locator('.counter')).toHaveText('0 / 0');
+  await page.getByRole('button',{name:'次の項目',exact:true}).click();await expect(page.getByRole('alertdialog')).toContainText('次の「002.txt」を開きますか？');
+  await page.getByRole('button',{name:'キャンセル',exact:true}).click();await expect(page.locator('h1')).toHaveText('000.txt');await expect(page.locator('.counter')).toHaveText('0 / 0');
+  await page.getByRole('button',{name:'次の項目',exact:true}).click();await page.getByRole('button',{name:'確定',exact:true}).click();await expect(page.locator('h1')).toHaveText('002.txt');await expect(page.locator('.counter')).toHaveText('1 / 1');
+});
