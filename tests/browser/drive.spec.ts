@@ -1,3 +1,4 @@
+import {captureUi} from './screenshots';
 import {test, expect, type Page, type BrowserContext} from '@playwright/test';
 import {existsSync, readFileSync} from 'node:fs';
 import {zipSync, gzipSync, gunzipSync} from 'fflate';
@@ -70,7 +71,7 @@ test('Drive exchanges real reviews between devices, preserves conflicts, and dow
     await comment(phone,'Phone edit');await openDrive(phone);await sync(phone,'Driveに保存しました');await closeSheet(phone);
     await comment(page,'PC parallel edit');await openDrive(page);await sync(page,'異なる変更');expect(server.files).toHaveLength(2);
     await page.getByRole('button',{name:/Driveのデータを使う：/}).click();await page.getByRole('button',{name:'キャンセル',exact:true}).click();expect(server.files).toHaveLength(2);
-    await page.screenshot({path:`docs/screenshots/${info.project.name}-drive-conflict.png`});
+    await captureUi(page,info,'drive-conflict');
     await page.getByRole('button',{name:/Driveのデータを使う：/}).click();await page.getByRole('button',{name:'確定',exact:true}).click();await expect(page.locator('.drive-status')).toContainText('端末に反映しました');expect(server.files).toHaveLength(3);
     const event=page.waitForEvent('download');await page.getByRole('button',{name:'同期前の端末データをバックアップ保存',exact:true}).click();const recovery=readFileSync((await (await event).path())!,'utf8');expect(recovery).toContain('PC parallel edit');expect(recovery).not.toContain('Phone edit');
     await closeSheet(page);await openFile(page);await expect(page.locator('.float-preview')).toHaveText('Phone edit');

@@ -1,3 +1,4 @@
+import {captureUi} from './screenshots';
 import { test, expect, type Page } from '@playwright/test';
 import { readFileSync, existsSync, readdirSync, mkdirSync, writeFileSync } from 'node:fs';
 import { zipSync, unzipSync } from 'fflate';
@@ -246,7 +247,7 @@ test('bottom sheets swipe, normal scrolling, keyboard and review screenshot', as
   await page.getByRole('button',{name:'送信',exact:true}).click();
   await page.getByRole('button',{name:'閉じる',exact:true}).click();
   mkdirSync('docs/screenshots',{recursive:true});
-  await page.screenshot({path:`docs/screenshots/${info.project.name}-review.png`});
+  await captureUi(page,info,'review');
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
 });
 
@@ -342,7 +343,7 @@ test('comment action buttons stay in one row at mobile and narrow widths',async(
   await actions.getByRole('button',{name:'編集',exact:true}).click();await page.getByLabel('コメント内容').fill('編集したコメント');await page.getByRole('button',{name:'保存',exact:true}).click();
   await expect(page.locator('.thread-root .post-text')).toHaveText('編集したコメント');
   await page.setViewportSize(info.project.name==='mobile'?{width:390,height:844}:{width:1280,height:900});
-  mkdirSync('docs/screenshots',{recursive:true});await page.screenshot({path:`docs/screenshots/${info.project.name}-comments.png`});
+  mkdirSync('docs/screenshots',{recursive:true});await captureUi(page,info,'comments');
   await actions.getByRole('button',{name:'解決',exact:true}).click();await page.getByRole('button',{name:'すべてのコメント',exact:true}).click();
   await expect(actions.getByRole('button')).toHaveText(['編集','削除','再開']);
   await actions.getByRole('button',{name:'再開',exact:true}).click();await checkRow();
@@ -398,7 +399,7 @@ test('item rows show a compact one-line original preview with ellipsis',async({p
   expect(await page.locator('.pick-source').evaluateAll(nodes=>nodes.some(node=>node.scrollWidth>node.clientWidth))).toBeTruthy();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
   await page.setViewportSize(info.project.name==='mobile'?{width:390,height:844}:{width:1280,height:900});
-  mkdirSync('docs/screenshots',{recursive:true});await page.screenshot({path:`docs/screenshots/${info.project.name}-items.png`});
+  mkdirSync('docs/screenshots',{recursive:true});await captureUi(page,info,'items');
 });
 
 test('diagnostic text viewer opens errors at the source line and switches languages',async({page},info)=>{
@@ -412,7 +413,7 @@ test('diagnostic text viewer opens errors at the source line and switches langua
   await page.getByRole('tab',{name:'英語',exact:true}).click();
   const line=Number(await page.locator('.focus-line').getAttribute('data-text-line')),en=readFileSync(`.reference/en-US/texts/${path}`,'utf8').split(/\r?\n/);
   await expect(page.locator('.focus-line code')).toHaveText(en[line-1]);
-  mkdirSync('docs/screenshots',{recursive:true});await page.screenshot({path:`docs/screenshots/${info.project.name}-diagnostic.png`});
+  mkdirSync('docs/screenshots',{recursive:true});await captureUi(page,info,'diagnostic');
   await page.locator('.text-scroll').evaluate(el=>{el.scrollTop=el.scrollHeight;});
   await expect(page.locator('.text-row').last()).toHaveAttribute('data-text-line',String(en.length));
   expect(await page.locator('.text-row').count()).toBeLessThanOrEqual(120);
@@ -578,12 +579,12 @@ test('export sheets select all files, align output buttons, and preview copied i
   await expect(files).toHaveCount(2);await expect(all).toBeChecked();await all.uncheck();await expect(page.locator('[data-export-path]:checked')).toHaveCount(0);await expect(page.getByRole('button',{name:'JSONを出力',exact:true})).toBeDisabled();
   await files.first().check();expect(await all.evaluate((el:HTMLInputElement)=>el.indeterminate)).toBeTruthy();await all.check();await expect(page.locator('[data-export-path]:checked')).toHaveCount(2);
   const jsonBox=await page.getByRole('button',{name:'JSONを出力',exact:true}).boundingBox(),zipBox=await page.getByRole('button',{name:'英訳TXTを出力',exact:true}).boundingBox();expect(jsonBox!.y).toBe(zipBox!.y);expect(jsonBox!.x+jsonBox!.width).toBeLessThan(zipBox!.x);
-  await page.screenshot({path:`docs/screenshots/${info.project.name}-export.png`});
+  await captureUi(page,info,'export');
   await page.getByRole('button',{name:'指示文をコピー',exact:true}).click();await expect(page.locator('.toast')).toContainText('指示文をコピーしました');await expect(page.locator('.sheet details')).toHaveCount(0);await expect(page.locator('.sheet .instructions')).toHaveCount(0);
   const copied=await page.evaluate(()=>(window as any).copiedInstructions);expect(copied).toContain('woditor_review_tool.py');
   await page.getByRole('button',{name:'指示文を確認',exact:true}).click();const modal=page.getByRole('dialog',{name:'指示文',exact:true});await expect(modal.locator('pre')).toHaveText(copied);await expect(page.getByRole('button',{name:'指示文を閉じる',exact:true})).toBeFocused();
   const box=await modal.boundingBox(),viewport=page.viewportSize()!;expect(Math.abs(box!.y+box!.height/2-viewport.height/2)).toBeLessThan(2);expect(Math.abs(box!.x+box!.width/2-viewport.width/2)).toBeLessThan(2);
-  await page.keyboard.press('Shift+Tab');await expect(modal.locator('pre')).toBeFocused();await page.keyboard.press('Tab');await expect(page.getByRole('button',{name:'指示文を閉じる',exact:true})).toBeFocused();await page.screenshot({path:`docs/screenshots/${info.project.name}-instructions.png`});await page.keyboard.press('Escape');await expect(modal).toHaveCount(0);await expect(page.getByRole('dialog',{name:'AIレビューを依頼',exact:true})).toBeVisible();
+  await page.keyboard.press('Shift+Tab');await expect(modal.locator('pre')).toBeFocused();await page.keyboard.press('Tab');await expect(page.getByRole('button',{name:'指示文を閉じる',exact:true})).toBeFocused();await captureUi(page,info,'instructions');await page.keyboard.press('Escape');await expect(modal).toHaveCount(0);await expect(page.getByRole('dialog',{name:'AIレビューを依頼',exact:true})).toBeVisible();
   await page.evaluate(()=>{(window as any).failClipboard=true;});await page.getByRole('button',{name:'指示文をコピー',exact:true}).click();await expect(page.locator('.toast')).toContainText('コピーできませんでした');await page.getByRole('button',{name:'指示文を確認',exact:true}).click();await expect(modal.locator('pre')).toHaveText(copied);await page.getByRole('button',{name:'指示文を閉じる',exact:true}).click();
   await page.getByRole('button',{name:'閉じる',exact:true}).click();await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'英訳TXTを出力',exact:true}).click();await expect(files).toHaveCount(4);await expect(all).toBeChecked();await all.uncheck();await expect(page.getByRole('button',{name:'英訳TXTを出力',exact:true})).toBeDisabled();await files.last().check();expect(await all.evaluate((el:HTMLInputElement)=>el.indeterminate)).toBeTruthy();await all.check();await expect(page.locator('[data-export-path]:checked')).toHaveCount(4);
 });
