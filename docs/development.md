@@ -81,6 +81,12 @@ english.zip
 
 ## JSON形式とPython補助ツール
 
+「AIレビューを依頼」は初回レビューとコメント回答を切り替える。従来の依頼はmode省略時もコメント回答として扱う。初回は `mode: "initial"`、`entries: []` とし、`targets` に選択したファイルの全項目・原文/英訳・版・既存スレッド・未確定案・周辺コマンドを含める。回答は `responses: []` と指摘だけの `suggestions`（changesは空）を返す。
+
+初回レビューは問題箇所だけをAIの未解決スレッドとして追加し、英訳を変更しない。指摘なしでも自動承認しない。対象外項目・重複ID・再取り込み・依頼後の原文/現訳/項目構成変更・翻訳変更や修正ZIP付きの初回回答は全体を拒否する。指摘へ返信した後は従来のコメント回答・差分確定フローを使う。
+
+Python補助ツールの初回レビュー用build入力は `{"responses":[],"suggestions":[{"path":"対象パス","itemId":"対象ID","reason":"指摘"}]}`。buildが指摘ID・版・空のchangesを補完し、validateで検証する。初回レビューではapplyを実行しない。
+
 依頼・回答の `schemaVersion` は1です。
 
 - [review-request.schema.json](schemas/review-request.schema.json)：依頼ID、相対パス、版（UTF-8 BOMを除いたテキストのSHA-256）、項目ID、Slot ID・英語側の位置・原文・現訳、コメントID・全投稿、周辺コマンド、再審用の保留案 `pendingChanges`。内部では日本語側の `line` と英語側の `enLine` を分離し、依頼JSONの `line` は英語側の行番号です。

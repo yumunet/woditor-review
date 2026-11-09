@@ -29,6 +29,32 @@ class ReviewToolTests(unittest.TestCase):
         response['responses'].append(response['responses'][0])
         with self.assertRaises(ValueError): validate(self.request, response)
 
+    def initial_request(self):
+        target = copy.deepcopy(self.request['entries'][0])
+        target.pop('commentId'); target.pop('posts')
+        target.update(sourceVersion=self.f['sourceVersion'], title='Event name', threads=[], pendingChanges=[])
+        return {**self.request, 'mode': 'initial', 'entries': [], 'targets': [target]}
+
+    def test_initial_review_builds_comments_without_existing_threads(self):
+        request = self.initial_request()
+        response = build(request, {'suggestions': [{'path': self.path, 'itemId': self.f['items'][0]['id'], 'reason': 'Spelling issue'}]})
+        validate(request, response)
+        self.assertEqual(response['responses'], [])
+        self.assertEqual(response['suggestions'][0]['changes'], [])
+        self.assertEqual(response['suggestions'][0]['fileVersion'], self.f['version'])
+        self.assertTrue(response['suggestions'][0]['id'])
+        validate(request, build(request, {'suggestions': []}))
+        with TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(ValueError, 'comments-only'):
+                apply_files(request, response, Path('.reference/en-US/texts'), Path(directory) / 'out')
+
+    def test_initial_review_rejects_unknown_targets_and_translation_changes(self):
+        request = self.initial_request()
+        with self.assertRaisesRegex(ValueError, 'Unknown'):
+            build(request, {'suggestions': [{'path': self.path, 'itemId': 'unknown', 'reason': 'Issue'}]})
+        with self.assertRaisesRegex(ValueError, 'comments-only'):
+            build(request, {'suggestions': [{'path': self.path, 'itemId': self.f['items'][0]['id'], 'reason': 'Issue', 'changes': self.decisions['responses'][0]['changes']}]})
+
     def test_pending_proposals_can_be_reassessed_without_applying_them(self):
         slot = self.request['entries'][0]['slots'][0]
         self.request['entries'][0]['pendingChanges'] = [{'id': 'old-change', 'slotId': slot['id'], 'before': slot['translation'], 'after': 'Withdrawn proposal'}]

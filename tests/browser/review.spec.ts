@@ -105,7 +105,7 @@ test('review JSON and revised TXT round trip, AI resolve/reopen and persistence'
   await page.getByRole('button', {name: '送信', exact: true}).click();
   await page.getByRole('button', {name: '閉じる', exact: true}).click();
   await page.getByRole('button', {name: 'メニュー', exact: true}).click();
-  await page.getByRole('button', {name: 'レビューJSONを出力', exact: true}).click();
+  await page.getByRole('button', {name: 'AIレビューを依頼', exact: true}).click();
   const downloadEvent = page.waitForEvent('download');
   await page.getByRole('button', {name: 'JSONを出力', exact: true}).click();
   const downloaded = await downloadEvent;
@@ -116,7 +116,7 @@ test('review JSON and revised TXT round trip, AI resolve/reopen and persistence'
   const response = {schemaVersion: 1, requestId: request.requestId, suggestions: [], responses: [{commentId: row.commentId, path: row.path, itemId: row.itemId, fileVersion: row.fileVersion, decision: 'accepted', reason: 'Adjusted the name.', changes: [{slotId: row.slots[0].id, before: row.slots[0].translation, after: 'Revised Name'}]}]};
   await page.getByRole('button', {name: '閉じる', exact: true}).click();
   await page.getByRole('button', {name: 'メニュー', exact: true}).click();
-  await page.getByRole('button', {name: 'レビューJSONを読み込む', exact: true}).click();
+  await page.getByRole('button', {name: 'AIレビュー結果を読み込む', exact: true}).click();
   await page.locator('input[name=answer]').setInputFiles({name: 'review_response.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(response))});
   const revised = readFileSync(`.reference/en-US/texts/${sourcePath}`, 'utf8').replace(/EVENT_NAME=[^\r\n]*/, 'EVENT_NAME=Revised Name');
   await page.locator('input[name=revised]').setInputFiles({name: 'revised.zip', mimeType: 'application/zip', buffer: Buffer.from(zipSync({[`en-US/texts/${sourcePath}`]: Buffer.from(revised)}))});
@@ -211,7 +211,7 @@ test('offline restart, local Python rendering, and saved review operations', asy
   await page.getByRole('button',{name:'閉じる',exact:true}).click();
   await expect(page.locator('.float-preview')).toHaveText('オフラインで保存したコメント');
   await page.getByRole('button',{name:'メニュー',exact:true}).click();
-  await page.getByRole('button',{name:'レビューJSONを出力',exact:true}).click();
+  await page.getByRole('button',{name:'AIレビューを依頼',exact:true}).click();
   const downloaded=page.waitForEvent('download');await page.getByRole('button',{name:'JSONを出力',exact:true}).click();
   const request=JSON.parse(readFileSync((await (await downloaded).path())!,'utf8'));expect(request.entries[0].posts[0].text).toContain('オフライン');
   await page.getByRole('button',{name:'閉じる',exact:true}).click();
@@ -300,7 +300,7 @@ test('corrected English positions survive JSON export, revised TXT and approved 
   await page.getByRole('button',{name:'コメント',exact:true}).click();
   await page.getByLabel('コメント内容').fill('Please revise this message');await page.getByRole('button',{name:'送信',exact:true}).click();
   await page.getByRole('button',{name:'閉じる',exact:true}).click();
-  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'レビューJSONを出力',exact:true}).click();
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'AIレビューを依頼',exact:true}).click();
   let event=page.waitForEvent('download');await page.getByRole('button',{name:'JSONを出力',exact:true}).click();
   const request=JSON.parse(readFileSync((await(await event).path())!,'utf8')),row=request.entries[0],slot=row.slots[0];
   const original=readFileSync(`.reference/en-US/texts/${path}`,'utf8'),lines=original.split(/\r?\n/);
@@ -312,7 +312,7 @@ test('corrected English positions survive JSON export, revised TXT and approved 
   const display=lines.find(l=>l.startsWith('■Show Message:'))!;
   const revised=original.replace(first,()=>`[103][0,1]<0>()("Extra translator comment")${nl}${first.replace(slot.translation,()=>after)}`).replace(display,()=>`▼ Extra translator comment${nl}${display}`);
   const response={schemaVersion:1,requestId:request.requestId,suggestions:[],responses:[{commentId:row.commentId,path,itemId:row.itemId,fileVersion:row.fileVersion,decision:'accepted',reason:'Revised message',changes:[{slotId:slot.id,before:slot.translation,after}]}]};
-  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'レビューJSONを読み込む',exact:true}).click();
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'AIレビュー結果を読み込む',exact:true}).click();
   await page.locator('input[name=answer]').setInputFiles({name:'response.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(response))});
   await page.locator('input[name=revised]').setInputFiles({name:'revised.zip',mimeType:'application/zip',buffer:Buffer.from(zipSync({[`en-US/texts/${path}`]:Buffer.from(revised)}))});
   await page.getByRole('button',{name:'回答を読み込む',exact:true}).click();await expect(page.locator('.translation-after')).toHaveText(after);
@@ -508,7 +508,7 @@ async function resolveCurrentComment(page:Page) {
 }
 
 async function exportCurrentRequest(page:Page) {
-  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'レビューJSONを出力',exact:true}).click();
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'AIレビューを依頼',exact:true}).click();
   const download=page.waitForEvent('download');await page.getByRole('button',{name:'JSONを出力',exact:true}).click();
   const file=await download,request=JSON.parse(readFileSync((await file.path())!,'utf8'));
   expect(file.suggestedFilename()).toBe(`review_request_${request.requestId.replace(/-/g,'').slice(0,12)}.json`);
@@ -517,7 +517,7 @@ async function exportCurrentRequest(page:Page) {
 }
 async function importRevisedAnswer(page:Page,request:any,decision:string,translation:string,changes:any[]) {
   const entry=request.entries[0],response={schemaVersion:1,requestId:request.requestId,suggestions:[],responses:[{commentId:entry.commentId,path:entry.path,itemId:entry.itemId,fileVersion:entry.fileVersion,decision,reason:decision==='rejected'?'Withdrawn after reconsideration':'Corrected spelling',changes}]};
-  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'レビューJSONを読み込む',exact:true}).click();
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'AIレビュー結果を読み込む',exact:true}).click();
   await page.locator('input[name=answer]').setInputFiles({name:'response.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(response))});
   const revised=readFileSync(`.reference/en-US/texts/${sourcePath}`,'utf8').replace(/EVENT_NAME=[^\r\n]*/,`EVENT_NAME=${translation}`);
   await page.locator('input[name=revised]').setInputFiles({name:'revised.zip',mimeType:'application/zip',buffer:Buffer.from(zipSync({[`en-US/texts/${sourcePath}`]:Buffer.from(revised)}))});
@@ -573,7 +573,7 @@ test('export sheets select all files, align output buttons, and preview copied i
   await page.addInitScript(()=>{Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async(text:string)=>{if((window as any).failClipboard)throw Error('Clipboard denied');(window as any).copiedInstructions=text;}}});});
   await loadNavigationFiles(page);
   for(const path of [navigationPaths[0],navigationPaths[2]]) {await openTreeFile(page,path);await postReviewComment(page,'Review this file');}
-  await page.getByRole('button',{name:'戻る',exact:true}).click();await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'レビューJSONを出力',exact:true}).click();
+  await page.getByRole('button',{name:'戻る',exact:true}).click();await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'AIレビューを依頼',exact:true}).click();
   const all=page.getByRole('checkbox',{name:'すべて選択',exact:true}),files=page.locator('[data-export-path]');
   await expect(files).toHaveCount(2);await expect(all).toBeChecked();await all.uncheck();await expect(page.locator('[data-export-path]:checked')).toHaveCount(0);await expect(page.getByRole('button',{name:'JSONを出力',exact:true})).toBeDisabled();
   await files.first().check();expect(await all.evaluate((el:HTMLInputElement)=>el.indeterminate)).toBeTruthy();await all.check();await expect(page.locator('[data-export-path]:checked')).toHaveCount(2);
@@ -583,7 +583,7 @@ test('export sheets select all files, align output buttons, and preview copied i
   const copied=await page.evaluate(()=>(window as any).copiedInstructions);expect(copied).toContain('woditor_review_tool.py');
   await page.getByRole('button',{name:'指示文を確認',exact:true}).click();const modal=page.getByRole('dialog',{name:'指示文',exact:true});await expect(modal.locator('pre')).toHaveText(copied);await expect(page.getByRole('button',{name:'指示文を閉じる',exact:true})).toBeFocused();
   const box=await modal.boundingBox(),viewport=page.viewportSize()!;expect(Math.abs(box!.y+box!.height/2-viewport.height/2)).toBeLessThan(2);expect(Math.abs(box!.x+box!.width/2-viewport.width/2)).toBeLessThan(2);
-  await page.keyboard.press('Shift+Tab');await expect(modal.locator('pre')).toBeFocused();await page.keyboard.press('Tab');await expect(page.getByRole('button',{name:'指示文を閉じる',exact:true})).toBeFocused();await page.screenshot({path:`docs/screenshots/${info.project.name}-instructions.png`});await page.keyboard.press('Escape');await expect(modal).toHaveCount(0);await expect(page.getByRole('dialog',{name:'レビューJSONを出力',exact:true})).toBeVisible();
+  await page.keyboard.press('Shift+Tab');await expect(modal.locator('pre')).toBeFocused();await page.keyboard.press('Tab');await expect(page.getByRole('button',{name:'指示文を閉じる',exact:true})).toBeFocused();await page.screenshot({path:`docs/screenshots/${info.project.name}-instructions.png`});await page.keyboard.press('Escape');await expect(modal).toHaveCount(0);await expect(page.getByRole('dialog',{name:'AIレビューを依頼',exact:true})).toBeVisible();
   await page.evaluate(()=>{(window as any).failClipboard=true;});await page.getByRole('button',{name:'指示文をコピー',exact:true}).click();await expect(page.locator('.toast')).toContainText('コピーできませんでした');await page.getByRole('button',{name:'指示文を確認',exact:true}).click();await expect(modal.locator('pre')).toHaveText(copied);await page.getByRole('button',{name:'指示文を閉じる',exact:true}).click();
   await page.getByRole('button',{name:'閉じる',exact:true}).click();await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'英訳TXTを出力',exact:true}).click();await expect(files).toHaveCount(4);await expect(all).toBeChecked();await all.uncheck();await expect(page.getByRole('button',{name:'英訳TXTを出力',exact:true})).toBeDisabled();await files.last().check();expect(await all.evaluate((el:HTMLInputElement)=>el.indeterminate)).toBeTruthy();await all.check();await expect(page.locator('[data-export-path]:checked')).toHaveCount(4);
 });
@@ -598,3 +598,18 @@ test.describe('backup timestamps',()=>{
     const backup=await file.path();await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'バックアップを復元',exact:true}).click();await page.locator('input[name=backup]').setInputFiles(backup!);await page.getByRole('button',{name:'復元する',exact:true}).click();await page.getByRole('button',{name:'確定',exact:true}).click();await expect(page.locator('.file-row')).toContainText('MapData');
   });
 });
+
+test('initial AI review adds comments without changing translations and continues with a correction request',async({page})=>{
+  test.skip(!corpus,'Private reference files not available');await loadReal(page);
+  const original=await page.locator('.translation').innerText();
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'AIレビューを依頼',exact:true}).click();await expect(page.getByRole('radio',{name:'英訳をチェックして指摘を作る',exact:true})).toBeChecked();
+  const event=page.waitForEvent('download');await page.getByRole('button',{name:'JSONを出力',exact:true}).click();const request=JSON.parse(readFileSync((await (await event).path())!,'utf8'));
+  expect(request.mode).toBe('initial');expect(request.entries).toEqual([]);expect(request.targets.length).toBeGreaterThan(1);expect(request.targets[0].threads).toEqual([]);await closeReviewSheet(page);
+  const target=request.targets[0],response={schemaVersion:1,requestId:request.requestId,responses:[],suggestions:[{id:'initial-ai-comment',path:target.path,itemId:target.itemId,fileVersion:target.fileVersion,reason:'名前表記を確認してください',changes:[]}]};
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'AIレビュー結果を読み込む',exact:true}).click();await page.locator('input[name=answer]').setInputFiles({name:'initial-response.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(response))});await page.getByRole('button',{name:'回答を読み込む',exact:true}).click();
+  await expect(page.locator('.float-preview')).toHaveText('名前表記を確認してください');await expect(page.locator('.translation')).toHaveText(original);await expect(page.locator('.translation-after')).toHaveCount(0);await expect(page.locator('.status')).toHaveText('未確認');
+  await page.reload();await openTreeFile(page,sourcePath);await page.locator('.comment-trigger').click();await expect(page.locator('.thread-top strong')).toHaveText('AI');await page.getByRole('button',{name:'返信',exact:true}).click();await page.getByLabel('コメント内容').fill('修正してください');await page.getByRole('button',{name:'送信',exact:true}).click();await closeReviewSheet(page);
+  const followup=await exportCurrentRequest(page);expect(followup.mode).not.toBe('initial');expect(followup.entries[0].posts.map((p:any)=>p.author)).toEqual(['ai','user']);
+  await importRevisedAnswer(page,followup,'accepted','Revised Name',[{slotId:target.slots[0].id,before:original,after:'Revised Name'}]);await expect(page.locator('.translation-after')).toHaveText('Revised Name');await resolveCurrentComment(page);await expect(page.locator('.translation')).toHaveText('Revised Name');
+});
+async function closeReviewSheet(page:Page){await page.getByRole('button',{name:'閉じる',exact:true}).click();}

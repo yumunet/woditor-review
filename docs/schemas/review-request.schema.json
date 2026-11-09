@@ -2,38 +2,310 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "woditor-review/request/v1",
   "type": "object",
-  "required": ["schemaVersion", "requestId", "createdAt", "entries"],
+  "required": [
+    "schemaVersion",
+    "requestId",
+    "createdAt",
+    "entries"
+  ],
   "additionalProperties": false,
   "properties": {
-    "schemaVersion": {"const": 1}, "requestId": {"type": "string", "minLength": 1},
-    "createdAt": {"type": "string"},
-    "entries": {"type": "array", "items": {
-      "type": "object", "additionalProperties": false,
-      "required": ["path", "fileVersion", "itemId", "slotIds", "commentId", "slots", "posts", "context"],
-      "properties": {
-        "path": {"type": "string"}, "fileVersion": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
-        "itemId": {"type": "string"}, "slotIds": {"type": "array", "items": {"type": "string"}},
-        "commentId": {"type": "string", "minLength": 1},
-        "slots": {"type": "array", "items": {
-          "type": "object", "additionalProperties": false,
-          "required": ["id", "source", "translation", "line", "key", "kind"],
-          "properties": {
-            "id": {"type": "string"}, "source": {"type": "string"}, "translation": {"type": "string"},
-            "line": {"type": "integer", "minimum": 1}, "key": {"type": "string"},
-            "kind": {"enum": ["metadata", "command_string"]}, "position": {"type": "integer", "minimum": 1}
+    "schemaVersion": {
+      "const": 1
+    },
+    "requestId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "createdAt": {
+      "type": "string"
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "fileVersion",
+          "itemId",
+          "slotIds",
+          "commentId",
+          "slots",
+          "posts",
+          "context"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "fileVersion": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "itemId": {
+            "type": "string"
+          },
+          "slotIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "commentId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "slots": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "source",
+                "translation",
+                "line",
+                "key",
+                "kind"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "translation": {
+                  "type": "string"
+                },
+                "line": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "key": {
+                  "type": "string"
+                },
+                "kind": {
+                  "enum": [
+                    "metadata",
+                    "command_string"
+                  ]
+                },
+                "position": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          "pendingChanges": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "slotId",
+                "before",
+                "after"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "slotId": {
+                  "type": "string"
+                },
+                "before": {
+                  "type": "string"
+                },
+                "after": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "posts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "author",
+                "text",
+                "createdAt"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "author": {
+                  "enum": [
+                    "user",
+                    "ai"
+                  ]
+                },
+                "text": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "decision": {
+                  "enum": [
+                    "accepted",
+                    "rejected",
+                    "partial",
+                    "needs_review"
+                  ]
+                },
+                "requestId": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "context": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
           }
-        }},
-        "pendingChanges": {"type": "array", "items": {
-          "type": "object", "additionalProperties": false,
-          "required": ["id", "slotId", "before", "after"],
-          "properties": {"id": {"type": "string"}, "slotId": {"type": "string"}, "before": {"type": "string"}, "after": {"type": "string"}}
-        }},
-        "posts": {"type": "array", "items": {
-          "type": "object", "required": ["id", "author", "text", "createdAt"],
-          "properties": {"id": {"type": "string"}, "author": {"enum": ["user", "ai"]}, "text": {"type": "string"}, "createdAt": {"type": "string"}, "decision": {"enum": ["accepted", "rejected", "partial", "needs_review"]}, "requestId": {"type": "string"}}
-        }},
-        "context": {"type": "array", "items": {"type": "object"}}
+        }
       }
-    }}
+    },
+    "mode": {
+      "enum": [
+        "comments",
+        "initial"
+      ]
+    },
+    "targets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "fileVersion",
+          "sourceVersion",
+          "itemId",
+          "title",
+          "slotIds",
+          "slots",
+          "context",
+          "threads",
+          "pendingChanges"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "fileVersion": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "itemId": {
+            "type": "string"
+          },
+          "slotIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "slots": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "source",
+                "translation",
+                "line",
+                "key",
+                "kind"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "translation": {
+                  "type": "string"
+                },
+                "line": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "key": {
+                  "type": "string"
+                },
+                "kind": {
+                  "enum": [
+                    "metadata",
+                    "command_string"
+                  ]
+                },
+                "position": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          "pendingChanges": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "slotId",
+                "before",
+                "after"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "slotId": {
+                  "type": "string"
+                },
+                "before": {
+                  "type": "string"
+                },
+                "after": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "context": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "sourceVersion": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "title": {
+            "type": "string"
+          },
+          "threads": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
   }
 }

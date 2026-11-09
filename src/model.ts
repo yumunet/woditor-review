@@ -36,11 +36,19 @@ export interface ReviewFile {
 }
 export interface Diagnostic { path: string; severity: 'error' | 'warning' | 'skip'; message: string; line?: number; enLine?: number }
 export interface DiagnosticDocument {path:string;jaText?:string;enText?:string}
+export type ReviewMode = 'comments' | 'initial';
+export interface ReviewTarget {
+  path: string; fileVersion: string; itemId: string; slotIds: string[];
+  slots: {id: string; source: string; translation: string; line: number; key: string; kind: string; position?: number}[];
+  context: Command[];
+}
+export interface InitialReviewTarget extends ReviewTarget {
+  sourceVersion: string; title: string; threads: Thread[]; pendingChanges: Pick<Change, 'id' | 'slotId' | 'before' | 'after'>[];
+}
 export interface ReviewRequest {
-  schemaVersion: 1; requestId: string; createdAt: string;
-  entries: {path: string; fileVersion: string; itemId: string; slotIds: string[]; commentId: string;
-    slots: { id: string; source: string; translation: string; line: number; key: string; kind: string; position?: number }[]; posts: Post[]; context: Command[];
-    pendingChanges?: Pick<Change, 'id' | 'slotId' | 'before' | 'after'>[]}[];
+  schemaVersion: 1; requestId: string; createdAt: string; mode?: ReviewMode;
+  entries: (ReviewTarget & {commentId: string; posts: Post[]; pendingChanges?: Pick<Change, 'id' | 'slotId' | 'before' | 'after'>[]})[];
+  targets?: InitialReviewTarget[];
 }
 export interface Workspace {
   schemaVersion: 1; files: ReviewFile[]; diagnostics: Diagnostic[]; requests: ReviewRequest[];

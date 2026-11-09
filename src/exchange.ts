@@ -1,13 +1,15 @@
-import type { Change, Decision, Item, ReviewFile, ReviewRequest, Workspace } from './model';
+import type { Change, Decision, Item, ReviewFile, ReviewRequest, ReviewMode, Workspace } from './model';
 import { sourceText, unresolved } from './model';
 import { now, uid } from './review-state';
 import { initialContext } from './ui';
 import { zipSync, strToU8 } from 'fflate';
 import { preserveGroups } from './grouping';
+import {createInitialRequest, initialInstructions, importInitialResponse} from './initial-review';
 
 const pendingForThread = (item: Item, threadId: string) => item.changes.filter(c => c.threadId === threadId && c.status === 'pending').map(({id,slotId,before,after}) => ({id,slotId,before,after}));
 
-export function createRequest(workspace: Workspace, selected: string[]): ReviewRequest {
+export function createRequest(workspace: Workspace, selected: string[], mode: ReviewMode = 'comments'): ReviewRequest {
+  if (mode === 'initial') return createInitialRequest(workspace, selected);
   const request: ReviewRequest = {schemaVersion: 1, requestId: uid(), createdAt: now(), entries: []};
   for (const file of workspace.files.filter(f => selected.includes(f.path))) for (const item of file.items) {
     const slots = item.slotIds.map(id => file.slots.find(s => s.id === id)!);
@@ -26,7 +28,7 @@ export const reviewFileNames = (request: Pick<ReviewRequest, 'requestId'>) => {
   return {request: `review_request_${id}.json`, response: `review_response_${id}.json`};
 };
 
-export const chatInstructions = (request: ReviewRequest) => `添付の依頼JSON（requestId: ${request.requestId}）と英訳TXTを、コメント履歴・pendingChanges（未確定の前回案）を踏まえてレビューしてください。
+export const chatInstructions = (request: ReviewRequest) => request.mode === 'initial' ? initialInstructions(request, reviewFileNames(request).response) : `添付の依頼JSON（requestId: ${request.requestId}）と英訳TXTを、コメント履歴・pendingChanges（未確定の前回案）を踏まえてレビューしてください。
 全commentIdに1件ずつ、accepted（採用）/ rejected（不採用）/ partial（一部採用）/ needs_review（要確認）と理由を回答。不確実な点は推測せず needs_review。
 提供の woditor_review_tool.py の build → validate → apply を使い、${reviewFileNames(request).response} と修正済み英訳ZIPを出力してください。
 build用の判断JSON: {"responses":[{"commentId":"依頼のID","decision":"accepted","reason":"理由","changes":[{"slotId":"対象ID","before":"slots.translation","after":"最終案"}]}],"suggestions":[]}。
@@ -64,6 +66,7 @@ export function importResponse(workspace: Workspace, value: unknown, revised?: R
   const request = workspace.requests.find(r => r.requestId === value.requestId);
   if (!request) throw new Error('対応するレビュー依頼がありません');
   if (workspace.importedResponses.includes(value.requestId)) throw new Error('この回答は既に取り込み済みです');
+  if (request.mode === 'initial') return importInitialResponse(workspace, request, value, !!revised);
   const seen = new Set<string>();
   if (value.responses.length !== request.entries.length) throw new Error('回答IDの欠落・件数不一致があります');
   const next = structuredClone(workspace);

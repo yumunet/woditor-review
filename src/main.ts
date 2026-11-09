@@ -1,5 +1,5 @@
 import './styles.css';
-import { emptyWorkspace, isDone, matches, sourceText, unresolved, type Workspace, type ReviewFile, type Item, type Filter, type ReviewRequest } from './model';
+import { emptyWorkspace, isDone, matches, sourceText, unresolved, type Workspace, type ReviewFile, type Item, type Filter, type ReviewRequest, type ReviewMode } from './model';
 import { escape as e, icon, folderTriangle, filterButtons, fileTree, compact, percent, initialContext, type TreeNode } from './ui';
 import { commandColor } from './command-colors';
 import { parseArchives, renderTranslations } from './parser-client';
@@ -39,7 +39,8 @@ let diagnosticTab: 'error' | 'warning' | 'skip' = 'error';
 let editTarget: {threadId: string; postId: string} | null = null;
 let confirmation: {question: string; run: () => void | Promise<void>} | null = null;
 let exportSelection = new Set<string>(), preparedRequest: ReviewRequest | null = null;
-const sheetTitles: Record<string,string> = {load: 'ファイルを読み込む', items: '翻訳項目', comments: 'コメント', progress: '全体の進捗', diagnostics: '読み込み結果', restore: 'バックアップを復元', export: 'レビューJSONを出力', response: 'レビューJSONを読み込む', reload: '英訳TXTを再読み込み', english: '英訳TXTを出力'};
+let reviewMode: ReviewMode = 'comments';
+const sheetTitles: Record<string,string> = {load: 'ファイルを読み込む', items: '翻訳項目', comments: 'コメント', progress: '全体の進捗', diagnostics: '読み込み結果', restore: 'バックアップを復元', export: 'AIレビューを依頼', response: 'AIレビュー結果を読み込む', reload: '英訳TXTを再読み込み', english: '英訳TXTを出力'};
 sheetTitles.source = '原文を補う';
 sheetTitles.text = 'テキスト表示';
 sheetTitles.drive = 'Google Drive同期';
@@ -60,12 +61,13 @@ const targets = () => currentFile()?.items.filter(i => matches(i, itemFilter)) ?
 function toastMarkup() {return notice ? `<div class="toast" role="status">${e(notice)}${noticeInstructions ? '<button data-action="preview-instructions">指示文を確認</button>' : ''}</div>` : '';}
 function toast(message: string, instructions: string | null = null) {notice = message; noticeInstructions = instructions; clearTimeout(toastTimer); root.querySelector('.toast')?.remove(); if (!menu) root.querySelector('.menu')?.remove(); root.insertAdjacentHTML('beforeend', toastMarkup()); toastTimer = setTimeout(() => {notice = ''; noticeInstructions = null; root.querySelector('.toast')?.remove();}, instructions ? 10000 : 5000);}
 function closeInstructions() {instructionsPreview = null; render(); root.querySelector<HTMLElement>('[data-action="preview-instructions"], [data-action="copy-instructions"]')?.focus();}
-function exportFiles() {return workspace.files.filter(f => sheet === 'english' || f.items.some(i => unresolved(i).length));}
+function exportFiles() {return workspace.files.filter(f => sheet === 'english' || reviewMode === 'initial' || f.items.some(i => unresolved(i).length));}
+function resetExportSelection() {exportSelection = new Set(exportFiles().filter(f => !path || f.path === path).map(f => f.path)); preparedRequest = null;}
 function exportRows() {
   const files = exportFiles(), checked = files.filter(f => exportSelection.has(f.path)).length;
   return `<div class="sheet-body"><label class="export-row export-all"><input id="export-all" type="checkbox" ${files.length && checked === files.length ? 'checked' : ''} ${!files.length ? 'disabled' : ''}>すべて選択</label>${files.map(f => `<label class="export-row"><input type="checkbox" data-export-path="${e(f.path)}" ${exportSelection.has(f.path) ? 'checked' : ''}>${e(f.path)}</label>`).join('') || '<div class="empty">出力対象のファイルはありません</div>'}</div>`;
 }
-function openSheet(name: string) {lastFocus = document.activeElement as HTMLElement; sheet = name; menu = false; replyTarget = null; editTarget = null; if (name === 'diagnostics') diagnosticTab = 'error'; if (name === 'export' || name === 'english') {exportSelection = new Set(workspace.files.filter(f => (!path || f.path === path) && (name === 'english' || f.items.some(i => unresolved(i).length))).map(f => f.path)); preparedRequest = null;} render(); root.querySelector<HTMLElement>('.sheet .icon, .sheet input, .sheet button:not(.handle)')?.focus();}
+function openSheet(name: string) {lastFocus = document.activeElement as HTMLElement; sheet = name; menu = false; replyTarget = null; editTarget = null; if (name === 'diagnostics') diagnosticTab = 'error'; if (name === 'export') reviewMode = workspace.files.some(f => (!path || f.path === path) && f.items.some(i => unresolved(i).length)) ? 'comments' : 'initial'; if (name === 'export' || name === 'english') resetExportSelection(); render(); root.querySelector<HTMLElement>('.sheet .icon, .sheet input, .sheet button:not(.handle)')?.focus();}
 function closeSheet() {sheet = null; replyTarget = null; editTarget = null; render(); lastFocus?.focus();}
 function persist(changedPath?: string) {void saveWorkspace(workspace, changedPath).catch(error => toast(`保存できませんでした。バックアップしてください：${String(error)}`));}
 function ask(question: string, run: () => void | Promise<void>) {confirmation = {question, run}; render(); root.querySelector<HTMLElement>('[data-action="confirm-cancel"]')?.focus();}
@@ -144,7 +146,7 @@ function sheetBody() {
   if (sheet === 'diagnostics') return diagnosticsView(workspace.diagnostics, diagnosticTab);
   if (sheet === 'comments') return commentsBody();
   if (sheet === 'restore') return '<form class="form" id="restore-form"><label>バックアップ JSON<input type="file" name="backup" accept=".json,application/json" required></label><button class="primary" type="submit">復元する</button></form>';
-  if (sheet === 'export') return `${exportRows()}<div class="sheet-foot"><div class="export-actions"><button class="primary" data-action="export-request" ${!exportSelection.size ? 'disabled' : ''}>JSONを出力</button><button class="text-act" data-action="english-zip" ${!exportSelection.size ? 'disabled' : ''}>英訳TXTを出力</button></div><div class="send-row"><button class="text-act" data-action="copy-instructions" ${!exportSelection.size ? 'disabled' : ''}>${icon('copy')}指示文をコピー</button></div></div>`;
+  if (sheet === 'export') return `<fieldset class="review-mode"><legend>依頼内容</legend><label><input type="radio" name="review-mode" value="initial" ${reviewMode === 'initial' ? 'checked' : ''}>英訳をチェックして指摘を作る</label><label><input type="radio" name="review-mode" value="comments" ${reviewMode === 'comments' ? 'checked' : ''}>既存コメントに回答・修正する</label></fieldset>${exportRows()}<div class="sheet-foot"><div class="export-actions"><button class="primary" data-action="export-request" ${!exportSelection.size ? 'disabled' : ''}>JSONを出力</button><button class="text-act" data-action="english-zip" ${!exportSelection.size ? 'disabled' : ''}>英訳TXTを出力</button></div><div class="send-row"><button class="text-act" data-action="copy-instructions" ${!exportSelection.size ? 'disabled' : ''}>${icon('copy')}指示文をコピー</button></div></div>`;
   if (sheet === 'response') return '<form class="form" id="response-form"><label>回答JSON<input type="file" name="answer" accept=".json,application/json" required></label><label>修正済み英訳 ZIP（任意）<input type="file" name="revised" accept=".zip,application/zip"></label><button class="primary" type="submit">回答を読み込む</button></form>';
   if (sheet === 'english') return `${exportRows()}<div class="sheet-foot"><button class="primary" data-action="english-zip" ${!exportSelection.size ? 'disabled' : ''}>英訳TXTを出力</button></div>`;
   if (sheet === 'reload') return '<form class="form" id="reload-form"><label>修正済み英訳 ZIP<input type="file" name="revised" accept=".zip,application/zip" required></label><button class="primary" type="submit">英訳を再読み込み</button></form>';
@@ -154,7 +156,7 @@ function render() {
   const scroll = root.querySelector('.scroll')?.scrollTop ?? 0;
   const sheetScroll = root.querySelector('.sheet-body')?.scrollTop ?? 0;
   const file = currentFile(), tree = fileTree(workspace.files, homeFilter), p = percent(tree.done, tree.total);
-  root.innerHTML = `<header class="top">${file ? `<button class="icon" aria-label="戻る" data-action="home">${icon('back')}</button>` : ''}<h1 title="${e(file?.path ?? '翻訳レビュー')}">${e(file?.path.split('/').at(-1) ?? '翻訳レビュー')}</h1>${!file ? `<button class="overall" data-action="progress" aria-label="全体の進捗"><span class="ring" style="--progress:${p ?? 0}%"></span>${p === null ? '—' : p + '%'}</button>` : ''}<button class="icon" aria-label="メニュー" data-action="menu" aria-expanded="${menu}">${icon('menu')}</button></header>${menu ? `<nav class="menu" aria-label="メニュー"><button data-action="load">ファイルを読み込む</button><button data-action="diagnostics">読み込み結果 (エラー${workspace.diagnostics.filter(d => d.severity === 'error').length})</button><button data-action="export">レビューJSONを出力</button><button data-action="response">レビューJSONを読み込む</button><button data-action="reload">英訳TXTを再読み込み</button><button data-action="backup">状態をバックアップ</button><button data-action="restore">バックアップを復元</button></nav>` : ''}${file ? review(file) : `${filterButtons(homeFilter, 'home')}<main class="scroll file-scroll">${workspace.files.length ? treeRows(tree) || '<div class="empty">対象のファイルはありません</div>' : `<div class="empty">日本語と英語のTXTを読み込んでください<br><button class="primary" data-action="load">${icon('upload')} ファイルを読み込む</button></div>`}</main>`}${sheet ? `<div class="scrim" data-action="close"></div><section class="sheet" role="dialog" aria-modal="true" aria-label="${e(({load: 'ファイルを読み込む', items: '翻訳項目', comments: 'コメント', progress: '全体の進捗', diagnostics: '読み込み結果'} as Record<string,string>)[sheet] ?? '')}"><button class="handle" aria-label="下にスワイプして閉じる" tabindex="-1"></button><div class="sheet-head"><h2>${({load: 'ファイルを読み込む', items: '翻訳項目', comments: 'コメント', progress: '全体の進捗', diagnostics: '読み込み結果'} as Record<string,string>)[sheet] ?? ''}</h2><button class="icon" aria-label="閉じる" data-action="close">${icon('close')}</button></div>${sheetBody()}</section>` : ''}${toastMarkup()}${busy ? `<div class="busy" role="status"><div class="spinner"></div><div>${e(busy)}</div></div>` : ''}`;
+  root.innerHTML = `<header class="top">${file ? `<button class="icon" aria-label="戻る" data-action="home">${icon('back')}</button>` : ''}<h1 title="${e(file?.path ?? '翻訳レビュー')}">${e(file?.path.split('/').at(-1) ?? '翻訳レビュー')}</h1>${!file ? `<button class="overall" data-action="progress" aria-label="全体の進捗"><span class="ring" style="--progress:${p ?? 0}%"></span>${p === null ? '—' : p + '%'}</button>` : ''}<button class="icon" aria-label="メニュー" data-action="menu" aria-expanded="${menu}">${icon('menu')}</button></header>${menu ? `<nav class="menu" aria-label="メニュー"><button data-action="load">ファイルを読み込む</button><button data-action="diagnostics">読み込み結果 (エラー${workspace.diagnostics.filter(d => d.severity === 'error').length})</button><button data-action="export">AIレビューを依頼</button><button data-action="response">AIレビュー結果を読み込む</button><button data-action="reload">英訳TXTを再読み込み</button><button data-action="backup">状態をバックアップ</button><button data-action="restore">バックアップを復元</button></nav>` : ''}${file ? review(file) : `${filterButtons(homeFilter, 'home')}<main class="scroll file-scroll">${workspace.files.length ? treeRows(tree) || '<div class="empty">対象のファイルはありません</div>' : `<div class="empty">日本語と英語のTXTを読み込んでください<br><button class="primary" data-action="load">${icon('upload')} ファイルを読み込む</button></div>`}</main>`}${sheet ? `<div class="scrim" data-action="close"></div><section class="sheet" role="dialog" aria-modal="true" aria-label="${e(({load: 'ファイルを読み込む', items: '翻訳項目', comments: 'コメント', progress: '全体の進捗', diagnostics: '読み込み結果'} as Record<string,string>)[sheet] ?? '')}"><button class="handle" aria-label="下にスワイプして閉じる" tabindex="-1"></button><div class="sheet-head"><h2>${({load: 'ファイルを読み込む', items: '翻訳項目', comments: 'コメント', progress: '全体の進捗', diagnostics: '読み込み結果'} as Record<string,string>)[sheet] ?? ''}</h2><button class="icon" aria-label="閉じる" data-action="close">${icon('close')}</button></div>${sheetBody()}</section>` : ''}${toastMarkup()}${busy ? `<div class="busy" role="status"><div class="spinner"></div><div>${e(busy)}</div></div>` : ''}`;
   root.querySelector('.sheet')?.setAttribute('aria-label', sheetTitles[sheet ?? ''] ?? '');
   root.querySelector('.menu [data-action="backup"]')?.insertAdjacentHTML('beforebegin', '<button data-action="english">英訳TXTを出力</button>');
   root.querySelector('.menu [data-action="backup"]')?.insertAdjacentHTML('beforebegin', '<button data-action="drive">Google Drive同期</button>');
@@ -260,7 +262,7 @@ root.addEventListener('scroll',event=>{
   const element=event.target as HTMLElement;
   if(sheet==='text' && textView && element.matches('.text-scroll')) paintTextView(textView,element);
 },true);
-root.addEventListener('change', event => {const el = event.target as HTMLInputElement; if (el.id === 'drive-auto') {void drive.setAutomatic(el.checked).catch(error => toast(String(error))); return;} if (el.id === 'export-all') {exportSelection = new Set(el.checked ? exportFiles().map(f => f.path) : []); preparedRequest = null; render(); return;} if (el.id === 'context-lang') {contextLang = el.value as 'en' | 'ja'; render();} if (el.dataset.exportPath) {if (el.checked) exportSelection.add(el.dataset.exportPath); else exportSelection.delete(el.dataset.exportPath); preparedRequest = null; render();}});
+root.addEventListener('change', event => {const el = event.target as HTMLInputElement; if (el.name === 'review-mode') {reviewMode = el.value as ReviewMode; resetExportSelection(); render(); return;} if (el.id === 'drive-auto') {void drive.setAutomatic(el.checked).catch(error => toast(String(error))); return;} if (el.id === 'export-all') {exportSelection = new Set(el.checked ? exportFiles().map(f => f.path) : []); preparedRequest = null; render(); return;} if (el.id === 'context-lang') {contextLang = el.value as 'en' | 'ja'; render();} if (el.dataset.exportPath) {if (el.checked) exportSelection.add(el.dataset.exportPath); else exportSelection.delete(el.dataset.exportPath); preparedRequest = null; render();}});
 root.addEventListener('submit', async event => {
   const form = event.target as HTMLFormElement;
   if (form.id === 'drive-config-form') {
@@ -284,6 +286,9 @@ root.addEventListener('submit', async event => {
     event.preventDefault(); const data = new FormData(form), answer = data.get('answer') as File, revised = data.get('revised') as File;
     busy = '修正データを確認中…'; render();
     try {
+      const answerValue = form.id === 'response-form' ? JSON.parse(await answer.text()) : null;
+      const initialReview = workspace.requests.some(r => r.requestId === answerValue?.requestId && r.mode === 'initial');
+      if (initialReview && revised?.size) throw new Error('初回レビューでは指摘JSONだけを指定してください');
       let parsed: ReviewFile[] | undefined;
       let diagnostics: Workspace['diagnostics'] = [];
       let documents=workspace.diagnosticDocuments??[];
@@ -296,11 +301,11 @@ root.addEventListener('submit', async event => {
         diagnostics = result.diagnostics;
         documents=replaceDiagnosticDocuments(documents,result.diagnosticDocuments,[...result.files.map(f=>f.path),...result.diagnostics.map(d=>d.path)]);
       }
-      if (form.id === 'response-form') workspace = importResponse(workspace, JSON.parse(await answer.text()), parsed);
+      if (form.id === 'response-form') workspace = importResponse(workspace, answerValue, parsed);
       else workspace = mergeFiles({...workspace, diagnostics: withoutReplacedDiagnostics(workspace.diagnostics, parsed!.map(f => f.path))}, parsed!);
       workspace.diagnostics.push(...diagnostics);
       workspace.diagnosticDocuments=documents;
-      await saveWorkspace(workspace); sheet = null; reconcileCurrent(); busy = ''; render(); toast('変更を読み込みました。再確認してください');
+      await saveWorkspace(workspace); sheet = null; reconcileCurrent(); busy = ''; render(); toast(initialReview ? `AIの指摘を${answerValue.suggestions.length}件読み込みました` : '変更を読み込みました。再確認してください');
     } catch (error) {busy = ''; render(); toast(String(error));} return;
   }
   if (form.id !== 'load-form') return;
@@ -333,7 +338,7 @@ async function exportReview(action: string) {
     for (const r of rendered) {const file = files.find(f => f.path === r.path)!; file.enText = r.text; file.version = r.version;}
     if (action === 'english-zip') download('en-US-reviewed.zip', zipSync(Object.fromEntries(files.map(f => [`en-US/texts/${f.path}`, strToU8((f.enBom ? '\uFEFF' : '') + f.enText)]))), 'application/zip');
     else {
-      if (!preparedRequest) {preparedRequest = createRequest(workspace, [...exportSelection]); workspace.requests.push(preparedRequest);}
+      if (!preparedRequest) {preparedRequest = createRequest(workspace, [...exportSelection], reviewMode); workspace.requests.push(preparedRequest);}
       if (action === 'export-request') download(reviewFileNames(preparedRequest).request, JSON.stringify(preparedRequest, null, 2));
       else {await navigator.clipboard.writeText(chatInstructions(preparedRequest));}
     }

@@ -107,6 +107,8 @@ export function validateWorkspace(data: unknown): asserts data is Workspace {
   }
   for (const r of data.requests) {
     if (!object(r) || r.schemaVersion !== 1 || !str(r.requestId) || !arr(r.entries)) return fail();
+    if (r.mode !== undefined && !['comments','initial'].includes(r.mode)) return fail();
+    if (r.mode === 'initial' && (r.entries.length || !arr(r.targets) || !r.targets.length || !r.targets.every((t: any) => object(t) && str(t.path) && str(t.itemId) && str(t.title) && hash(t.fileVersion) && hash(t.sourceVersion) && arr(t.slotIds) && arr(t.slots) && arr(t.context) && arr(t.threads) && arr(t.pendingChanges)))) return fail();
     for (const row of r.entries) if (!object(row) || !str(row.path) || !str(row.itemId) || !str(row.commentId) || !hash(row.fileVersion) || !arr(row.slotIds) || !arr(row.slots) || !arr(row.posts) || !arr(row.context)) return fail();
   }
   if (!data.importedResponses.every(str)) return fail();

@@ -33,6 +33,31 @@ test('character-level difference preserves whitespace, Unicode, and escapes mark
   assert.equal(d.after, 'c<span class="diff-added">u</span>t 😺 &lt;<span class="diff-added">y</span>&gt;\n');
 });
 
+test('initial review exports uncommented items and imports only AI comments, then supports the normal reply cycle',{skip:!corpus},()=>{
+  const file=structuredClone(reference!),workspace={...emptyWorkspace(),files:[file]};file.items[0].approved=true;
+  const before=JSON.stringify(file),request=createRequest(workspace,[file.path],'initial');workspace.requests.push(request);
+  assert.equal(request.entries.length,0);assert.equal(request.targets!.length,file.items.length);assert.equal(request.targets![0].slots[0].translation,file.slots[0].translation);
+  assert.match(chatInstructions(request),/build → validate/);assert.match(chatInstructions(request),/英訳は変更せず/);
+  const target=request.targets![0],response:ReviewResponse={schemaVersion:1,requestId:request.requestId,responses:[],suggestions:[{id:'new-ai-issue',path:target.path,itemId:target.itemId,fileVersion:target.fileVersion,reason:'Check this spelling',changes:[]}]};
+  const next=importResponse(workspace,response),nf=next.files[0],ni=nf.items[0];
+  assert.equal(JSON.stringify(file),before);assert.deepEqual(nf.slots,file.slots);assert.equal(nf.enText,file.enText);assert.equal(nf.version,file.version);assert.equal(ni.approved,false);assert.equal(ni.changes.length,0);assert.equal(ni.threads[0].posts[0].author,'ai');
+  const restored=restoreJson(backupJson(next));assert.equal(restored.requests[0].targets!.length,file.items.length);
+  addComment(ni,'Please fix it',ni.threads[0].id);const followup=createRequest(next,[nf.path]);next.requests.push(followup);assert.equal(followup.entries.length,1);assert.equal(followup.entries[0].posts[0].author,'ai');
+  const result=importResponse(next,{schemaVersion:1,requestId:followup.requestId,suggestions:[],responses:[{commentId:ni.threads[0].id,path:nf.path,itemId:ni.id,fileVersion:nf.version,decision:'accepted',reason:'Fixed',changes:[{slotId:nf.slots[0].id,before:nf.slots[0].translation,after:'Reviewed spelling'}]}]});
+  assert.equal(result.files[0].items[0].changes[0].status,'pending');setResolved(result.files[0].items[0],result.files[0].slots,ni.threads[0].id,true);assert.equal(result.files[0].slots[0].translation,'Reviewed spelling');
+});
+test('initial review rejects edits, foreign targets, duplicate imports and stale originals atomically',{skip:!corpus},()=>{
+  const file=structuredClone(reference!),workspace={...emptyWorkspace(),files:[file]},request=createRequest(workspace,[file.path],'initial');workspace.requests.push(request);
+  const target=request.targets![0],base:ReviewResponse={schemaVersion:1,requestId:request.requestId,responses:[],suggestions:[{id:'issue',path:target.path,itemId:target.itemId,fileVersion:target.fileVersion,reason:'Issue',changes:[]}]};
+  for(const corrupt of [(r:ReviewResponse)=>r.suggestions[0].itemId='foreign',(r:ReviewResponse)=>r.suggestions.push(structuredClone(r.suggestions[0])),(r:ReviewResponse)=>r.suggestions[0].changes.push({slotId:file.slots[0].id,before:file.slots[0].translation,after:'edit'})]){const r=structuredClone(base),before=JSON.stringify(workspace);corrupt(r);assert.throws(()=>importResponse(workspace,r));assert.equal(JSON.stringify(workspace),before);}
+  assert.throws(()=>importResponse(workspace,base,[]),/指摘コメント/);assert.throws(()=>importResponse(importResponse(workspace,base),base),/既に/);
+  file.slots[0].translation+=' changed';assert.throws(()=>importResponse(workspace,base),/依頼後/);file.slots[0].translation=target.slots[0].translation;file.slots[0].source+=' changed';assert.throws(()=>importResponse(workspace,base),/依頼後/);
+});
+test('a clean initial review creates no comments and never automatically approves items',{skip:!corpus},()=>{
+  const workspace={...emptyWorkspace(),files:[structuredClone(reference!)]},request=createRequest(workspace,[reference!.path],'initial');workspace.requests.push(request);
+  const next=importResponse(workspace,{schemaVersion:1,requestId:request.requestId,responses:[],suggestions:[]});assert.deepEqual(next.files,workspace.files);assert.equal(next.importedResponses[0],request.requestId);
+});
+
 test('each request names its response uniquely and gives concise portable review instructions', {skip: !corpus}, () => {
   const {workspace}=setup(),first=createRequest(workspace,[workspace.files[0].path]),second=createRequest(workspace,[workspace.files[0].path]);
   assert.notEqual(reviewFileNames(first).response,reviewFileNames(second).response);

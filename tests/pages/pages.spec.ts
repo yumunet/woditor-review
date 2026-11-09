@@ -30,7 +30,7 @@ test('project Pages assets, install scope, and offline Python work under the sub
     if(await page.getByRole('button',{name:'閉じる',exact:true}).count())await page.getByRole('button',{name:'閉じる',exact:true}).click();
     for(const name of ['MapData','MapData/SampleMapA',path])await page.locator(`.file-row[data-value="${name}"]`).click();
     await expect(page.locator('.source')).toContainText('夕一');await page.getByRole('button',{name:'コメント',exact:true}).click();await page.getByLabel('コメント内容').fill('Pages offline review');await page.getByRole('button',{name:'送信',exact:true}).click();await page.getByRole('button',{name:'閉じる',exact:true}).click();
-    await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'レビューJSONを出力',exact:true}).click();const download=page.waitForEvent('download');await page.getByRole('button',{name:'JSONを出力',exact:true}).click();const request=JSON.parse(readFileSync((await (await download).path())!,'utf8'));expect(request.entries[0].posts[0].text).toBe('Pages offline review');
+    await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'AIレビューを依頼',exact:true}).click();const download=page.waitForEvent('download');await page.getByRole('button',{name:'JSONを出力',exact:true}).click();const request=JSON.parse(readFileSync((await (await download).path())!,'utf8'));expect(request.entries[0].posts[0].text).toBe('Pages offline review');
     await page.reload();await expect(page.locator('.file-row')).toHaveCount(1);
   }
   expect(paths.every(p=>p.startsWith(base))).toBeTruthy();expect(failures).toEqual([]);

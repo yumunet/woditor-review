@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+from uuid import uuid4
 from pathlib import Path, PurePosixPath
 from review_parser import decode, digest, render_file
 from woditor_translation_tool import COMMAND, META, fields, tokens
@@ -58,6 +59,19 @@ def validate(request: dict, response: dict):
     check_schema(response, read(SCHEMAS / 'review-response.schema.json'))
     if request['requestId'] != response['requestId']:
         raise ValueError('Request ID mismatch')
+    if request.get('mode') == 'initial':
+        if request['entries'] or not request.get('targets') or response['responses']:
+            raise ValueError('Initial review requires targets and no comment responses')
+        seen = set()
+        for suggestion in response['suggestions']:
+            if suggestion['id'] in seen:
+                raise ValueError('Duplicate suggestion ID')
+            seen.add(suggestion['id'])
+            if suggestion['changes']:
+                raise ValueError('Initial review is comments-only')
+            if not any(all(t[k] == suggestion[k] for k in ('path', 'itemId', 'fileVersion')) for t in request['targets']):
+                raise ValueError('Unknown initial review target')
+        return
     entries = {e['commentId']: e for e in request['entries']}
     if len(entries) != len(request['entries']):
         raise ValueError('Duplicate request comment ID')
@@ -101,6 +115,15 @@ def validate(request: dict, response: dict):
 
 
 def build(request: dict, decisions: dict) -> dict:
+    if request.get('mode') == 'initial':
+        result = {'schemaVersion': 1, 'requestId': request['requestId'], 'responses': decisions.get('responses', []), 'suggestions': []}
+        for suggestion in decisions.get('suggestions', []):
+            target = next((t for t in request.get('targets', []) if all(t[k] == suggestion[k] for k in ('path', 'itemId'))), None)
+            if target is None:
+                raise ValueError('Unknown initial review target')
+            result['suggestions'].append({'id': str(uuid4()), 'fileVersion': target['fileVersion'], 'changes': [], **suggestion})
+        validate(request, result)
+        return result
     entries = {e['commentId']: e for e in request['entries']}
     result = {'schemaVersion': 1, 'requestId': request['requestId'], 'responses': [], 'suggestions': decisions.get('suggestions', [])}
     for decision in decisions['responses']:
@@ -115,6 +138,8 @@ def build(request: dict, decisions: dict) -> dict:
 
 def apply_files(request: dict, response: dict, english_root: Path, output_root: Path):
     validate(request, response)
+    if request.get('mode') == 'initial':
+        raise ValueError('Initial review is comments-only; apply is not supported')
     if output_root.exists():
         raise ValueError('Output directory already exists; choose a new directory')
     src, dst = english_root.resolve(), output_root.resolve()
