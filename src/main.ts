@@ -14,11 +14,13 @@ import { diagnosticsView, withoutReplacedDiagnostics } from './diagnostics';
 import { threadView } from './comments';
 import { updateManualSources } from './source-edit';
 import {newlineWarning,slotWarnings} from './translation-warnings';
+import {itemRows} from './item-picker';
 
 const root = document.querySelector<HTMLDivElement>('#app')!;
 let workspace: Workspace = emptyWorkspace();
 let path: string | null = null, currentId: string | null = null;
 let homeFilter: Filter = 'all', itemFilter: Filter = 'all';
+let itemQuery='';
 const expanded = new Set<string>();
 let menu = false, sheet: string | null = null, contextOpen = true, contextLang: 'ja' | 'en' = 'en';
 let before = 3, after = 3, usageIndex = 0, busy = '', notice = '';
@@ -86,7 +88,7 @@ function sheetBody() {
     return `<form class="form source-edit" id="source-form">${file.slots.filter(s=>item.slotIds.includes(s.id) && s.sourceMissing).map(s=>`<label>原文<textarea name="${e(s.id)}" aria-label="補完する原文">${e(sourceText(s))}</textarea></label>`).join('')}<button class="primary" type="submit">保存</button></form>`;
   }
   if (sheet === 'load') return `<form class="form" id="load-form"><label>日本語原文 ZIP<input type="file" name="ja" accept=".zip,application/zip" required></label><label>英訳済み ZIP<input type="file" name="en" accept=".zip,application/zip" required></label><button class="primary" type="submit">読み込む</button></form>`;
-  if (sheet === 'items') return `${filterButtons(itemFilter, 'item')}<div class="sheet-body">${targets().map(i => `<button class="pick-row ${i.id === currentId ? 'active' : ''}" data-action="pick" data-value="${e(i.id)}"><span class="dot ${isDone(i) ? 'done' : unresolved(i).length ? 'comment' : ''}"></span><span>${e(i.title)}</span><span class="pick-meta">${isDone(i) ? '確認済み' : '未確認'}</span></button>`).join('') || '<div class="empty">対象の項目はありません</div>'}</div>`;
+  if (sheet === 'items') return `${filterButtons(itemFilter, 'item')}<div class="item-search"><input type="search" id="item-search" aria-label="翻訳項目を検索" placeholder="原文・英訳を検索" value="${e(itemQuery)}"></div><div class="sheet-body">${itemRows(currentFile()!,targets(),currentId,itemQuery)}</div>`;
   if (sheet === 'progress') return `<div class="sheet-body">${progressRows(fileTree(workspace.files, 'all'))}</div>`;
   if (sheet === 'diagnostics') return diagnosticsView(workspace.diagnostics, diagnosticTab);
   if (sheet === 'comments') return commentsBody();
@@ -124,7 +126,7 @@ root.addEventListener('click', event => {
   menu = false;
   if (action === 'home') {path = null; currentId = null; sheet = null;}
   else if (action === 'folder') {if (expanded.has(value!)) expanded.delete(value!); else expanded.add(value!);}
-  else if (action === 'file') {path = value!; itemFilter = 'all'; selectItem(currentFile()!.items[0]?.id ?? '');}
+  else if (action === 'file') {path = value!; itemFilter = 'all'; itemQuery=''; selectItem(currentFile()!.items[0]?.id ?? '');}
   else if (action === 'filter') {if (scope === 'home') homeFilter = value as Filter; else {itemFilter = value as Filter; if (!targets().some(i => i.id === currentId)) currentId = targets()[0]?.id ?? null;}}
   else if (action === 'pick') {selectItem(value!); closeSheet(); return;}
   else if (action === 'close') {closeSheet(); return;}
@@ -163,6 +165,13 @@ root.addEventListener('click', event => {
   else if (['export-request', 'copy-instructions', 'english-zip'].includes(action!)) {void exportReview(action!); return;}
   else if (['load', 'items', 'comments', 'progress', 'diagnostics', 'restore', 'export', 'response', 'reload', 'english'].includes(action!)) {openSheet(action!); return;}
   render();
+});
+root.addEventListener('input',event=>{
+  const input=event.target as HTMLInputElement;
+  if(input.id!=='item-search' || sheet!=='items') return;
+  itemQuery=input.value;
+  const body=root.querySelector('.sheet-body');
+  if(body) {body.innerHTML=itemRows(currentFile()!,targets(),currentId,itemQuery);body.scrollTop=0;}
 });
 root.addEventListener('change', event => {const el = event.target as HTMLInputElement; if (el.id === 'context-lang') {contextLang = el.value as 'en' | 'ja'; render();} if (el.dataset.exportPath) {if (el.checked) exportSelection.add(el.dataset.exportPath); else exportSelection.delete(el.dataset.exportPath); preparedRequest = null; render();}});
 root.addEventListener('submit', async event => {

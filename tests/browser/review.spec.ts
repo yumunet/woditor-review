@@ -361,3 +361,15 @@ test('ambiguous English translations can be reviewed with a manually supplied or
   await page.reload();for(const name of path.split('/')) await page.locator('.file-row').filter({has:page.locator('.row-name',{hasText:name})}).click();
   await page.locator('.entry-open').click();await page.locator('.pick-row[data-value="R:E00058:S1"]').click();await expect(page.locator('.source')).toHaveText('青いSマークについて');
 });
+test('item search filters rows by either language without changing counters or navigation',async({page})=>{
+  test.skip(!corpus,'Private reference files not available');await loadReal(page);
+  const count=(await page.locator('.counter').textContent())!.split('/')[1].trim();
+  await page.locator('.entry-open').click();
+  const search=page.getByRole('searchbox',{name:'翻訳項目を検索'});
+  await search.fill('HeY ThErE');await expect(page.locator('.pick-row')).toHaveCount(1);await expect(search).toBeFocused();
+  await expect(page.locator('.counter')).toHaveText(`1 / ${count}`);
+  await page.locator('.pick-row').click();await expect(page.locator('.counter')).toHaveText(`2 / ${count}`);
+  await page.locator('.entry-open').click();await search.fill('ゆういち');await expect(page.locator('.pick-row').first()).toBeVisible();
+  await search.fill('no such translation');await expect(page.locator('.pick-row')).toHaveCount(0);await expect(page.locator('.counter')).toHaveText(`2 / ${count}`);
+  await page.getByRole('button',{name:'閉じる',exact:true}).click();await page.getByRole('button',{name:'次の項目',exact:true}).click();await expect(page.locator('.counter')).toHaveText(`3 / ${count}`);
+});
