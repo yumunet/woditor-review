@@ -5,6 +5,7 @@ export const escape = (s: string | number) => String(s).replace(/[&<>"']/g, c =>
 const paths: Record<string, string> = {
   back: '<path d="m15 18-6-6 6-6"/>', next: '<path d="m9 6 6 6-6 6"/>',
   down: '<path d="m6 9 6 6 6-6"/>', check: '<path d="m5 12 4 4L19 6"/>',
+  'check-circle': '<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>',
   undo: '<path d="M3 10h10a7 7 0 0 1 0 14M3 10l5-5M3 10l5 5" transform="translate(0 -3)"/>',
   close: '<path d="m6 6 12 12M6 18 18 6"/>', menu: '<circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>',
   list: '<path d="M8 6h12M8 12h12M8 18h12M3 6h1M3 12h1M3 18h1"/>',

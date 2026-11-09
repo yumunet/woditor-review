@@ -25,6 +25,9 @@ test('real ZIP -> folders -> compare -> context -> filtered empty state', async 
   page.on('pageerror', err => errors.push(String(err)));
   await loadReal(page);
   await expect(page.locator('.entry-title')).toHaveText('イベント名');
+  await expect(page.locator('.source')).toHaveCSS('background-color','rgb(255, 255, 255)');
+  await expect(page.locator('.translation')).toHaveCSS('background-color','rgb(255, 255, 255)');
+  await expect(page.locator('.approve svg circle')).toHaveAttribute('r','9');
   await page.getByRole('button', {name: '次の項目', exact: true}).click();
   await expect(page.locator('.translation')).toContainText('Yuichi');
   await expect(page.locator('.command.current')).toContainText('Show Message');
@@ -108,7 +111,7 @@ test('review JSON and revised TXT round trip, AI resolve/reopen and persistence'
   const downloaded = await downloadEvent;
   const request = JSON.parse(readFileSync((await downloaded.path())!, 'utf8'));
   expect(request.entries).toHaveLength(1);
-  await expect(page.getByLabel('ChatGPT向け指示文')).toHaveValue(new RegExp(request.requestId));
+  await expect(page.getByLabel('ChatGPT向け指示文')).toHaveCount(0);
   const row = request.entries[0];
   const response = {schemaVersion: 1, requestId: request.requestId, suggestions: [], responses: [{commentId: row.commentId, path: row.path, itemId: row.itemId, fileVersion: row.fileVersion, decision: 'accepted', reason: 'Adjusted the name.', changes: [{slotId: row.slots[0].id, before: row.slots[0].translation, after: 'Revised Name'}]}]};
   await page.getByRole('button', {name: '閉じる', exact: true}).click();
@@ -509,8 +512,7 @@ async function exportCurrentRequest(page:Page) {
   const download=page.waitForEvent('download');await page.getByRole('button',{name:'JSONを出力',exact:true}).click();
   const file=await download,request=JSON.parse(readFileSync((await file.path())!,'utf8'));
   expect(file.suggestedFilename()).toBe(`review_request_${request.requestId}.json`);
-  const instructions=await page.getByLabel('ChatGPT向け指示文').inputValue();
-  expect(instructions).toContain(`review_response_${request.requestId}.json`);expect(instructions).not.toContain('python/woditor_review_tool.py');
+  await expect(page.getByLabel('ChatGPT向け指示文')).toHaveCount(0);
   await page.getByRole('button',{name:'閉じる',exact:true}).click();return request;
 }
 async function importRevisedAnswer(page:Page,request:any,decision:string,translation:string,changes:any[]) {
@@ -531,7 +533,10 @@ test('rejected reassessment ZIP imports and discarded proposals stay discarded a
   await page.getByRole('button',{name:'返信',exact:true}).click();await page.getByLabel('コメント内容').fill('Please withdraw the previous proposal');await page.getByRole('button',{name:'送信',exact:true}).click();await page.getByRole('button',{name:'閉じる',exact:true}).click();
   const second=await exportCurrentRequest(page);expect(second.entries[0].pendingChanges[0].after).toBe('Revised Name');
   await importRevisedAnswer(page,second,'rejected',slot.translation,[]);
-  await expect(page.locator('.translation-after')).toHaveText('Revised Name');await page.getByRole('button',{name:'不採用の変更を破棄',exact:true}).click();await page.getByRole('button',{name:'キャンセル',exact:true}).click();await expect(page.locator('.translation-after')).toBeVisible();
+  await expect(page.locator('.translation-after')).toHaveText('Revised Name');
+  const sourceBox=await page.locator('.source').boundingBox(),afterBox=await page.locator('.translation-after').boundingBox(),noticeBox=await page.locator('.rejected-proposal').boundingBox(),discardBox=await page.getByRole('button',{name:'不採用の変更を破棄',exact:true}).boundingBox();
+  expect(noticeBox!.x).toBe(sourceBox!.x);expect(discardBox!.x).toBe(sourceBox!.x);expect(noticeBox!.y-afterBox!.y-afterBox!.height).toBeGreaterThanOrEqual(12);
+  await page.getByRole('button',{name:'不採用の変更を破棄',exact:true}).click();await page.getByRole('button',{name:'キャンセル',exact:true}).click();await expect(page.locator('.translation-after')).toBeVisible();
   await page.getByRole('button',{name:'不採用の変更を破棄',exact:true}).click();await page.getByRole('button',{name:'確定',exact:true}).click();await expect(page.locator('.translation-after')).toHaveCount(0);await expect(page.locator('.translation')).toHaveText(slot.translation);
   await page.reload();await openTreeFile(page,sourcePath);await expect(page.getByRole('button',{name:'不採用の変更を破棄',exact:true})).toHaveCount(0);
   await resolveCurrentComment(page);await page.locator('.comment-trigger').click();await page.getByRole('button',{name:'すべてのコメント',exact:true}).click();await page.getByRole('button',{name:'再開',exact:true}).click();await expect(page.locator('.post-text')).toContainText(['Correct the name','Corrected spelling','Please withdraw the previous proposal','Withdrawn after reconsideration']);await page.getByRole('button',{name:'閉じる',exact:true}).click();await expect(page.locator('.translation-after')).toHaveCount(0);
@@ -561,4 +566,24 @@ test('resolved last comment stays until confirming a move to the next filtered f
   await page.getByRole('button',{name:'次の項目',exact:true}).click();await expect(page.getByRole('alertdialog')).toContainText('次の「002.txt」を開きますか？');
   await page.getByRole('button',{name:'キャンセル',exact:true}).click();await expect(page.locator('h1')).toHaveText('000.txt');await expect(page.locator('.counter')).toHaveText('0 / 0');
   await page.getByRole('button',{name:'次の項目',exact:true}).click();await page.getByRole('button',{name:'確定',exact:true}).click();await expect(page.locator('h1')).toHaveText('002.txt');await expect(page.locator('.counter')).toHaveText('1 / 1');
+});
+
+test('export sheets select all files, align output buttons, and preview copied instructions in the center',async({page},info)=>{
+  test.skip(!corpus,'Private reference files not available');
+  await page.addInitScript(()=>{Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async(text:string)=>{if((window as any).failClipboard)throw Error('Clipboard denied');(window as any).copiedInstructions=text;}}});});
+  await loadNavigationFiles(page);
+  for(const path of [navigationPaths[0],navigationPaths[2]]) {await openTreeFile(page,path);await postReviewComment(page,'Review this file');}
+  await page.getByRole('button',{name:'戻る',exact:true}).click();await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'レビューJSONを出力',exact:true}).click();
+  const all=page.getByRole('checkbox',{name:'すべて選択',exact:true}),files=page.locator('[data-export-path]');
+  await expect(files).toHaveCount(2);await expect(all).toBeChecked();await all.uncheck();await expect(page.locator('[data-export-path]:checked')).toHaveCount(0);await expect(page.getByRole('button',{name:'JSONを出力',exact:true})).toBeDisabled();
+  await files.first().check();expect(await all.evaluate((el:HTMLInputElement)=>el.indeterminate)).toBeTruthy();await all.check();await expect(page.locator('[data-export-path]:checked')).toHaveCount(2);
+  const jsonBox=await page.getByRole('button',{name:'JSONを出力',exact:true}).boundingBox(),zipBox=await page.getByRole('button',{name:'英訳TXTを出力',exact:true}).boundingBox();expect(jsonBox!.y).toBe(zipBox!.y);expect(jsonBox!.x+jsonBox!.width).toBeLessThan(zipBox!.x);
+  await page.screenshot({path:`docs/screenshots/${info.project.name}-export.png`});
+  await page.getByRole('button',{name:'指示文をコピー',exact:true}).click();await expect(page.locator('.toast')).toContainText('指示文をコピーしました');await expect(page.locator('.sheet details')).toHaveCount(0);await expect(page.locator('.sheet .instructions')).toHaveCount(0);
+  const copied=await page.evaluate(()=>(window as any).copiedInstructions);expect(copied).toContain('woditor_review_tool.py');
+  await page.getByRole('button',{name:'指示文を確認',exact:true}).click();const modal=page.getByRole('dialog',{name:'指示文',exact:true});await expect(modal.locator('pre')).toHaveText(copied);await expect(page.getByRole('button',{name:'指示文を閉じる',exact:true})).toBeFocused();
+  const box=await modal.boundingBox(),viewport=page.viewportSize()!;expect(Math.abs(box!.y+box!.height/2-viewport.height/2)).toBeLessThan(2);expect(Math.abs(box!.x+box!.width/2-viewport.width/2)).toBeLessThan(2);
+  await page.keyboard.press('Shift+Tab');await expect(modal.locator('pre')).toBeFocused();await page.keyboard.press('Tab');await expect(page.getByRole('button',{name:'指示文を閉じる',exact:true})).toBeFocused();await page.screenshot({path:`docs/screenshots/${info.project.name}-instructions.png`});await page.keyboard.press('Escape');await expect(modal).toHaveCount(0);await expect(page.getByRole('dialog',{name:'レビューJSONを出力',exact:true})).toBeVisible();
+  await page.evaluate(()=>{(window as any).failClipboard=true;});await page.getByRole('button',{name:'指示文をコピー',exact:true}).click();await expect(page.locator('.toast')).toContainText('コピーできませんでした');await page.getByRole('button',{name:'指示文を確認',exact:true}).click();await expect(modal.locator('pre')).toHaveText(copied);await page.getByRole('button',{name:'指示文を閉じる',exact:true}).click();
+  await page.getByRole('button',{name:'閉じる',exact:true}).click();await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'英訳TXTを出力',exact:true}).click();await expect(files).toHaveCount(4);await expect(all).toBeChecked();await all.uncheck();await expect(page.getByRole('button',{name:'英訳TXTを出力',exact:true})).toBeDisabled();await files.last().check();expect(await all.evaluate((el:HTMLInputElement)=>el.indeterminate)).toBeTruthy();await all.check();await expect(page.locator('[data-export-path]:checked')).toHaveCount(4);
 });
