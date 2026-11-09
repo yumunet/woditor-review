@@ -5,6 +5,8 @@ import { initialContext } from './ui';
 import { zipSync, strToU8 } from 'fflate';
 import { preserveGroups } from './grouping';
 
+const pendingForThread = (item: Item, threadId: string) => item.changes.filter(c => c.threadId === threadId && c.status === 'pending').map(({id,slotId,before,after}) => ({id,slotId,before,after}));
+
 export function createRequest(workspace: Workspace, selected: string[]): ReviewRequest {
   const request: ReviewRequest = {schemaVersion: 1, requestId: uid(), createdAt: now(), entries: []};
   for (const file of workspace.files.filter(f => selected.includes(f.path))) for (const item of file.items) {
@@ -13,7 +15,7 @@ export function createRequest(workspace: Workspace, selected: string[]): ReviewR
     for (const thread of unresolved(item)) request.entries.push({path: file.path, fileVersion: file.version,
       itemId: item.id, slotIds: [...item.slotIds], commentId: thread.id,
       slots: slots.map(s => ({id: s.id, source: sourceText(s), translation: s.translation, line: s.enLine ?? s.line, key: s.key, kind: s.kind, position: s.position})),
-      posts: structuredClone(thread.posts), context: line === undefined ? [] : initialContext(file, line, 3, 3)});
+      posts: structuredClone(thread.posts), pendingChanges: pendingForThread(item, thread.id), context: line === undefined ? [] : initialContext(file, line, 3, 3)});
   }
   if (!request.entries.length) throw new Error('選択したファイルに未解決コメントがありません');
   return request;
@@ -82,11 +84,18 @@ export function importResponse(workspace: Workspace, value: unknown, revised?: R
     const entry = request.entries.find(e => e.commentId === a.commentId);
     if (!entry || entry.path !== a.path || entry.itemId !== a.itemId || entry.fileVersion !== a.fileVersion) throw new Error('依頼と回答のIDが一致しません');
     if (a.changes.some(c => !entry.slotIds.includes(c.slotId))) throw new Error('依頼対象外の翻訳単位です');
-    const postId = uid(), {item} = apply(a, a.commentId, postId, 'response');
-    const thread = item.threads.find(t => t.id === a.commentId);
+    const file = next.files.find(f => f.path === a.path), item = file?.items.find(i => i.id === a.itemId);
+    const thread = item?.threads.find(t => t.id === a.commentId);
     if (!thread || thread.resolved || JSON.stringify(thread.posts) !== JSON.stringify(entry.posts)) throw new Error('依頼後にコメントが変更・解決されています');
+    if (entry.pendingChanges && JSON.stringify(pendingForThread(item!, a.commentId)) !== JSON.stringify(entry.pendingChanges)) throw new Error('依頼後に保留中の変更が変更・破棄されています');
+    const postId = uid();
+    for (const change of item!.changes.filter(c => c.threadId === a.commentId && c.status === 'pending')) {
+      if (a.changes.some(edit => edit.slotId === change.slotId)) change.status = 'discarded';
+      else if (a.decision === 'rejected') change.rejectedBy = postId;
+    }
+    apply(a, a.commentId, postId, 'response');
     thread.posts.push({id: postId, author: 'ai', text: a.reason + (a.explanation ? '\n' + a.explanation : ''), createdAt: now(), decision: a.decision, requestId: value.requestId});
-    item.approved = false;
+    item!.approved = false;
   }
   for (const a of value.suggestions) {
     if (!request.entries.some(e => e.path === a.path && e.itemId === a.itemId && e.fileVersion === a.fileVersion)) throw new Error('改善提案の項目・バージョンは依頼に含まれていません');
@@ -105,8 +114,8 @@ export function importResponse(workspace: Workspace, value: unknown, revised?: R
         if (!old) throw new Error('修正TXTの翻訳単位が一致しません');
         old.enLine = slot.enLine;
         const item = file.items.find(i => i.slotIds.includes(old.id))!;
-        const pending = item.changes.find(c => c.slotId === old.id && c.status === 'pending');
-        if (pending) {if (pending.after !== slot.translation) throw new Error('回答JSONと修正TXTの新訳が一致しません');}
+        const pending = item.changes.filter(c => c.slotId === old.id && c.status === 'pending').at(-1);
+        if (pending) {if ((pending.rejectedBy ? old.translation : pending.after) !== slot.translation) throw new Error('回答JSONと修正TXTの新訳が一致しません');}
         else if (old.translation !== slot.translation) {
           const answers = value.responses.filter(a => a.path === file.path && a.itemId === item.id);
           const threadId = answers.length === 1 ? answers[0].commentId : uid();

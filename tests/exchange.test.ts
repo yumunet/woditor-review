@@ -6,7 +6,7 @@ import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { createRequest, importResponse, mergeFiles, type ReviewResponse } from '../src/exchange';
 import { emptyWorkspace, isDone, sourceText, type ReviewFile, type Workspace } from '../src/model';
-import { addComment, approveItem, canEdit, setResolved } from '../src/review-state';
+import { addComment, approveItem, canEdit, discardRejectedChanges, setResolved } from '../src/review-state';
 import { backupJson, restoreJson } from '../src/storage';
 import { characterDiff } from '../src/diff';
 import { canMerge, mergeGroup, splitGroup } from '../src/grouping';
@@ -64,6 +64,65 @@ test('revised TXT must agree with response; undeclared changes need manual revie
   assert.equal(next.files[0].items[0].changes[0].status, 'pending');
   assert.equal(next.files[0].items[1].threads[0].posts[0].decision, 'needs_review');
   revised.slots[0].translation = 'conflict'; assert.throws(() => importResponse(workspace, response, [revised]));
+});
+
+test('rejected reassessment imports the original TXT and lets the user discard the former proposal', {skip: !corpus}, () => {
+  const {workspace,response,thread}=setup();
+  const first=importResponse(workspace,response),file=first.files[0],item=file.items[0],original=file.slots[0].translation;
+  addComment(item,'Please reconsider the proposed change',thread.id);
+  const request=createRequest(first,[file.path]);first.requests.push(request);
+  const rejected:ReviewResponse={schemaVersion:1,requestId:request.requestId,suggestions:[],responses:[{...response.responses[0],decision:'rejected',reason:'Withdraw the previous proposal',changes:[]}]};
+  const revised=structuredClone(reference!);
+  const next=importResponse(first,rejected,[revised]),nf=next.files[0],ni=nf.items[0];
+  assert.equal(nf.slots[0].translation,original);
+  assert.ok(ni.changes[0].rejectedBy);
+  assert.throws(()=>setResolved(ni,nf.slots,thread.id,true),/破棄/);
+  discardRejectedChanges(ni);
+  assert.equal(ni.changes[0].status,'discarded');
+  setResolved(ni,nf.slots,thread.id,true);assert.equal(nf.slots[0].translation,original);
+  setResolved(ni,nf.slots,thread.id,false);assert.equal(ni.changes[0].status,'discarded');
+  const restored=restoreJson(backupJson(next));assert.equal(restored.files[0].items[0].changes[0].status,'discarded');
+  assert.equal(restored.files[0].items[0].threads[0].posts.filter(p=>p.author==='ai').length,2);
+});
+
+test('a new reassessment proposal replaces its own pending edit, but not another thread edit', {skip: !corpus}, () => {
+  const {workspace,response,thread}=setup();const first=importResponse(workspace,response),file=first.files[0],item=file.items[0];
+  addComment(item,'A different spelling please',thread.id);
+  const request=createRequest(first,[file.path]);first.requests.push(request);
+  assert.equal(request.entries[0].pendingChanges?.[0].after,'Yuichi, revised');
+  const revised=structuredClone(reference!);revised.slots[0].translation='Second proposal';
+  const answer:ReviewResponse={...response,requestId:request.requestId,responses:[{...response.responses[0],changes:[{...response.responses[0].changes[0],after:'Second proposal'}]}]};
+  const next=importResponse(first,answer,[revised]),nf=next.files[0],ni=nf.items[0];
+  assert.deepEqual(ni.changes.map(c=>c.status),['discarded','pending']);
+  setResolved(ni,nf.slots,thread.id,true);assert.equal(nf.slots[0].translation,'Second proposal');
+  setResolved(ni,nf.slots,thread.id,false);assert.equal(nf.slots[0].translation,reference!.slots[0].translation);
+  const other=addComment(item,'Another issue'),otherRequest=createRequest(first,[file.path]);first.requests.push(otherRequest);
+  const conflicting={...answer,requestId:otherRequest.requestId,responses:otherRequest.entries.map(e=>({...answer.responses[0],commentId:e.commentId,changes:e.commentId===other.id?answer.responses[0].changes:[]}))};
+  const before=JSON.stringify(first);assert.throws(()=>importResponse(first,conflicting),/保留中/);assert.equal(JSON.stringify(first),before);
+});
+
+test('reopening multiple committed revisions restores the baseline before rejected reassessment', {skip: !corpus}, () => {
+  const {workspace,response,thread}=setup();let next=importResponse(workspace,response),file=next.files[0],item=file.items[0];
+  setResolved(item,file.slots,thread.id,true);
+  const second=addComment(item,'Improve again'),request=createRequest(next,[file.path]);next.requests.push(request);
+  const edit={slotId:file.slots[0].id,before:file.slots[0].translation,after:'Third spelling'};
+  next=importResponse(next,{...response,requestId:request.requestId,responses:[{...response.responses[0],commentId:second.id,changes:[edit]}]});
+  file=next.files[0];item=file.items[0];setResolved(item,file.slots,second.id,true);
+  assert.throws(()=>setResolved(item,file.slots,thread.id,false),/後続/);
+  setResolved(item,file.slots,second.id,false);assert.equal(file.slots[0].translation,'Yuichi, revised');
+  addComment(item,'Reconsider',second.id);const third=createRequest(next,[file.path]);next.requests.push(third);
+  const rejected=importResponse(next,{...response,requestId:third.requestId,responses:third.entries.map(e=>({...response.responses[0],commentId:e.commentId,decision:'rejected' as const,changes:[]}))});
+  file=rejected.files[0];item=file.items[0];discardRejectedChanges(item);setResolved(item,file.slots,second.id,true);
+  assert.equal(file.slots[0].translation,'Yuichi, revised');
+});
+
+test('discarding a proposal after exporting a request invalidates the stale answer', {skip: !corpus}, () => {
+  const {workspace,response,thread}=setup();let first=importResponse(workspace,response);let file=first.files[0],item=file.items[0];
+  addComment(item,'Reconsider',thread.id);const request=createRequest(first,[file.path]);first.requests.push(request);
+  const reject={...response,requestId:request.requestId,responses:[{...response.responses[0],decision:'rejected' as const,changes:[]}]};
+  first=importResponse(first,reject);file=first.files[0];item=file.items[0];
+  const stale=createRequest(first,[file.path]);first.requests.push(stale);discardRejectedChanges(item);
+  assert.throws(()=>importResponse(first,{...reject,requestId:stale.requestId}),/破棄/);
 });
 test('reload keeps unchanged approval and comments; changes await re-review', {skip: !corpus}, () => {
   const {workspace, file, item} = setup();

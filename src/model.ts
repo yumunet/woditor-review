@@ -18,8 +18,9 @@ export type Decision = 'accepted' | 'rejected' | 'partial' | 'needs_review';
 export interface Thread { id: string; resolved: boolean; posts: Post[] }
 export interface Change {
   id: string; slotId: string; before: string; after: string; threadId: string | null;
-  status: 'pending' | 'committed'; createdAt: string; origin: 'ai' | 'reload';
+  status: 'pending' | 'committed' | 'discarded'; createdAt: string; origin: 'ai' | 'reload';
   aiPostId?: string;
+  rejectedBy?: string;
 }
 export interface Item {
   id: string; slotIds: string[]; title: string; code: number | null; depth: number | null;
@@ -38,7 +39,8 @@ export interface DiagnosticDocument {path:string;jaText?:string;enText?:string}
 export interface ReviewRequest {
   schemaVersion: 1; requestId: string; createdAt: string;
   entries: {path: string; fileVersion: string; itemId: string; slotIds: string[]; commentId: string;
-    slots: { id: string; source: string; translation: string; line: number; key: string; kind: string; position?: number }[]; posts: Post[]; context: Command[]}[];
+    slots: { id: string; source: string; translation: string; line: number; key: string; kind: string; position?: number }[]; posts: Post[]; context: Command[];
+    pendingChanges?: Pick<Change, 'id' | 'slotId' | 'before' | 'after'>[]}[];
 }
 export interface Workspace {
   schemaVersion: 1; files: ReviewFile[]; diagnostics: Diagnostic[]; requests: ReviewRequest[];

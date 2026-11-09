@@ -29,6 +29,15 @@ class ReviewToolTests(unittest.TestCase):
         response['responses'].append(response['responses'][0])
         with self.assertRaises(ValueError): validate(self.request, response)
 
+    def test_pending_proposals_can_be_reassessed_without_applying_them(self):
+        slot = self.request['entries'][0]['slots'][0]
+        self.request['entries'][0]['pendingChanges'] = [{'id': 'old-change', 'slotId': slot['id'], 'before': slot['translation'], 'after': 'Withdrawn proposal'}]
+        response = build(self.request, {'responses': [{'commentId': 'comment', 'decision': 'rejected', 'reason': 'Withdraw the previous proposal', 'changes': []}]})
+        with TemporaryDirectory() as directory:
+            out = Path(directory) / 'rejected'
+            apply_files(self.request, response, Path('.reference/en-US/texts'), out)
+            self.assertEqual((out / self.path).read_bytes(), self.raw)
+
     def test_render_preserves_original_and_protected_sections(self):
         self.f['slots'][0]['translation'] = 'Yuichi revised'
         rendered = render_file(self.f['enText'], self.f['slots'])

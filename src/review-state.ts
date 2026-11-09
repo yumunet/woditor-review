@@ -29,18 +29,25 @@ export function deleteComment(item: Item, threadId: string, postId: string) {
   thread.posts = thread.posts.filter(p => p.id !== postId);
   if (!thread.posts.length) item.threads = item.threads.filter(t => t.id !== threadId);
 }
+export function discardRejectedChanges(item: Item) {
+  const rejected = item.changes.filter(c => c.status === 'pending' && c.rejectedBy);
+  if (!rejected.length) throw new Error('破棄できる不採用の変更がありません');
+  for (const change of rejected) change.status = 'discarded';
+  item.approved = false;
+}
 export function setResolved(item: Item, slots: Slot[], threadId: string, resolved: boolean) {
   const thread = item.threads.find(t => t.id === threadId);
   if (!thread) throw new Error('コメントが見つかりません');
   // Validate the entire transition before changing any field.
-  const changes = item.changes.filter(c => c.threadId === threadId);
+  const changes = item.changes.filter(c => c.threadId === threadId && c.status !== 'discarded');
+  if (resolved && changes.some(c => c.status === 'pending' && c.rejectedBy)) throw new Error('再審で不採用になった変更を破棄してから解決してください');
   for (const c of changes) if (!slots.some(s => s.id === c.slotId)) throw new Error('翻訳単位が見つかりません');
   for (const c of changes) {
-    const later = item.changes.slice(item.changes.indexOf(c) + 1).some(next => next.slotId === c.slotId && next.threadId !== threadId);
+    const later = item.changes.slice(item.changes.indexOf(c) + 1).some(next => next.slotId === c.slotId && next.threadId !== threadId && next.status !== 'discarded');
     if (later) throw new Error('同じ翻訳に後続の変更があります。履歴を上書きしないため、このコメントの状態は変更できません');
   }
   thread.resolved = resolved;
-  for (const c of changes) {
+  for (const c of resolved ? changes : [...changes].reverse()) {
     const slot = slots.find(s => s.id === c.slotId)!;
     slot.translation = resolved ? c.after : c.before;
     c.status = resolved ? 'committed' : 'pending';
@@ -49,6 +56,7 @@ export function setResolved(item: Item, slots: Slot[], threadId: string, resolve
 }
 export function approveItem(item: Item, slots: Slot[], resolveComments = false) {
   if (unresolved(item).length && !resolveComments) throw new Error('未解決コメントがあります');
+  if (item.changes.some(c => c.status === 'pending' && c.rejectedBy)) throw new Error('再審で不採用になった変更を破棄してから承認してください');
   if (item.changes.some(c => c.status === 'pending' && c.origin === 'ai' && !c.threadId)) throw new Error('対応コメントのないAI変更を確認してください');
   if (resolveComments) for (const t of unresolved(item)) setResolved(item, slots, t.id, true);
   for (const c of item.changes.filter(c => c.status === 'pending' && c.origin === 'reload')) {

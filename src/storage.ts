@@ -72,7 +72,7 @@ export function validateWorkspace(data: unknown): asserts data is Workspace {
       }
       const changes = new Set();
       for (const c of i.changes) {
-        if (!object(c) || !str(c.id) || changes.has(c.id) || !i.slotIds.includes(c.slotId) || !str(c.before) || !str(c.after) || !['pending','committed'].includes(c.status) || !['ai','reload'].includes(c.origin) || !str(c.createdAt) || c.threadId !== null && !localThreads.has(c.threadId)) return fail();
+        if (!object(c) || !str(c.id) || changes.has(c.id) || !i.slotIds.includes(c.slotId) || !str(c.before) || !str(c.after) || !['pending','committed','discarded'].includes(c.status) || !['ai','reload'].includes(c.origin) || !str(c.createdAt) || c.threadId !== null && !localThreads.has(c.threadId) || c.rejectedBy !== undefined && (!str(c.rejectedBy) || !i.threads.some((t: any) => t.id === c.threadId && t.posts.some((p: any) => p.id === c.rejectedBy && p.author === 'ai' && p.decision === 'rejected')))) return fail();
         changes.add(c.id);
       }
       if (i.approved && (i.threads.some((t: any) => !t.resolved) || i.changes.some((c: any) => c.status === 'pending'))) return fail();

@@ -23,6 +23,11 @@
             "kind": {"enum": ["metadata", "command_string"]}, "position": {"type": "integer", "minimum": 1}
           }
         }},
+        "pendingChanges": {"type": "array", "items": {
+          "type": "object", "additionalProperties": false,
+          "required": ["id", "slotId", "before", "after"],
+          "properties": {"id": {"type": "string"}, "slotId": {"type": "string"}, "before": {"type": "string"}, "after": {"type": "string"}}
+        }},
         "posts": {"type": "array", "items": {
           "type": "object", "required": ["id", "author", "text", "createdAt"],
           "properties": {"id": {"type": "string"}, "author": {"enum": ["user", "ai"]}, "text": {"type": "string"}, "createdAt": {"type": "string"}, "decision": {"enum": ["accepted", "rejected", "partial", "needs_review"]}, "requestId": {"type": "string"}}

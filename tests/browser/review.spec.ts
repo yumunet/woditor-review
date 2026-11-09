@@ -503,6 +503,39 @@ async function postReviewComment(page:Page,text:string) {
 async function resolveCurrentComment(page:Page) {
   await page.locator('.comment-trigger').click();await page.getByRole('button',{name:'解決',exact:true}).click();await page.getByRole('button',{name:'閉じる',exact:true}).click();
 }
+
+async function exportCurrentRequest(page:Page) {
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'レビューJSONを出力',exact:true}).click();
+  const download=page.waitForEvent('download');await page.getByRole('button',{name:'JSONを出力',exact:true}).click();
+  const request=JSON.parse(readFileSync((await (await download).path())!,'utf8'));
+  await page.getByRole('button',{name:'閉じる',exact:true}).click();return request;
+}
+async function importRevisedAnswer(page:Page,request:any,decision:string,translation:string,changes:any[]) {
+  const entry=request.entries[0],response={schemaVersion:1,requestId:request.requestId,suggestions:[],responses:[{commentId:entry.commentId,path:entry.path,itemId:entry.itemId,fileVersion:entry.fileVersion,decision,reason:decision==='rejected'?'Withdrawn after reconsideration':'Corrected spelling',changes}]};
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'レビューJSONを読み込む',exact:true}).click();
+  await page.locator('input[name=answer]').setInputFiles({name:'response.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(response))});
+  const revised=readFileSync(`.reference/en-US/texts/${sourcePath}`,'utf8').replace(/EVENT_NAME=[^\r\n]*/,`EVENT_NAME=${translation}`);
+  await page.locator('input[name=revised]').setInputFiles({name:'revised.zip',mimeType:'application/zip',buffer:Buffer.from(zipSync({[`en-US/texts/${sourcePath}`]:Buffer.from(revised)}))});
+  await page.getByRole('button',{name:'回答を読み込む',exact:true}).click();await expect(page.locator('.busy')).toHaveCount(0);await expect(page.getByRole('dialog')).toHaveCount(0);
+}
+
+test('rejected reassessment ZIP imports and discarded proposals stay discarded after reopen and restart',async({page})=>{
+  test.skip(!corpus,'Private reference files not available');await loadReal(page);await postReviewComment(page,'Correct the name');
+  const first=await exportCurrentRequest(page),slot=first.entries[0].slots[0];
+  await importRevisedAnswer(page,first,'accepted','Revised Name',[{slotId:slot.id,before:slot.translation,after:'Revised Name'}]);
+  await resolveCurrentComment(page);await expect(page.locator('.translation')).toHaveText('Revised Name');
+  await page.locator('.comment-trigger').click();await page.getByRole('button',{name:'すべてのコメント',exact:true}).click();await page.getByRole('button',{name:'再開',exact:true}).click();
+  await page.getByRole('button',{name:'返信',exact:true}).click();await page.getByLabel('コメント内容').fill('Please withdraw the previous proposal');await page.getByRole('button',{name:'送信',exact:true}).click();await page.getByRole('button',{name:'閉じる',exact:true}).click();
+  const second=await exportCurrentRequest(page);expect(second.entries[0].pendingChanges[0].after).toBe('Revised Name');
+  await importRevisedAnswer(page,second,'rejected',slot.translation,[]);
+  await expect(page.locator('.translation-after')).toHaveText('Revised Name');await page.getByRole('button',{name:'不採用の変更を破棄',exact:true}).click();await page.getByRole('button',{name:'キャンセル',exact:true}).click();await expect(page.locator('.translation-after')).toBeVisible();
+  await page.getByRole('button',{name:'不採用の変更を破棄',exact:true}).click();await page.getByRole('button',{name:'確定',exact:true}).click();await expect(page.locator('.translation-after')).toHaveCount(0);await expect(page.locator('.translation')).toHaveText(slot.translation);
+  await page.reload();await openTreeFile(page,sourcePath);await expect(page.getByRole('button',{name:'不採用の変更を破棄',exact:true})).toHaveCount(0);
+  await resolveCurrentComment(page);await page.locator('.comment-trigger').click();await page.getByRole('button',{name:'すべてのコメント',exact:true}).click();await page.getByRole('button',{name:'再開',exact:true}).click();await expect(page.locator('.post-text')).toContainText(['Correct the name','Corrected spelling','Please withdraw the previous proposal','Withdrawn after reconsideration']);await page.getByRole('button',{name:'閉じる',exact:true}).click();await expect(page.locator('.translation-after')).toHaveCount(0);
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'英訳TXTを出力',exact:true}).click();const zipEvent=page.waitForEvent('download');await page.getByRole('button',{name:'英訳TXTを出力',exact:true}).click();
+  const zip=readFileSync((await (await zipEvent).path())!);expect(Buffer.from(unzipSync(zip)[`en-US/texts/${sourcePath}`]).toString('utf8')).toContain(`EVENT_NAME=${slot.translation}`);await page.getByRole('button',{name:'閉じる',exact:true}).click();
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'英訳TXTを再読み込み',exact:true}).click();await page.locator('input[name=revised]').setInputFiles({name:'reviewed.zip',mimeType:'application/zip',buffer:zip});await page.getByRole('button',{name:'英訳を再読み込み',exact:true}).click();await expect(page.locator('.busy')).toHaveCount(0);await expect(page.locator('.translation-after')).toHaveCount(0);await expect(page.locator('.translation')).toHaveText(slot.translation);
+});
 test('resolved comment-filter items stay visible while counters update until arrow navigation',async({page})=>{
   test.skip(!corpus,'Private reference files not available');await loadReal(page);
   await postReviewComment(page,'First issue');await page.getByRole('button',{name:'次の項目',exact:true}).click();await postReviewComment(page,'Second issue');
