@@ -16,6 +16,7 @@ import { updateManualSources } from './source-edit';
 import {newlineWarning,slotWarnings} from './translation-warnings';
 import {itemRows} from './item-picker';
 import {createTextView,paintTextView,targetLine,textLineHeight,textViewMarkup,type TextView,type TextLanguage} from './text-viewer';
+import {navigationQuestion,navigationTarget} from './navigation';
 
 const root = document.querySelector<HTMLDivElement>('#app')!;
 let workspace: Workspace = emptyWorkspace();
@@ -47,7 +48,16 @@ function persist(changedPath?: string) {void saveWorkspace(workspace, changedPat
 function ask(question: string, run: () => void | Promise<void>) {confirmation = {question, run}; render(); root.querySelector<HTMLElement>('[data-action="confirm-cancel"]')?.focus();}
 function reconcileCurrent() {if (!targets().some(i => i.id === currentId)) {currentId = targets()[0]?.id ?? null; if (!currentId && sheet === 'comments') sheet = null;}}
 function selectItem(id: string) {currentId = id; before = after = 3; usageIndex = 0; contextOpen = true;}
-function move(delta: number) {const list = targets(), index = list.findIndex(i => i.id === currentId); const target = list[index + delta]; if (target) {selectItem(target.id); render(); root.querySelector('.review')?.scrollTo(0, 0);}}
+function move(delta: number) {
+  if(!path) return;
+  const target=navigationTarget(workspace.files,path,currentId,itemFilter,homeFilter,delta<0?-1:1);
+  if(!target) return;
+  const go=()=>{
+    if(target.crossesFile) {path=target.file.path;itemFilter=target.filter;itemQuery='';sheet=null;}
+    selectItem(target.item.id);render();root.querySelector('.review')?.scrollTo(0,0);
+  };
+  if(target.crossesFile) ask(navigationQuestion(path,target),go);else go();
+}
 function refreshTextView(position=false) {
   const scroller=root.querySelector<HTMLElement>('.text-scroll');
   if(!textView || !scroller) return;
@@ -71,6 +81,8 @@ function context(file: ReviewFile, item: Item) {
 }
 function review(file: ReviewFile) {
   const item = currentItem(), list = targets(), index = list.findIndex(i => i.id === currentId);
+  const previous=navigationTarget(workspace.files,file.path,currentId,itemFilter,homeFilter,-1);
+  const next=navigationTarget(workspace.files,file.path,currentId,itemFilter,homeFilter,1);
   let body = '<div class="empty">対象の項目はありません</div>';
   if (item) {
     const slots = item.slotIds.map(id => file.slots.find(s => s.id === id)!);
@@ -79,7 +91,7 @@ function review(file: ReviewFile) {
     const diff = pending.length ? characterDiff(oldText, slots.map(s => pending.find(c => c.slotId === s.id)?.after ?? s.translation).join('\n')) : null;
     body = `<button class="entry-open" data-action="items"><span class="entry-title">${e(item.title)}</span><span class="status ${isDone(item) ? 'done' : ''}">${isDone(item) ? '確認済み' : '未確認'}</span>${icon('list')}</button><div class="pair"><div><div class="label">原文</div><div class="text-box source">${e(slots.map(sourceText).join('\n'))}</div>${slots.some(s=>s.sourceMissing) ? '<button class="text-act" data-action="source-edit">原文を補う</button>' : ''}</div><div><div class="label">${diff ? '変更前の英訳' : '英訳'}</div><div class="text-box translation">${diff?.before ?? e(oldText)}</div>${slots.flatMap(slotWarnings).map(w => `<p class="slot-warning ${w === newlineWarning ? 'subtle' : ''}">${e(w)}</p>`).join('')}</div>${diff ? `<div><div class="label">変更後の英訳</div><div class="text-box translation-after">${diff.after}</div></div>` : ''}</div>${context(file, item)}`;
   }
-  return `<main class="scroll review">${!item ? `<button class="entry-open" data-action="items">項目を選択${icon('list')}</button>` : ''}${body}</main><footer class="bottom"><button class="comment-trigger" data-action="comments" ${!item ? 'disabled' : ''}>${icon('comment')}コメント${item?.threads.length ? `<span class="bubble">${item.threads.length}</span>` : ''}</button><span class="counter" aria-live="polite">${index + 1} / ${list.length}</span><button class="prevnext" data-action="prev" aria-label="前の項目" ${index <= 0 ? 'disabled' : ''}>${icon('back')}</button><button class="prevnext next" data-action="next" aria-label="次の項目" ${index < 0 || index >= list.length - 1 ? 'disabled' : ''}>${icon('next')}</button></footer>${item && unresolved(item).length ? `<button class="float-comment" data-action="comments"><div class="float-head">未解決 ${unresolved(item).length}件</div><div class="float-preview">${e(latestPreview(item))}</div></button>` : ''}${item ? `<button class="approve ${isDone(item) ? 'undo' : ''}" data-action="approve">${icon(isDone(item) ? 'undo' : 'check')}${isDone(item) ? '未確認に戻す' : '承認'}</button>` : ''}`;
+  return `<main class="scroll review">${!item ? `<button class="entry-open" data-action="items">項目を選択${icon('list')}</button>` : ''}${body}</main><footer class="bottom"><button class="comment-trigger" data-action="comments" ${!item ? 'disabled' : ''}>${icon('comment')}コメント${item?.threads.length ? `<span class="bubble">${item.threads.length}</span>` : ''}</button><span class="counter" aria-live="polite">${index + 1} / ${list.length}</span><button class="prevnext" data-action="prev" aria-label="前の項目" ${!previous ? 'disabled' : ''}>${icon('back')}</button><button class="prevnext next" data-action="next" aria-label="次の項目" ${!next ? 'disabled' : ''}>${icon('next')}</button></footer>${item && unresolved(item).length ? `<button class="float-comment" data-action="comments"><div class="float-head">未解決 ${unresolved(item).length}件</div><div class="float-preview">${e(latestPreview(item))}</div></button>` : ''}${item ? `<button class="approve ${isDone(item) ? 'undo' : ''}" data-action="approve">${icon(isDone(item) ? 'undo' : 'check')}${isDone(item) ? '未確認に戻す' : '承認'}</button>` : ''}`;
 }
 function commentsBody() {
   const item = currentItem(); if (!item) return '<div class="empty">対象の項目はありません</div>';

@@ -448,3 +448,51 @@ test('folder disclosure triangles keep the same geometry in both states',async({
   const open=await geometry();await folder.click();await expect(folder).toHaveAttribute('aria-expanded','false');
   expect(await geometry()).toEqual(open);await folder.click();await expect(folder).toHaveAttribute('aria-expanded','true');expect(await geometry()).toEqual(open);
 });
+
+const navigationPaths=['BasicData/CommonEvent/000.txt','BasicData/CommonEvent/001.txt','BasicData/CommonEvent/002.txt','MapData/Dungeon/Event_0000.txt'];
+async function openTreeFile(page:Page,path:string) {
+  if(await page.getByRole('button',{name:'戻る',exact:true}).count()) await page.getByRole('button',{name:'戻る',exact:true}).click();
+  const parts=path.split('/');
+  for(let i=0;i<parts.length;i++) {
+    const row=page.locator(`.file-row[data-value="${parts.slice(0,i+1).join('/')}"]`);
+    if(i===parts.length-1 || await row.getAttribute('aria-expanded')==='false') await row.click();
+  }
+}
+async function loadNavigationFiles(page:Page) {
+  await page.goto('/');await page.getByRole('button',{name:'ファイルを読み込む',exact:true}).click();
+  for(const [name,lang] of [['ja','ja-JP'],['en','en-US']]) {
+    const entries=Object.fromEntries(navigationPaths.map(path=>[`${lang}/texts/${path}`,readFileSync(`.reference/${lang}/texts/${path}`)]));
+    await page.locator(`input[name=${name}]`).setInputFiles({name:`${lang}.zip`,mimeType:'application/zip',buffer:Buffer.from(zipSync(entries))});
+  }
+  await page.getByRole('button',{name:'読み込む',exact:true}).click();await expect(page.locator('.busy')).toHaveCount(0,{timeout:90_000});
+  if(await page.getByRole('dialog').count()) await page.getByRole('button',{name:'閉じる',exact:true}).click();
+}
+test('boundary navigation confirms forward and backward file changes and preserves cancellation',async({page})=>{
+  test.skip(!corpus,'Private reference files not available');await loadNavigationFiles(page);await openTreeFile(page,navigationPaths[0]);
+  await expect(page.getByRole('button',{name:'前の項目',exact:true})).toBeDisabled();
+  await page.locator('.entry-open').click();await page.locator('.pick-row').last().click();
+  const last=await page.locator('.counter').textContent();
+  await page.getByRole('button',{name:'次の項目',exact:true}).click();await expect(page.getByRole('alertdialog')).toContainText('次の「001.txt」を開きますか？');
+  await page.getByRole('button',{name:'キャンセル',exact:true}).click();await expect(page.locator('h1')).toHaveText('000.txt');await expect(page.locator('.counter')).toHaveText(last!);
+  await page.getByRole('button',{name:'次の項目',exact:true}).click();await page.getByRole('button',{name:'確定',exact:true}).click();
+  await expect(page.locator('h1')).toHaveText('001.txt');await expect(page.locator('.counter')).toHaveText(/^1 \/ /);
+  await page.keyboard.press('ArrowLeft');await expect(page.getByRole('alertdialog')).toContainText('前の「000.txt」を開きますか？');
+  await page.getByRole('button',{name:'確定',exact:true}).click();await expect(page.locator('h1')).toHaveText('000.txt');await expect(page.locator('.counter')).toHaveText(last!);
+});
+test('cross-file navigation applies the folder filter and distinguishes folder changes',async({page})=>{
+  test.skip(!corpus,'Private reference files not available');await loadNavigationFiles(page);
+  for(const path of [navigationPaths[0],navigationPaths[2],navigationPaths[3]]) {
+    await openTreeFile(page,path);await page.getByRole('button',{name:'コメント',exact:true}).click();await page.getByLabel('コメント内容').fill('Review '+path);
+    await page.getByRole('button',{name:'送信',exact:true}).click();await page.getByRole('button',{name:'閉じる',exact:true}).click();
+  }
+  await page.getByRole('button',{name:'戻る',exact:true}).click();await page.getByRole('button',{name:'コメントあり',exact:true}).click();await openTreeFile(page,navigationPaths[0]);
+  await expect(page.locator('.counter')).toHaveText('1 / 1');
+  await page.getByRole('button',{name:'次の項目',exact:true}).click();await expect(page.getByRole('alertdialog')).toContainText('次の「002.txt」を開きますか？');
+  await page.getByRole('button',{name:'確定',exact:true}).click();await expect(page.locator('h1')).toHaveText('002.txt');await expect(page.locator('.counter')).toHaveText('1 / 1');
+  await page.getByRole('button',{name:'次の項目',exact:true}).click();await expect(page.getByRole('alertdialog')).toContainText('次のフォルダ「MapData/Dungeon」へ移動して「Event_0000.txt」を開きますか？');
+  await page.getByRole('button',{name:'キャンセル',exact:true}).click();await expect(page.locator('h1')).toHaveText('002.txt');
+  await page.getByRole('button',{name:'次の項目',exact:true}).click();await page.getByRole('button',{name:'確定',exact:true}).click();await expect(page.locator('h1')).toHaveText('Event_0000.txt');
+  await expect(page.getByRole('button',{name:'次の項目',exact:true})).toBeDisabled();
+  await page.getByRole('button',{name:'前の項目',exact:true}).click();await expect(page.getByRole('alertdialog')).toContainText('前のフォルダ「BasicData/CommonEvent」');
+  await page.getByRole('button',{name:'確定',exact:true}).click();await expect(page.locator('h1')).toHaveText('002.txt');
+});
