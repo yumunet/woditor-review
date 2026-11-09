@@ -32,9 +32,8 @@ class PairTests(unittest.TestCase):
             self.assertEqual(len(ids), len(set(ids)))
             self.assertTrue(all(not i['approved'] for i in data['items']))
         self.assertEqual(sum(passed.values()) + sum(rejected.values()), 328)
-        self.assertGreater(passed['common'], 100)
-        self.assertGreater(passed['database'], 40)
-        self.assertGreater(passed['map'], 20)
+        self.assertEqual(passed, {'common': 225, 'database': 66, 'map': 37})
+        self.assertFalse(rejected)
         print(f'\nReal corpus: paired={dict(passed)}, rejected={dict(rejected)}')
 
     def test_actual_english_and_comment_group(self):
@@ -46,16 +45,19 @@ class PairTests(unittest.TestCase):
         self.assertEqual(d['commands'][0]['code'], 101)
         self.assertTrue(d['commands'][0]['en'].startswith('■Show Message'))
 
-    def test_inconsistent_real_file_refused(self):
-        with self.assertRaisesRegex(ValueError, '一致しません'):
-            self.pair('MapData/SampleMapA/Event_0009.txt')
+    def test_legacy_string_arguments_automatically_aligned(self):
+        data = self.pair('MapData/SampleMapA/Event_0009.txt')
+        self.assertFalse(data['errors'])
+        self.assertTrue(any('追加された引数' in warning for warning in data['warnings']))
+        self.assertTrue(any('Eat here' in s['translation'] for s in data['slots']))
 
     def test_structure_and_slot_position(self):
         path = 'MapData/SampleMapA/Event_0000.txt'
         ja = (ROOT/'ja-JP/texts'/path).read_bytes()
         en = (ROOT/'en-US/texts'/path).read_bytes()
-        with self.assertRaises(ValueError):
-            pair_file(path, ja, en.replace(b'[101][0,1]', b'[106][0,1]', 1))
+        result = pair_file(path, ja, en.replace(b'[101][0,1]', b'[106][0,1]', 1))
+        self.assertTrue(result['errors'])
+        self.assertFalse(any(s['command'] and s['command']['code'] == 101 and 'Hey there' in s['translation'] for s in result['slots']))
 
     def test_direct_self_usage(self):
         d = self.pair('BasicData/CommonEvent/003.txt')

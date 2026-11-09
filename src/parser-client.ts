@@ -8,7 +8,7 @@ export async function renderTranslations(files: ReviewFile[]): Promise<{path: st
     const cleanup = () => {target.removeEventListener('message', message); target.removeEventListener('error', error);};
     const message = ({data}: MessageEvent) => {if (data.id !== id) return; cleanup(); data.error ? reject(new Error(data.error)) : resolve(data.result);};
     const error = (event: ErrorEvent) => {cleanup(); worker?.terminate(); worker = undefined; reject(new Error(event.message));};
-    const payload = files.map(file => ({path: file.path, enText: file.enText, slots: file.slots.map(({id,line,kind,key,position,translation}) => ({id,line,kind,key,position,translation}))}));
+    const payload = files.map(file => ({path: file.path, enText: file.enText, slots: file.slots.map(({id,line,enLine,kind,key,position,translation}) => ({id,line,enLine,kind,key,position,translation}))}));
     target.addEventListener('message', message); target.addEventListener('error', error); target.postMessage({id, files: payload});
   });
 }

@@ -19,7 +19,7 @@ def main():
     if not ja_root.exists() or not en_root.exists():
         raise SystemExit('Reference corpus is not installed')
     types, paired, rejected, commands, excluded = [Counter() for _ in range(5)]
-    errors, skipped, counts = [], [], Counter()
+    errors, warnings, skipped, counts = [], [], [], Counter()
     ja_hash, en_hash = hashlib.sha256(), hashlib.sha256()
     for source in sorted(ja_root.rglob('*.txt')):
         path = source.relative_to(ja_root).as_posix()
@@ -47,6 +47,14 @@ def main():
             errors.append({'path': path, 'type': kind, 'reason': str(error)})
             continue
         paired[kind] += 1
+        if result['errors']:
+            counts['filesWithAlignmentErrors'] += 1
+        counts['unmatchedSlots'] += len(result['errors'])
+        counts['alignmentExcludedSlots'] += len(result['excluded']) - len(data['excluded'])
+        for error in result['errors']:
+            errors.append({'path': path, 'type': kind, 'reason': error})
+        if result['warnings']:
+            warnings.append({'path': path, 'messages': result['warnings']})
         counts['pairedSlots'] += len(result['slots'])
         counts['reviewItems'] += len(result['items'])
         counts['commentGroups'] += sum(len(i['slotIds']) > 1 for i in result['items'])
@@ -55,12 +63,12 @@ def main():
     output = {'generatedAt': datetime.now(timezone(timedelta(hours=9))).isoformat(),
               'sourceFiles': dict(types), 'pairedFiles': dict(paired), 'rejectedFiles': dict(rejected),
               'counts': dict(counts), 'commandCounts': dict(commands), 'excludedReasons': dict(excluded),
-              'unsupportedFiles': skipped, 'errors': errors,
+              'unsupportedFiles': skipped, 'errors': errors, 'warnings': warnings,
               'corpusSha256': {'ja': ja_hash.hexdigest(), 'en': en_hash.hexdigest()},
               'nativeElapsedSeconds': round(perf_counter() - start, 3)}
     dest = ROOT / 'docs/validation-corpus.json'
     dest.write_text(json.dumps(output, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
-    print(json.dumps({k: v for k, v in output.items() if k not in ('commandCounts','errors','unsupportedFiles')}, ensure_ascii=False, indent=2))
+    print(json.dumps({k: v for k, v in output.items() if k not in ('commandCounts','errors','warnings','unsupportedFiles')}, ensure_ascii=True, indent=2))
 
 
 if __name__ == '__main__': main()

@@ -1,6 +1,7 @@
 import type { PyodideInterface } from 'pyodide';
 import original from '../python/woditor_translation_tool.py?raw';
 import adapter from '../python/review_parser.py?raw';
+import alignment from '../python/review_alignment.py?raw';
 import { readZip } from './archive';
 import type { Diagnostic, ReviewFile } from './model';
 
@@ -13,9 +14,10 @@ async function python() {
     const py: PyodideInterface = await loadPyodide({indexURL});
     py.globals.set('original_code', original);
     py.globals.set('adapter_code', adapter);
+    py.globals.set('alignment_code', alignment);
     await py.runPythonAsync(`
 import types, sys, json
-for name, code in [('woditor_translation_tool', original_code), ('review_parser', adapter_code)]:
+for name, code in [('woditor_translation_tool', original_code), ('review_alignment', alignment_code), ('review_parser', adapter_code)]:
     module = types.ModuleType(name)
     sys.modules[name] = module
     exec(compile(code, name + '.py', 'exec'), module.__dict__)
@@ -63,6 +65,7 @@ self.onmessage = async ({data}: MessageEvent<{id: number; ja: ArrayBuffer; en: A
           const parsed: ReviewFile = JSON.parse(pair(path, raw, other));
           files.push(parsed);
           parsed.warnings.forEach(message => diagnostics.push({path, severity: 'warning', message}));
+          parsed.errors?.forEach(message => diagnostics.push({path, severity: 'error', message}));
         } catch (err) {diagnostics.push({path, severity: 'error', message: messageFor(err)});}
       }
       for (const path of en.keys()) if (!ja.has(path)) diagnostics.push({path, severity: 'skip', message: '日本語原文がありません'});

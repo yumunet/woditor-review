@@ -4,18 +4,19 @@ import { zipSync, unzipSync } from 'fflate';
 const real = '.reference/ja-JP/texts/MapData/SampleMapA/Event_0000.txt';
 const corpus = existsSync(real);
 const sourcePath = 'MapData/SampleMapA/Event_0000.txt';
-export async function loadReal(page: Page) {
+export async function loadReal(page: Page, importPath = sourcePath) {
   await page.goto('/');
   await page.getByRole('button', {name: 'ファイルを読み込む', exact: true}).click();
   for (const [name, lang] of [['ja', 'ja-JP'], ['en', 'en-US']]) {
-    const buffer = Buffer.from(zipSync({[`extra/${lang}/texts/${sourcePath}`]: readFileSync(`.reference/${lang}/texts/${sourcePath}`)}));
+    const buffer = Buffer.from(zipSync({[`extra/${lang}/texts/${importPath}`]: readFileSync(`.reference/${lang}/texts/${importPath}`)}));
     await page.locator(`input[name=${name}]`).setInputFiles({name: `${lang}.zip`, mimeType: 'application/zip', buffer});
   }
   await page.getByRole('button', {name: '読み込む', exact: true}).click();
   await expect(page.locator('.busy')).toHaveCount(0, {timeout: 90_000});
   if (await page.getByRole('dialog').count()) await page.getByRole('button', {name: '閉じる', exact: true}).click();
-  for (const name of ['MapData', 'SampleMapA', 'Event_0000.txt']) await page.locator('.file-row').filter({has: page.locator('.row-name', {hasText: name})}).click();
-  await expect(page.locator('.source')).toContainText('夕一');
+  for (const name of importPath.split('/')) await page.locator('.file-row').filter({has: page.locator('.row-name', {hasText: name})}).click();
+  if (importPath === sourcePath) await expect(page.locator('.source')).toContainText('夕一');
+  else await expect(page.locator('.source')).toBeVisible();
 }
 
 test('real ZIP -> folders -> compare -> context -> filtered empty state', async ({page}) => {
@@ -170,17 +171,25 @@ test('full real corpus in worker, diagnostics, all folder progress and restart',
   await expect(page.locator('.busy')).toHaveCount(0, {timeout:90_000});
   const elapsedMs=Date.now()-start;
   expect(await page.evaluate(() => {clearInterval((window as any).timer);return (window as any).ticks;})).toBeGreaterThan(10);
-  await expect(page.locator('.diagnostic.error')).toHaveCount(67);
+  await expect(page.getByRole('tab',{name:'エラー (10)',exact:true})).toHaveAttribute('aria-selected','true');
+  await expect(page.locator('.diagnostic.error')).toHaveCount(10);
+  await expect(page.locator('.diagnostic.warning, .diagnostic.skip')).toHaveCount(0);
+  await page.getByRole('tab',{name:/^警告/}).click();
+  await expect(page.locator('.diagnostic.error, .diagnostic.skip')).toHaveCount(0);
+  await expect(page.locator('.diagnostic.warning').first()).toBeVisible();
+  await page.getByRole('tab',{name:'対象外 (20)',exact:true}).click();
+  await expect(page.locator('.diagnostic.skip')).toHaveCount(20);
+  await page.getByRole('tab',{name:'エラー (10)',exact:true}).click();
   const summary = await page.evaluate(async () => {
     const db=await new Promise<IDBDatabase>((resolve,reject)=>{const r=indexedDB.open('woditor-review');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
     const files:any[]=await new Promise(resolve=>{const r=db.transaction('files').objectStore('files').getAll();r.onsuccess=()=>resolve(r.result);});db.close();
     return {files:files.length,items:files.reduce((n,f)=>n+f.items.length,0),slots:files.reduce((n,f)=>n+f.slots.length,0),types:files.reduce((a,f)=>({...a,[f.type]:(a[f.type]||0)+1}),{}), usages:files.reduce((n,f)=>n+Object.values(f.usages).filter((hits:any)=>hits.length>1).length,0)};
   });
-  expect(summary.files).toBe(261); expect(summary.types).toEqual({common:172,database:58,map:31}); expect(summary.usages).toBeGreaterThan(0);
+  expect(summary.files).toBe(328); expect(summary.types).toEqual({common:225,database:66,map:37}); expect(summary.usages).toBeGreaterThan(0);
   mkdirSync('test-results',{recursive:true});writeFileSync(`test-results/corpus-${info.project.name}.json`,JSON.stringify({...summary,elapsedMs},null,2));
   await page.getByRole('button', {name:'閉じる',exact:true}).click();
   await page.getByRole('button', {name:'全体の進捗',exact:true}).click();
-  await expect(page.locator('.progress-detail')).toContainText(['全体','BasicData','CDataBase','CommonEvent','DataBase','SysDataBase','MapData','Dungeon','SampleMapA','SampleMapB']);
+  await expect(page.locator('.progress-detail')).toContainText(['全体','BasicData','CDataBase','CommonEvent','DataBase','SysDataBase','MapData','Dungeon','SampleMapA','SampleMapB','TitleMap']);
   await page.getByRole('button', {name:'閉じる',exact:true}).click();
   await page.reload(); await expect(page.locator('.file-row')).toHaveCount(2);
   expect(external).toEqual([]);
@@ -277,4 +286,36 @@ test('manual comment split and merge', async ({page}) => {
   await page.getByRole('button',{name:'次のコメントと結合',exact:true}).click();await page.getByRole('button',{name:'確定',exact:true}).click();
   await expect(page.locator('.source')).toHaveText(source!);
   await expect(page.locator('.counter')).toHaveText(new RegExp(` / ${grouped.count}$`));
+});
+
+test('corrected English positions survive JSON export, revised TXT and approved ZIP export',async({page})=>{
+  test.skip(!corpus,'Private reference files not available');
+  const path='MapData/SampleMapA/Event_0023.txt';
+  await loadReal(page,path);
+  await page.getByRole('button',{name:'次の項目',exact:true}).click();
+  await expect(page.locator('.translation')).toContainText("I'm a witch.");
+  await page.getByRole('button',{name:'コメント',exact:true}).click();
+  await page.getByLabel('コメント内容').fill('Please revise this message');await page.getByRole('button',{name:'送信',exact:true}).click();
+  await page.getByRole('button',{name:'閉じる',exact:true}).click();
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'レビューJSONを出力',exact:true}).click();
+  let event=page.waitForEvent('download');await page.getByRole('button',{name:'JSONを出力',exact:true}).click();
+  const request=JSON.parse(readFileSync((await(await event).path())!,'utf8')),row=request.entries[0],slot=row.slots[0];
+  const original=readFileSync(`.reference/en-US/texts/${path}`,'utf8'),lines=original.split(/\r?\n/);
+  const first=lines.find(l=>l.startsWith('[101]'))!;
+  expect(slot.line).toBe(lines.indexOf(first)+1);
+  expect(slot.line).toBeGreaterThan(Number(slot.id.match(/^L(\d+)/)[1]));
+  await page.getByRole('button',{name:'閉じる',exact:true}).click();
+  const after=slot.translation+' Revised.',nl=original.includes('\r\n')?'\r\n':'\n';
+  const display=lines.find(l=>l.startsWith('■Show Message:'))!;
+  const revised=original.replace(first,()=>`[103][0,1]<0>()("Extra translator comment")${nl}${first.replace(slot.translation,()=>after)}`).replace(display,()=>`▼ Extra translator comment${nl}${display}`);
+  const response={schemaVersion:1,requestId:request.requestId,suggestions:[],responses:[{commentId:row.commentId,path,itemId:row.itemId,fileVersion:row.fileVersion,decision:'accepted',reason:'Revised message',changes:[{slotId:slot.id,before:slot.translation,after}]}]};
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'レビューJSONを読み込む',exact:true}).click();
+  await page.locator('input[name=answer]').setInputFiles({name:'response.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(response))});
+  await page.locator('input[name=revised]').setInputFiles({name:'revised.zip',mimeType:'application/zip',buffer:Buffer.from(zipSync({[`en-US/texts/${path}`]:Buffer.from(revised)}))});
+  await page.getByRole('button',{name:'回答を読み込む',exact:true}).click();await expect(page.locator('.translation-after')).toHaveText(after);
+  await page.getByRole('button',{name:/コメント/}).first().click();await page.getByRole('button',{name:'解決',exact:true}).click();await page.getByRole('button',{name:'閉じる',exact:true}).click();
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'英訳TXTを出力',exact:true}).click();
+  event=page.waitForEvent('download');await page.getByRole('button',{name:'英訳TXTを出力',exact:true}).click();
+  const zip=unzipSync(readFileSync((await(await event).path())!)),output=Buffer.from(zip[`en-US/texts/${path}`]).toString('utf8');
+  expect(output).toBe(revised);
 });

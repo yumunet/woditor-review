@@ -1,10 +1,12 @@
 export type Filter = 'all' | 'pending' | 'comment' | 'done';
 export interface Command {
+  enLine?: number | null;
   line: number; code: number; kind: string | null; depth: number; numbers: number[];
   strings: string[]; parentCode: number | null; opaque: boolean;
   ja: string; en: string; displayLineJa: number; displayLineEn: number;
 }
 export interface Slot {
+  enLine?: number;
   id: string; line: number; start: number; end: number; source: string; translation: string;
   kind: string; key: string; title: string; position?: number; command: Command | null;
   fingerprint: string; warnings: string[];
@@ -27,6 +29,7 @@ export interface ReviewFile {
   slots: Slot[]; items: Item[]; commands: Command[]; usages: Record<string, number[]>;
   excluded: Array<Partial<Slot> & { reason: string }>; warnings: string[];
   manualGroups?: string[][];
+  errors?: string[];
 }
 export interface Diagnostic { path: string; severity: 'error' | 'warning' | 'skip'; message: string }
 export interface ReviewRequest {

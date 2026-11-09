@@ -12,7 +12,7 @@ export function createRequest(workspace: Workspace, selected: string[]): ReviewR
     const line = slots[0].command ? slots[0].line : file.usages[slots[0].id]?.[0];
     for (const thread of unresolved(item)) request.entries.push({path: file.path, fileVersion: file.version,
       itemId: item.id, slotIds: [...item.slotIds], commentId: thread.id,
-      slots: slots.map(s => ({id: s.id, source: s.source, translation: s.translation, line: s.line, key: s.key, kind: s.kind, position: s.position})),
+      slots: slots.map(s => ({id: s.id, source: s.source, translation: s.translation, line: s.enLine ?? s.line, key: s.key, kind: s.kind, position: s.position})),
       posts: structuredClone(thread.posts), context: line === undefined ? [] : initialContext(file, line, 3, 3)});
   }
   if (!request.entries.length) throw new Error('選択したファイルに未解決コメントがありません');
@@ -103,6 +103,7 @@ export function importResponse(workspace: Workspace, value: unknown, revised?: R
       for (const slot of updated.slots) {
         const old = file.slots.find(s => s.id === slot.id && s.source === slot.source && s.fingerprint === slot.fingerprint);
         if (!old) throw new Error('修正TXTの翻訳単位が一致しません');
+        old.enLine = slot.enLine;
         const item = file.items.find(i => i.slotIds.includes(old.id))!;
         const pending = item.changes.find(c => c.slotId === old.id && c.status === 'pending');
         if (pending) {if (pending.after !== slot.translation) throw new Error('回答JSONと修正TXTの新訳が一致しません');}

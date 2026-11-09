@@ -54,6 +54,7 @@ export function validateWorkspace(data: unknown): asserts data is Workspace {
     for (const s of f.slots) {
       if (!object(s) || !str(s.id) || slots.has(s.id) || !str(s.source) || !str(s.translation) || !str(s.key) || !str(s.kind) || !hash(s.fingerprint) || !arr(s.warnings) || !s.warnings.every(str) || !Number.isInteger(s.line) || s.line < 1 || !Number.isInteger(s.start) || !Number.isInteger(s.end) || s.start < 0 || s.end < s.start) return fail();
       slots.add(s.id);
+      if (s.enLine !== undefined && (!Number.isInteger(s.enLine) || s.enLine < 1)) return fail();
     }
     for (const i of f.items) {
       if (!object(i) || !str(i.id) || items.has(i.id) || !str(i.title) || typeof i.approved !== 'boolean' || !arr(i.slotIds) || !i.slotIds.length || !arr(i.threads) || !arr(i.changes)) return fail();

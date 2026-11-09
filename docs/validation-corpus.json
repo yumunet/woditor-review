@@ -1,30 +1,29 @@
 {
-  "generatedAt": "2026-11-09T13:24:55.448553+09:00",
+  "generatedAt": "2026-11-09T17:24:02.810967+09:00",
   "sourceFiles": {
     "database": 66,
     "common": 225,
     "map": 37
   },
   "pairedFiles": {
-    "database": 58,
-    "common": 172,
-    "map": 31
+    "database": 66,
+    "common": 225,
+    "map": 37
   },
-  "rejectedFiles": {
-    "database": 8,
-    "common": 53,
-    "map": 6
-  },
+  "rejectedFiles": {},
   "counts": {
     "sourceOriginalSlots": 23719,
     "sourceIncludedSlots": 18347,
     "sourceExcludedSlots": 5372,
     "sourceUnhandledLines": 0,
-    "pairedSlots": 10634,
-    "reviewItems": 10131,
-    "commentGroups": 320,
-    "selfVariablesWithMultipleUsages": 1642,
-    "slotsWithTokenWarnings": 220
+    "unmatchedSlots": 10,
+    "alignmentExcludedSlots": 3863,
+    "pairedSlots": 14484,
+    "reviewItems": 13575,
+    "commentGroups": 478,
+    "selfVariablesWithMultipleUsages": 2226,
+    "slotsWithTokenWarnings": 587,
+    "filesWithAlignmentErrors": 2
   },
   "commandCounts": {
     "103": 6045,
@@ -103,344 +102,952 @@
   ],
   "errors": [
     {
-      "path": "BasicData/CDataBase/00.txt",
-      "type": "database",
-      "reason": "原文部分の行数が一致しません: 日本語 669 / 英語 661"
-    },
-    {
-      "path": "BasicData/CDataBase/01.txt",
-      "type": "database",
-      "reason": "原文部分の行数が一致しません: 日本語 1291 / 英語 1015"
-    },
-    {
-      "path": "BasicData/CDataBase/04.txt",
-      "type": "database",
-      "reason": "原文部分の行数が一致しません: 日本語 4315 / 英語 715"
-    },
-    {
-      "path": "BasicData/CDataBase/10.txt",
-      "type": "database",
-      "reason": "原文部分の行数が一致しません: 日本語 687 / 英語 681"
-    },
-    {
-      "path": "BasicData/CDataBase/17.txt",
-      "type": "database",
-      "reason": "原文部分の行数が一致しません: 日本語 243 / 英語 241"
-    },
-    {
-      "path": "BasicData/CommonEvent/000.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 237 / 英語 231"
-    },
-    {
-      "path": "BasicData/CommonEvent/001.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 237 / 英語 231"
-    },
-    {
-      "path": "BasicData/CommonEvent/002.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 237 / 英語 231"
-    },
-    {
-      "path": "BasicData/CommonEvent/008.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 190 / 英語 180"
-    },
-    {
-      "path": "BasicData/CommonEvent/011.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 234 / 英語 228"
-    },
-    {
-      "path": "BasicData/CommonEvent/012.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 230 / 英語 224"
-    },
-    {
-      "path": "BasicData/CommonEvent/014.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 245 / 英語 216"
-    },
-    {
-      "path": "BasicData/CommonEvent/015.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 202 / 英語 173"
-    },
-    {
-      "path": "BasicData/CommonEvent/016.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 192 / 英語 168"
-    },
-    {
-      "path": "BasicData/CommonEvent/021.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 229 / 英語 225"
-    },
-    {
-      "path": "BasicData/CommonEvent/025.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 223 / 英語 208"
-    },
-    {
-      "path": "BasicData/CommonEvent/026.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 273 / 英語 265"
-    },
-    {
-      "path": "BasicData/CommonEvent/027.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 195 / 英語 168"
-    },
-    {
-      "path": "BasicData/CommonEvent/030.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 208 / 英語 185"
-    },
-    {
-      "path": "BasicData/CommonEvent/031.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 394 / 英語 382"
-    },
-    {
-      "path": "BasicData/CommonEvent/032.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 194 / 英語 168"
-    },
-    {
-      "path": "BasicData/CommonEvent/033.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 190 / 英語 170"
-    },
-    {
-      "path": "BasicData/CommonEvent/034.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 222 / 英語 218"
-    },
-    {
-      "path": "BasicData/CommonEvent/035.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 189 / 英語 175"
-    },
-    {
-      "path": "BasicData/CommonEvent/036.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 200 / 英語 168"
-    },
-    {
-      "path": "BasicData/CommonEvent/037.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 249 / 英語 246"
-    },
-    {
-      "path": "BasicData/CommonEvent/038.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 192 / 英語 168"
-    },
-    {
-      "path": "BasicData/CommonEvent/041.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 192 / 英語 168"
-    },
-    {
-      "path": "BasicData/CommonEvent/042.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 192 / 英語 168"
-    },
-    {
-      "path": "BasicData/CommonEvent/043.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 192 / 英語 168"
-    },
-    {
-      "path": "BasicData/CommonEvent/045.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 186 / 英語 168"
-    },
-    {
-      "path": "BasicData/CommonEvent/047.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 178 / 英語 168"
-    },
-    {
-      "path": "BasicData/CommonEvent/070.txt",
-      "type": "common",
-      "reason": "コマンド構造が一致しません（行 257）"
-    },
-    {
-      "path": "BasicData/CommonEvent/071.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 266 / 英語 260"
-    },
-    {
-      "path": "BasicData/CommonEvent/072.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 209 / 英語 205"
-    },
-    {
-      "path": "BasicData/CommonEvent/073.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 207 / 英語 203"
-    },
-    {
-      "path": "BasicData/CommonEvent/074.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 383 / 英語 377"
-    },
-    {
-      "path": "BasicData/CommonEvent/078.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 229 / 英語 223"
-    },
-    {
-      "path": "BasicData/CommonEvent/082.txt",
-      "type": "common",
-      "reason": "コマンド構造が一致しません（行 178）"
-    },
-    {
-      "path": "BasicData/CommonEvent/085.txt",
-      "type": "common",
-      "reason": "コマンド構造が一致しません（行 401）"
-    },
-    {
-      "path": "BasicData/CommonEvent/086.txt",
-      "type": "common",
-      "reason": "コマンド構造が一致しません（行 217）"
-    },
-    {
-      "path": "BasicData/CommonEvent/089.txt",
-      "type": "common",
-      "reason": "コマンド構造が一致しません（行 242）"
-    },
-    {
-      "path": "BasicData/CommonEvent/093.txt",
-      "type": "common",
-      "reason": "コマンド構造が一致しません（行 706）"
-    },
-    {
-      "path": "BasicData/CommonEvent/094.txt",
-      "type": "common",
-      "reason": "コマンド構造が一致しません（行 439）"
-    },
-    {
-      "path": "BasicData/CommonEvent/095.txt",
-      "type": "common",
-      "reason": "コマンド構造が一致しません（行 429）"
-    },
-    {
-      "path": "BasicData/CommonEvent/099.txt",
-      "type": "common",
-      "reason": "コマンド構造が一致しません（行 264）"
-    },
-    {
-      "path": "BasicData/CommonEvent/109.txt",
-      "type": "common",
-      "reason": "コマンド構造が一致しません（行 233）"
-    },
-    {
-      "path": "BasicData/CommonEvent/119.txt",
-      "type": "common",
-      "reason": "コマンド構造が一致しません（行 187）"
-    },
-    {
-      "path": "BasicData/CommonEvent/129.txt",
-      "type": "common",
-      "reason": "コマンド構造が一致しません（行 193）"
-    },
-    {
-      "path": "BasicData/CommonEvent/132.txt",
-      "type": "common",
-      "reason": "コマンド構造が一致しません（行 787）"
-    },
-    {
-      "path": "BasicData/CommonEvent/173.txt",
-      "type": "common",
-      "reason": "コマンド構造が一致しません（行 173）"
-    },
-    {
-      "path": "BasicData/CommonEvent/181.txt",
-      "type": "common",
-      "reason": "コマンド構造が一致しません（行 355）"
-    },
-    {
-      "path": "BasicData/CommonEvent/186.txt",
-      "type": "common",
-      "reason": "コマンド構造が一致しません（行 282）"
-    },
-    {
-      "path": "BasicData/CommonEvent/192.txt",
-      "type": "common",
-      "reason": "コマンド構造が一致しません（行 379）"
-    },
-    {
-      "path": "BasicData/CommonEvent/208.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 633 / 英語 617"
-    },
-    {
-      "path": "BasicData/CommonEvent/210.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 186 / 英語 168"
-    },
-    {
-      "path": "BasicData/CommonEvent/212.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 188 / 英語 170"
-    },
-    {
-      "path": "BasicData/CommonEvent/214.txt",
-      "type": "common",
-      "reason": "原文部分の行数が一致しません: 日本語 178 / 英語 172"
-    },
-    {
-      "path": "BasicData/DataBase/08.txt",
-      "type": "database",
-      "reason": "原文部分の行数が一致しません: 日本語 583 / 英語 581"
-    },
-    {
-      "path": "BasicData/DataBase/12.txt",
-      "type": "database",
-      "reason": "原文部分の行数が一致しません: 日本語 4315 / 英語 715"
-    },
-    {
-      "path": "BasicData/DataBase/13.txt",
-      "type": "database",
-      "reason": "原文部分の行数が一致しません: 日本語 253 / 英語 251"
-    },
-    {
-      "path": "MapData/SampleMapA/Event_0009.txt",
+      "path": "MapData/SampleMapA/Event_0019.txt",
       "type": "map",
-      "reason": "コマンド構造が一致しません（行 54）"
-    },
-    {
-      "path": "MapData/SampleMapA/Event_0013.txt",
-      "type": "map",
-      "reason": "コマンド構造が一致しません（行 62）"
+      "reason": "行 106（文章の表示）: 対応候補が複数あり自動関連付けできません"
     },
     {
       "path": "MapData/SampleMapA/Event_0019.txt",
       "type": "map",
-      "reason": "コマンド構造が一致しません（行 107）"
+      "reason": "行 107（文章の表示）: 対応候補が複数あり自動関連付けできません"
     },
     {
-      "path": "MapData/SampleMapA/Event_0023.txt",
+      "path": "MapData/SampleMapA/Event_0019.txt",
       "type": "map",
-      "reason": "原文部分の行数が一致しません: 日本語 59 / 英語 61"
-    },
-    {
-      "path": "MapData/SampleMapA/Event_0024.txt",
-      "type": "map",
-      "reason": "コマンド構造が一致しません（行 67）"
+      "reason": "行 108（文章の表示）: 対応候補が複数あり自動関連付けできません"
     },
     {
       "path": "MapData/TitleMap/Event_0000.txt",
       "type": "map",
-      "reason": "コマンド構造が一致しません（行 67）"
+      "reason": "行 58（コメント）: 対応候補が複数あり自動関連付けできません"
+    },
+    {
+      "path": "MapData/TitleMap/Event_0000.txt",
+      "type": "map",
+      "reason": "行 59（コメント）: 対応候補が複数あり自動関連付けできません"
+    },
+    {
+      "path": "MapData/TitleMap/Event_0000.txt",
+      "type": "map",
+      "reason": "行 60（コメント）: 対応候補が複数あり自動関連付けできません"
+    },
+    {
+      "path": "MapData/TitleMap/Event_0000.txt",
+      "type": "map",
+      "reason": "行 61（コメント）: 対応候補が複数あり自動関連付けできません"
+    },
+    {
+      "path": "MapData/TitleMap/Event_0000.txt",
+      "type": "map",
+      "reason": "行 63（コメント）: 対応候補が複数あり自動関連付けできません"
+    },
+    {
+      "path": "MapData/TitleMap/Event_0000.txt",
+      "type": "map",
+      "reason": "行 75（コメント）: 対応候補が複数あり自動関連付けできません"
+    },
+    {
+      "path": "MapData/TitleMap/Event_0000.txt",
+      "type": "map",
+      "reason": "行 76（コメント）: 対応候補が複数あり自動関連付けできません"
+    }
+  ],
+  "warnings": [
+    {
+      "path": "BasicData/CDataBase/00.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 669 / 英語 661）",
+        "設定値の差を保持: 4件",
+        "英語版で無効化された設定: 4件",
+        "設定キーによる行ずれ補正: 364件",
+        "英語版で削除された設定: 4件",
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/CDataBase/01.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 1291 / 英語 1015）",
+        "設定値の差を保持: 92件",
+        "英語版で無効化された設定: 138件",
+        "設定キーによる行ずれ補正: 581件",
+        "英語版で削除された設定: 138件",
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/CDataBase/02.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/CDataBase/03.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/CDataBase/04.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 4315 / 英語 715）",
+        "設定値の差を保持: 200件",
+        "英語版で無効化された設定: 1800件",
+        "設定キーによる行ずれ補正: 301件",
+        "英語版で削除された設定: 1800件",
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/CDataBase/05.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/CDataBase/06.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/CDataBase/07.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/CDataBase/08.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/CDataBase/09.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/CDataBase/10.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 687 / 英語 681）",
+        "設定値の差を保持: 2件",
+        "英語版で無効化された設定: 3件",
+        "設定キーによる行ずれ補正: 316件",
+        "英語版で削除された設定: 3件",
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/CDataBase/13.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/CDataBase/14.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/CDataBase/15.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/CDataBase/16.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/CDataBase/17.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 243 / 英語 241）",
+        "設定値の差を保持: 2件",
+        "英語版で無効化された設定: 1件",
+        "設定キーによる行ずれ補正: 60件",
+        "英語版で削除された設定: 1件",
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/CDataBase/18.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/CDataBase/19.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/000.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 237 / 英語 231）",
+        "設定値の差を保持: 3件",
+        "英語版で無効化された設定: 3件",
+        "設定キーによる行ずれ補正: 133件",
+        "英語版で削除された設定: 3件",
+        "コマンド列による行ずれ補正: 55件",
+        "旧形式の文字列操作に追加された引数を補正: 4件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/001.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 237 / 英語 231）",
+        "設定値の差を保持: 3件",
+        "英語版で無効化された設定: 3件",
+        "設定キーによる行ずれ補正: 133件",
+        "英語版で削除された設定: 3件",
+        "コマンド列による行ずれ補正: 55件",
+        "旧形式の文字列操作に追加された引数を補正: 4件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/002.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 237 / 英語 231）",
+        "設定値の差を保持: 3件",
+        "英語版で無効化された設定: 3件",
+        "設定キーによる行ずれ補正: 133件",
+        "英語版で削除された設定: 3件",
+        "コマンド列による行ずれ補正: 55件",
+        "旧形式の文字列操作に追加された引数を補正: 4件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/008.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 190 / 英語 180）",
+        "設定値の差を保持: 3件",
+        "英語版で無効化された設定: 8件",
+        "設定キーによる行ずれ補正: 139件",
+        "英語版で削除された設定: 2件",
+        "コマンド列による行ずれ補正: 3件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/011.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 234 / 英語 228）",
+        "設定値の差を保持: 4件",
+        "英語版で無効化された設定: 3件",
+        "設定キーによる行ずれ補正: 148件",
+        "英語版で削除された設定: 3件",
+        "コマンド列による行ずれ補正: 23件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/012.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 230 / 英語 224）",
+        "設定値の差を保持: 3件",
+        "英語版で無効化された設定: 3件",
+        "設定キーによる行ずれ補正: 146件",
+        "英語版で削除された設定: 3件",
+        "コマンド列による行ずれ補正: 23件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/014.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 245 / 英語 216）",
+        "設定値の差を保持: 5件",
+        "英語版で無効化された設定: 13件",
+        "設定キーによる行ずれ補正: 134件",
+        "英語版で削除された設定: 16件",
+        "コマンド列による行ずれ補正: 37件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/015.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 202 / 英語 173）",
+        "設定値の差を保持: 5件",
+        "英語版で無効化された設定: 13件",
+        "設定キーによる行ずれ補正: 130件",
+        "英語版で削除された設定: 16件",
+        "コマンド列による行ずれ補正: 2件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/016.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 192 / 英語 168）",
+        "設定値の差を保持: 8件",
+        "英語版で無効化された設定: 12件",
+        "設定キーによる行ずれ補正: 129件",
+        "英語版で削除された設定: 12件",
+        "コマンド列による行ずれ補正: 1件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/021.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 229 / 英語 225）",
+        "設定値の差を保持: 2件",
+        "英語版で無効化された設定: 2件",
+        "設定キーによる行ずれ補正: 139件",
+        "英語版で削除された設定: 2件",
+        "コマンド列による行ずれ補正: 35件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/025.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 223 / 英語 208）",
+        "設定値の差を保持: 5件",
+        "英語版で無効化された設定: 9件",
+        "設定キーによる行ずれ補正: 134件",
+        "英語版で削除された設定: 6件",
+        "コマンド列による行ずれ補正: 35件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/026.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 273 / 英語 265）",
+        "設定値の差を保持: 3件",
+        "英語版で無効化された設定: 5件",
+        "設定キーによる行ずれ補正: 142件",
+        "英語版で削除された設定: 3件",
+        "コマンド列による行ずれ補正: 74件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/027.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 195 / 英語 168）",
+        "設定値の差を保持: 3件",
+        "英語版で無効化された設定: 12件",
+        "設定キーによる行ずれ補正: 128件",
+        "英語版で削除された設定: 15件",
+        "コマンド列による行ずれ補正: 1件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/030.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 208 / 英語 185）",
+        "設定値の差を保持: 5件",
+        "英語版で無効化された設定: 10件",
+        "設定キーによる行ずれ補正: 130件",
+        "英語版で削除された設定: 13件",
+        "コマンド列による行ずれ補正: 14件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/031.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 394 / 英語 382）",
+        "設定値の差を保持: 7件",
+        "英語版で無効化された設定: 6件",
+        "設定キーによる行ずれ補正: 143件",
+        "英語版で削除された設定: 6件",
+        "コマンド列による行ずれ補正: 185件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/032.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 194 / 英語 168）",
+        "設定値の差を保持: 6件",
+        "英語版で無効化された設定: 10件",
+        "設定キーによる行ずれ補正: 128件",
+        "英語版で削除された設定: 16件",
+        "コマンド列による行ずれ補正: 1件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/033.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 190 / 英語 170）",
+        "設定値の差を保持: 8件",
+        "英語版で無効化された設定: 10件",
+        "設定キーによる行ずれ補正: 129件",
+        "英語版で削除された設定: 10件",
+        "コマンド列による行ずれ補正: 3件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/034.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 222 / 英語 218）",
+        "設定値の差を保持: 1件",
+        "コマンド列による行ずれ補正: 27件",
+        "英語版で削除されたコマンド: 4件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/035.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 189 / 英語 175）",
+        "設定値の差を保持: 6件",
+        "英語版で無効化された設定: 7件",
+        "設定キーによる行ずれ補正: 131件",
+        "英語版で削除された設定: 7件",
+        "コマンド列による行ずれ補正: 2件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/036.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 200 / 英語 168）",
+        "設定値の差を保持: 8件",
+        "英語版で無効化された設定: 16件",
+        "設定キーによる行ずれ補正: 129件",
+        "英語版で削除された設定: 16件",
+        "コマンド列による行ずれ補正: 1件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/037.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 249 / 英語 246）",
+        "設定値の差を保持: 1件",
+        "英語版で無効化された設定: 3件",
+        "設定キーによる行ずれ補正: 134件",
+        "コマンド列による行ずれ補正: 61件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/038.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 192 / 英語 168）",
+        "設定値の差を保持: 8件",
+        "英語版で無効化された設定: 12件",
+        "設定キーによる行ずれ補正: 129件",
+        "英語版で削除された設定: 12件",
+        "コマンド列による行ずれ補正: 1件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/041.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 192 / 英語 168）",
+        "設定値の差を保持: 8件",
+        "英語版で無効化された設定: 12件",
+        "設定キーによる行ずれ補正: 129件",
+        "英語版で削除された設定: 12件",
+        "コマンド列による行ずれ補正: 1件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/042.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 192 / 英語 168）",
+        "設定値の差を保持: 8件",
+        "英語版で無効化された設定: 12件",
+        "設定キーによる行ずれ補正: 129件",
+        "英語版で削除された設定: 12件",
+        "コマンド列による行ずれ補正: 1件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/043.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 192 / 英語 168）",
+        "設定値の差を保持: 8件",
+        "英語版で無効化された設定: 12件",
+        "設定キーによる行ずれ補正: 129件",
+        "英語版で削除された設定: 12件",
+        "コマンド列による行ずれ補正: 1件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/045.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 186 / 英語 168）",
+        "設定値の差を保持: 6件",
+        "英語版で無効化された設定: 9件",
+        "設定キーによる行ずれ補正: 128件",
+        "英語版で削除された設定: 9件",
+        "コマンド列による行ずれ補正: 1件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/047.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 178 / 英語 168）",
+        "設定値の差を保持: 4件",
+        "英語版で無効化された設定: 5件",
+        "設定キーによる行ずれ補正: 129件",
+        "英語版で削除された設定: 5件",
+        "コマンド列による行ずれ補正: 1件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/070.txt",
+      "messages": [
+        "旧形式の文字列操作に追加された引数を補正: 46件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/071.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 266 / 英語 260）",
+        "設定値の差を保持: 2件",
+        "英語版で無効化された設定: 3件",
+        "設定キーによる行ずれ補正: 137件",
+        "英語版で削除された設定: 3件",
+        "コマンド列による行ずれ補正: 71件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/072.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 209 / 英語 205）",
+        "設定値の差を保持: 3件",
+        "英語版で無効化された設定: 2件",
+        "設定キーによる行ずれ補正: 130件",
+        "英語版で削除された設定: 2件",
+        "コマンド列による行ずれ補正: 30件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/073.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 207 / 英語 203）",
+        "設定値の差を保持: 3件",
+        "英語版で無効化された設定: 2件",
+        "設定キーによる行ずれ補正: 130件",
+        "英語版で削除された設定: 2件",
+        "コマンド列による行ずれ補正: 28件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/074.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 383 / 英語 377）",
+        "設定値の差を保持: 3件",
+        "英語版で無効化された設定: 3件",
+        "設定キーによる行ずれ補正: 128件",
+        "英語版で削除された設定: 3件",
+        "コマンド列による行ずれ補正: 206件",
+        "コマンド引数の差を保持して関連付け: 1件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/078.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 229 / 英語 223）",
+        "設定値の差を保持: 4件",
+        "英語版で無効化された設定: 3件",
+        "設定キーによる行ずれ補正: 137件",
+        "英語版で削除された設定: 3件",
+        "コマンド列による行ずれ補正: 36件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/082.txt",
+      "messages": [
+        "コマンド引数の差を保持して関連付け: 1件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/085.txt",
+      "messages": [
+        "旧形式の文字列操作に追加された引数を補正: 4件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/086.txt",
+      "messages": [
+        "コマンド引数の差を保持して関連付け: 2件",
+        "旧形式の文字列操作に追加された引数を補正: 3件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/089.txt",
+      "messages": [
+        "旧形式の文字列操作に追加された引数を補正: 1件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/093.txt",
+      "messages": [
+        "旧形式の文字列操作に追加された引数を補正: 1件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/094.txt",
+      "messages": [
+        "旧形式の文字列操作に追加された引数を補正: 3件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/095.txt",
+      "messages": [
+        "旧形式の文字列操作に追加された引数を補正: 34件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/099.txt",
+      "messages": [
+        "旧形式の文字列操作に追加された引数を補正: 1件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/109.txt",
+      "messages": [
+        "コマンド引数の差を保持して関連付け: 3件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/119.txt",
+      "messages": [
+        "旧形式の文字列操作に追加された引数を補正: 2件",
+        "コマンド引数の差を保持して関連付け: 4件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/129.txt",
+      "messages": [
+        "コマンド引数の差を保持して関連付け: 1件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/132.txt",
+      "messages": [
+        "コマンド引数の差を保持して関連付け: 1件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/173.txt",
+      "messages": [
+        "旧形式の文字列操作に追加された引数を補正: 1件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/181.txt",
+      "messages": [
+        "旧形式の文字列操作に追加された引数を補正: 2件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/186.txt",
+      "messages": [
+        "コマンド引数の差を保持して関連付け: 1件",
+        "旧形式の文字列操作に追加された引数を補正: 9件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/192.txt",
+      "messages": [
+        "コマンド引数の差を保持して関連付け: 1件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/208.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 633 / 英語 617）",
+        "設定値の差を保持: 6件",
+        "英語版で無効化された設定: 8件",
+        "設定キーによる行ずれ補正: 129件",
+        "英語版で削除された設定: 8件",
+        "コマンド列による行ずれ補正: 450件",
+        "コマンド引数の差を保持して関連付け: 5件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/210.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 186 / 英語 168）",
+        "設定値の差を保持: 6件",
+        "英語版で無効化された設定: 9件",
+        "設定キーによる行ずれ補正: 128件",
+        "英語版で削除された設定: 9件",
+        "コマンド列による行ずれ補正: 1件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/212.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 188 / 英語 170）",
+        "設定値の差を保持: 4件",
+        "英語版で無効化された設定: 9件",
+        "設定キーによる行ずれ補正: 129件",
+        "英語版で削除された設定: 9件",
+        "コマンド列による行ずれ補正: 3件"
+      ]
+    },
+    {
+      "path": "BasicData/CommonEvent/214.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 178 / 英語 172）",
+        "設定値の差を保持: 2件",
+        "英語版で無効化された設定: 3件",
+        "設定キーによる行ずれ補正: 129件",
+        "英語版で削除された設定: 3件",
+        "コマンド列による行ずれ補正: 5件"
+      ]
+    },
+    {
+      "path": "BasicData/DataBase/00.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/DataBase/01.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/DataBase/02.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/DataBase/03.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/DataBase/04.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/DataBase/05.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/DataBase/06.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/DataBase/07.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/DataBase/08.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 583 / 英語 581）",
+        "設定値の差を保持: 3件",
+        "英語版で無効化された設定: 1件",
+        "設定キーによる行ずれ補正: 323件",
+        "英語版で削除された設定: 1件",
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/DataBase/09.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/DataBase/10.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/DataBase/11.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/DataBase/12.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 4315 / 英語 715）",
+        "設定値の差を保持: 200件",
+        "英語版で無効化された設定: 1800件",
+        "設定キーによる行ずれ補正: 301件",
+        "英語版で削除された設定: 1800件",
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/DataBase/13.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 253 / 英語 251）",
+        "設定値の差を保持: 2件",
+        "英語版で無効化された設定: 1件",
+        "設定キーによる行ずれ補正: 58件",
+        "英語版で削除された設定: 1件",
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/DataBase/15.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/DataBase/16.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/DataBase/17.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/SysDataBase/00.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/SysDataBase/01.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/SysDataBase/02.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/SysDataBase/03.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/SysDataBase/04.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/SysDataBase/05.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/SysDataBase/06.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/SysDataBase/07.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/SysDataBase/08.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/SysDataBase/09.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/SysDataBase/10.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/SysDataBase/11.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/SysDataBase/12.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/SysDataBase/13.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/SysDataBase/14.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "BasicData/SysDataBase/24.txt",
+      "messages": [
+        "CSV部分に差があります。CSVは翻訳レビュー対象外です"
+      ]
+    },
+    {
+      "path": "MapData/SampleMapA/Event_0009.txt",
+      "messages": [
+        "旧形式の文字列操作に追加された引数を補正: 1件"
+      ]
+    },
+    {
+      "path": "MapData/SampleMapA/Event_0013.txt",
+      "messages": [
+        "コマンド引数の差を保持して関連付け: 2件"
+      ]
+    },
+    {
+      "path": "MapData/SampleMapA/Event_0019.txt",
+      "messages": [
+        "英語版だけのコマンドを保持: 1件",
+        "英語版だけのコメントを保持: 2件"
+      ]
+    },
+    {
+      "path": "MapData/SampleMapA/Event_0023.txt",
+      "messages": [
+        "原文部分の行数差を自動補正しました（日本語 59 / 英語 61）",
+        "設定値の差を保持: 1件",
+        "コマンド列による行ずれ補正: 16件",
+        "英語版だけのコメントを保持: 1件",
+        "英語版だけのコマンドを保持: 1件"
+      ]
+    },
+    {
+      "path": "MapData/SampleMapA/Event_0024.txt",
+      "messages": [
+        "コマンド引数の差を保持して関連付け: 2件"
+      ]
+    },
+    {
+      "path": "MapData/TitleMap/Event_0000.txt",
+      "messages": [
+        "コマンド列による行ずれ補正: 9件",
+        "英語版だけのコメントを保持: 11件"
+      ]
     }
   ],
   "corpusSha256": {
     "ja": "70ff681055c4a7f46a934b8c615906d4e49a71704643585f4887322587798105",
     "en": "b86fb0ece149b22d9075a62fa362c804f4541d232d968c90e5454b471ee21034"
   },
-  "nativeElapsedSeconds": 2.122
+  "nativeElapsedSeconds": 3.182
 }

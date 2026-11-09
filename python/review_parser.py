@@ -9,6 +9,7 @@ import hashlib
 import re
 from collections import Counter
 from dataclasses import asdict
+from review_alignment import align
 
 from woditor_translation_tool import (
     COMMAND, META, JP, analyze, fields, file_type, command_mask,
@@ -130,29 +131,25 @@ def pair_file(path: str, ja_raw: bytes, en_raw: bytes) -> dict:
         raise ValueError('日本語・英語のファイル形式が一致しません')
     analyze(en, data['type'])  # Validate CSV markers on the English side too.
     a, b = source_lines(ja), source_lines(en)
-    if len(a) != len(b):
-        raise ValueError(f'原文部分の行数が一致しません: 日本語 {len(a)} / 英語 {len(b)}')
-    warnings = []
-    for n, (x, y) in enumerate(zip(a, b), 1):
-        if COMMAND.fullmatch(x):
-            if (command_mask(x) or x) != (command_mask(y) or y):
-                raise ValueError(f'コマンド構造が一致しません（行 {n}）')
-        elif m := META.fullmatch(x):
-            other = META.fullmatch(y)
-            if not other or m[1] != other[1]:
-                raise ValueError(f'メタデータのキーが一致しません（行 {n}）')
-            if not metadata_allowed(data['type'], m[1]) and x != y:
-                raise ValueError(f'翻訳対象外のメタデータが異なります（行 {n}）')
-        elif x != y:
-            raise ValueError(f'構造が一致しません（行 {n}）')
+    alignment = align(ja, en, data['type'], command_info)
+    warnings = alignment['warnings']
+    errors = []
     # Newlines belong to each input version and are never normalized in storage.
     endings = lambda s: [re.search(r'(\r\n|\r|\n)$', l)[0] if re.search(r'(\r\n|\r|\n)$', l) else ''
-                         for l in s.splitlines(keepends=True)[:len(a)]]
-    if endings(ja) != endings(en):
+                         for l in s.splitlines(keepends=True)]
+    ja_endings, en_endings = endings(ja), endings(en)
+    if any(ja_endings[n - 1] != en_endings[e - 1] for n, e in alignment['lines'].items()):
         warnings.append('日本語と英語の改行形式が異なります（読み込み時の形式を保持）')
     slots = []
     for s in data['slots']:
-        line = b[s['line'] - 1]
+        en_line = alignment['lines'].get(s['line'])
+        if en_line is None:
+            reason = alignment['excluded'].get(s['line'], '対応候補が複数あり自動関連付けできません')
+            data['excluded'].append({**s, 'reason': reason})
+            if s['line'] in alignment['ambiguous']:
+                errors.append(f'行 {s["line"]}（{s["title"]}）: {reason}')
+            continue
+        line = b[en_line - 1]
         if s['kind'] == 'metadata':
             translation = META.fullmatch(line)[2]
         else:
@@ -166,16 +163,18 @@ def pair_file(path: str, ja_raw: bytes, en_raw: bytes) -> dict:
         if tokens(s['source']) != tokens(translation):
             issues.append('制御文字・置換文字列が原文と異なります')
         structure = command_mask(a[s['line'] - 1]) if s['command'] else s['key']
-        slots.append({**s, 'translation': translation, 'warnings': issues,
+        slots.append({**s, 'enLine': en_line, 'translation': translation, 'warnings': issues,
                       'fingerprint': digest(s['key'] + '\0' + s['source'] + '\0' + (structure or ''))})
     items, serial = [], Counter()
     for s in slots:
         info = s['command']
         prev = items[-1] if items else None
         if (info and info['code'] == 103 and prev and prev['code'] == 103
-                and prev['lastLine'] + 1 == s['line'] and prev['depth'] == info['depth']):
+                and prev['lastLine'] + 1 == s['line']
+                and prev['depth'] == info['depth']):
             prev['slotIds'].append(s['id'])
             prev['lastLine'] = s['line']
+            prev['lastEnLine'] = s['enLine']
         else:
             title = s['title']
             serial[title] += 1
@@ -183,16 +182,18 @@ def pair_file(path: str, ja_raw: bytes, en_raw: bytes) -> dict:
                           'title': f'{title} {serial[title]}' if info else title,
                           'code': info['code'] if info else None,
                           'depth': info['depth'] if info else None,
-                          'lastLine': s['line'], 'approved': False, 'threads': [], 'changes': []})
+                          'lastLine': s['line'], 'lastEnLine': s['enLine'], 'approved': False, 'threads': [], 'changes': []})
     commands = []
     if data['type'] != 'database':
         jp, ep = command_display_pairs(ja), command_display_pairs(en)
-        if [n for n, _, _ in jp] != [n for n, _, _ in ep]:
-            raise ValueError('表示コマンドとの対応が一致しません')
-        for (n, dn, display), (_, edn, edisplay) in zip(jp, ep):
-            commands.append({'line': n, 'ja': display, 'en': edisplay,
-                             'displayLineJa': dn, 'displayLineEn': edn,
-                             **data['commands'][n]})
+        jp = {n: (dn, display) for n, dn, display in jp}
+        ep = {n: (dn, display) for n, dn, display in ep}
+        for n, en_n in alignment['commands']:
+            dn, display = jp[n] if n is not None else (0, '')
+            edn, edisplay = ep[en_n] if en_n is not None else (0, '')
+            info = data['commands'][n] if n is not None else alignment['enCommands'][en_n]
+            commands.append({**info, 'line': n if n is not None else -en_n, 'enLine': en_n,
+                             'ja': display, 'en': edisplay, 'displayLineJa': dn, 'displayLineEn': edn})
     usages = {}
     if data['type'] == 'common':
         for s in slots:
@@ -201,7 +202,7 @@ def pair_file(path: str, ja_raw: bytes, en_raw: bytes) -> dict:
                 num = re.compile(rf'(?<!\d){1600000 + index}(?!\d)')
                 special = re.compile(rf'\\cself\[{index}\]', re.I)
                 usages[s['id']] = [c['line'] for c in commands
-                                   if num.search(a[c['line'] - 1]) or special.search(a[c['line'] - 1])]
+                                   if c['line'] > 0 and (num.search(a[c['line'] - 1]) or special.search(a[c['line'] - 1]))]
     if data['type'] == 'database':
         marker = '<<--CSV_START-->>'
         if (marker in ja) != (marker in en):
@@ -213,7 +214,7 @@ def pair_file(path: str, ja_raw: bytes, en_raw: bytes) -> dict:
     return {'path': path, 'type': data['type'], 'jaText': ja, 'enText': en,
             'jaBom': ja_bom, 'enBom': en_bom, 'sourceVersion': digest(ja), 'version': digest(en),
             'slots': slots, 'items': items, 'commands': commands, 'usages': usages,
-            'excluded': data['excluded'], 'warnings': warnings}
+            'excluded': data['excluded'], 'warnings': warnings, 'errors': errors}
 
 
 def render_file(text: str, slots: list[dict]) -> dict:
@@ -225,7 +226,7 @@ def render_file(text: str, slots: list[dict]) -> dict:
         offset += len(line)
     replacements, edited = [], set()
     for slot in slots:
-        n, value = slot['line'], slot['translation']
+        n, value = slot.get('enLine', slot['line']), slot['translation']
         if not isinstance(value, str) or any(c in value for c in ('\0', '\r', '\n')):
             raise ValueError('Translation must be a single encoded line')
         line = lines[n - 1].rstrip('\r\n')

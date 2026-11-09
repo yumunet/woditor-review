@@ -10,6 +10,7 @@ import { characterDiff } from './diff';
 import { strToU8, zipSync } from 'fflate';
 import { registerPwa } from './pwa';
 import { canMerge, canSplit, mergeGroup, splitGroup } from './grouping';
+import { diagnosticsView, withoutReplacedDiagnostics } from './diagnostics';
 
 const root = document.querySelector<HTMLDivElement>('#app')!;
 let workspace: Workspace = emptyWorkspace();
@@ -22,6 +23,7 @@ let toastTimer: ReturnType<typeof setTimeout>;
 function updateBusy(message: string) {busy = message; const el = root.querySelector('.busy > div:last-child'); if (el) el.textContent = message;}
 let lastFocus: HTMLElement | null = null;
 let commentTab: 'open' | 'all' = 'open', replyTarget: string | null = null;
+let diagnosticTab: 'error' | 'warning' | 'skip' = 'error';
 let editTarget: {threadId: string; postId: string} | null = null;
 let confirmation: {question: string; run: () => void | Promise<void>} | null = null;
 let exportSelection = new Set<string>(), preparedRequest: ReviewRequest | null = null;
@@ -30,7 +32,7 @@ const currentFile = () => workspace.files.find(f => f.path === path);
 const currentItem = () => currentFile()?.items.find(i => i.id === currentId);
 const targets = () => currentFile()?.items.filter(i => matches(i, itemFilter)) ?? [];
 function toast(message: string) {notice = message; clearTimeout(toastTimer); root.querySelector('.toast')?.remove(); if (!menu) root.querySelector('.menu')?.remove(); root.insertAdjacentHTML('beforeend', `<div class="toast" role="status">${e(notice)}</div>`); toastTimer = setTimeout(() => {notice = ''; root.querySelector('.toast')?.remove();}, 5000);}
-function openSheet(name: string) {lastFocus = document.activeElement as HTMLElement; sheet = name; menu = false; replyTarget = null; editTarget = null; if (name === 'export' || name === 'english') {exportSelection = new Set(workspace.files.filter(f => (!path || f.path === path) && (name === 'english' || f.items.some(i => unresolved(i).length))).map(f => f.path)); preparedRequest = null;} render(); root.querySelector<HTMLElement>('.sheet .icon, .sheet input, .sheet button:not(.handle)')?.focus();}
+function openSheet(name: string) {lastFocus = document.activeElement as HTMLElement; sheet = name; menu = false; replyTarget = null; editTarget = null; if (name === 'diagnostics') diagnosticTab = 'error'; if (name === 'export' || name === 'english') {exportSelection = new Set(workspace.files.filter(f => (!path || f.path === path) && (name === 'english' || f.items.some(i => unresolved(i).length))).map(f => f.path)); preparedRequest = null;} render(); root.querySelector<HTMLElement>('.sheet .icon, .sheet input, .sheet button:not(.handle)')?.focus();}
 function closeSheet() {sheet = null; replyTarget = null; editTarget = null; render(); lastFocus?.focus();}
 function persist(changedPath?: string) {void saveWorkspace(workspace, changedPath).catch(error => toast(`保存できませんでした。バックアップしてください：${String(error)}`));}
 function ask(question: string, run: () => void | Promise<void>) {confirmation = {question, run}; render(); root.querySelector<HTMLElement>('[data-action="confirm-cancel"]')?.focus();}
@@ -77,7 +79,7 @@ function sheetBody() {
   if (sheet === 'load') return `<form class="form" id="load-form"><label>日本語原文 ZIP<input type="file" name="ja" accept=".zip,application/zip" required></label><label>英訳済み ZIP<input type="file" name="en" accept=".zip,application/zip" required></label><button class="primary" type="submit">読み込む</button></form>`;
   if (sheet === 'items') return `${filterButtons(itemFilter, 'item')}<div class="sheet-body">${targets().map(i => `<button class="pick-row ${i.id === currentId ? 'active' : ''}" data-action="pick" data-value="${e(i.id)}"><span class="dot ${isDone(i) ? 'done' : unresolved(i).length ? 'comment' : ''}"></span><span>${e(i.title)}</span><span class="pick-meta">${isDone(i) ? '確認済み' : '未確認'}</span></button>`).join('') || '<div class="empty">対象の項目はありません</div>'}</div>`;
   if (sheet === 'progress') return `<div class="sheet-body">${progressRows(fileTree(workspace.files, 'all'))}</div>`;
-  if (sheet === 'diagnostics') return `<div class="sheet-body">${workspace.diagnostics.map(d => `<div class="diagnostic ${d.severity}"><strong>${e(d.path)}</strong>${d.severity === 'error' ? 'エラー：' : d.severity === 'skip' ? '対象外：' : '警告：'}${e(d.message)}</div>`).join('') || '<div class="empty">エラー・警告はありません</div>'}</div>`;
+  if (sheet === 'diagnostics') return diagnosticsView(workspace.diagnostics, diagnosticTab);
   if (sheet === 'comments') return commentsBody();
   if (sheet === 'restore') return '<form class="form" id="restore-form"><label>バックアップ JSON<input type="file" name="backup" accept=".json,application/json" required></label><button class="primary" type="submit">復元する</button></form>';
   if (sheet === 'export') return `<div class="sheet-body">${workspace.files.filter(f => f.items.some(i => unresolved(i).length)).map(f => `<label class="export-row"><input type="checkbox" data-export-path="${e(f.path)}" ${exportSelection.has(f.path) ? 'checked' : ''}>${e(f.path)}</label>`).join('') || '<div class="empty">未解決コメントはありません</div>'}</div><div class="sheet-foot"><div class="send-row"><button class="primary" data-action="export-request" ${!exportSelection.size ? 'disabled' : ''}>JSONを出力</button><button class="text-act" data-action="copy-instructions" ${!exportSelection.size ? 'disabled' : ''}>${icon('copy')}指示文をコピー</button></div><div class="send-row"><button class="text-act" data-action="english-zip" ${!exportSelection.size ? 'disabled' : ''}>英訳TXTを出力</button></div>${preparedRequest ? `<details><summary class="hint">指示文</summary><textarea class="instructions" aria-label="ChatGPT向け指示文" readonly>${e(chatInstructions(preparedRequest))}</textarea></details>` : ''}</div>`;
@@ -130,6 +132,7 @@ root.addEventListener('click', event => {
     try {approve();} catch(error) {toast(String(error));} return;
   }
   else if (action === 'comment-tab') commentTab = value as 'open' | 'all';
+  else if (action === 'diagnostic-tab') diagnosticTab = value as typeof diagnosticTab;
   else if (action === 'reply') {replyTarget = value!; editTarget = null; render(); root.querySelector<HTMLTextAreaElement>('textarea')?.focus(); return;}
   else if (action === 'edit') {editTarget = {threadId: button.dataset.thread!, postId: button.dataset.post!}; replyTarget = null; render(); root.querySelector<HTMLTextAreaElement>('textarea')?.focus(); return;}
   else if (action === 'delete') {
@@ -169,15 +172,18 @@ root.addEventListener('submit', async event => {
     busy = '修正データを確認中…'; render();
     try {
       let parsed: ReviewFile[] | undefined;
+      let diagnostics: Workspace['diagnostics'] = [];
       if (revised?.size) {
         const zip = sourceZip(workspace);
         const result = await parseArchives(zip.buffer as ArrayBuffer, await revised.arrayBuffer(), updateBusy, true);
         if (result.diagnostics.some(d => d.severity === 'error')) throw new Error(result.diagnostics.filter(d => d.severity === 'error').map(d => d.path + ': ' + d.message).join('\n'));
         if (!result.files.length) throw new Error('対応する英訳TXTがありません');
         parsed = result.files;
+        diagnostics = result.diagnostics;
       }
       if (form.id === 'response-form') workspace = importResponse(workspace, JSON.parse(await answer.text()), parsed);
-      else workspace = mergeFiles(workspace, parsed!);
+      else workspace = mergeFiles({...workspace, diagnostics: withoutReplacedDiagnostics(workspace.diagnostics, parsed!.map(f => f.path))}, parsed!);
+      workspace.diagnostics.push(...diagnostics);
       await saveWorkspace(workspace); sheet = null; reconcileCurrent(); busy = ''; render(); toast('変更を読み込みました。再確認してください');
     } catch (error) {busy = ''; render(); toast(String(error));} return;
   }
@@ -188,8 +194,13 @@ root.addEventListener('submit', async event => {
   busy = '読み込み中…'; sheet = null; render();
   try {
     const result = await parseArchives(await ja.arrayBuffer(), await en.arrayBuffer(), updateBusy);
+    diagnosticTab = 'error';
     if (!result.files.length) {workspace.diagnostics = result.diagnostics; sheet = 'diagnostics'; busy = ''; render(); return;}
-    if (workspace.files.length) {workspace = mergeFiles(workspace, result.files); workspace.diagnostics.push(...result.diagnostics);} else workspace = {...emptyWorkspace(), ...result};
+    if (workspace.files.length) {
+      const attempted = [...result.files.map(f => f.path), ...result.diagnostics.map(d => d.path)];
+      workspace = mergeFiles({...workspace, diagnostics: withoutReplacedDiagnostics(workspace.diagnostics, attempted)}, result.files);
+      workspace.diagnostics.push(...result.diagnostics);
+    } else workspace = {...emptyWorkspace(), ...result};
     path = currentId = null;
     await saveWorkspace(workspace);
     if (result.diagnostics.length) sheet = 'diagnostics';
