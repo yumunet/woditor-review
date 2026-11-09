@@ -6,7 +6,22 @@
 
 UIはTypeScript、解析はWeb Worker上のPython / Pyodide、状態保存はIndexedDB。サーバーDBは使用しない。Google Drive同期を有効にした場合だけGoogleの認証・Drive APIを使用する。初回は同一ホストから約12MBのPyodideランタイムを取得する。本番ビルドは14ローカルリソースを含むPWAを生成する。
 
-静的公開は dist/ 一式をHTTPSサイトのルートへ配置する。file:// やサブディレクトリへの配置は非対応。インストールとオフライン確認は npm run build と npm run preview を使用する。
+静的公開は `dist/` 一式をHTTPSで配信する。`BASE_PATH` 環境変数で配置パスを指定でき、未指定は `/`。`file://` での直接起動は非対応。インストールとオフライン確認は `npm run build` と `npm run preview` を使用する。
+
+GitHub Pagesの `.github/workflows/deploy.yml` は `BASE_PATH=/woditor-review/` でビルドし、`dist/` を公開する。リポジトリのPages公開元はGitHub Actionsを選択する。`GOOGLE_CLIENT_ID` Secretがあれば、runner上だけで `.env.production.local` を生成する。設定ファイルとIDの値はコミットせず、配信するJavaScriptにだけ組み込む。クライアントシークレットやトークンは渡さない。
+
+HTMLのリンクとWorkerはViteのbaseを使う。PWA生成時も同じVite設定からbaseを読み、Manifestのid・start_url・scope・アイコン、キャッシュ対象、ナビゲーションのフォールバックを揃える。Service Workerのスコープとキャッシュ名を配置パスごとに分け、他パスのキャッシュを削除しない。
+
+Windowsでサブパスを検証する場合：
+
+```powershell
+$env:BASE_PATH = '/woditor-review/'
+npm run build
+npm run test:pages
+npm run preview
+```
+
+このときのURLは `http://127.0.0.1:4173/woditor-review/`。ルート配置へ戻す場合は `Remove-Item Env:BASE_PATH` の後に再ビルドする。ビルドとプレビューでは同じ `BASE_PATH` を使用する。
 
 ## 読込仕様
 

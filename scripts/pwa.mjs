@@ -1,6 +1,14 @@
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { deflateSync } from 'node:zlib';
+import { resolveConfig } from 'vite';
+
+const {base} = await resolveConfig({}, 'build', 'production', 'production');
+if (!base.startsWith('/') || base.startsWith('//') || !base.endsWith('/')) throw new Error('BASE_PATH must be an absolute path ending in /');
+const manifest = JSON.parse(await readFile('public/manifest.webmanifest', 'utf8'));
+Object.assign(manifest, {id: base, start_url: base, scope: base});
+manifest.icons = manifest.icons.map(icon => ({...icon, src: base + icon.src.replace(/^\//, '')}));
+await writeFile('dist/manifest.webmanifest', JSON.stringify(manifest, null, 2));
 
 // Rasterize the small app icon without an extra image dependency.
 const crc32 = buffer => {
@@ -34,14 +42,18 @@ const files = (await readdir('dist', {recursive: true})).filter(f => /\.(html|js
 const hash = createHash('sha256');
 for (const file of files) hash.update(await readFile(`dist/${file}`));
 const version = hash.digest('hex').slice(0,16);
+const prefix = `woditor-review-${createHash('sha256').update(base).digest('hex').slice(0,8)}-`;
 await writeFile('dist/sw.js', `
-const CACHE = 'woditor-review-${version}';
-const ASSETS = ${JSON.stringify(files.map(f=>'/'+f))};
+const PREFIX = ${JSON.stringify(prefix)};
+const CACHE = PREFIX + '${version}';
+const BASE = ${JSON.stringify(base)};
+const ASSETS = ${JSON.stringify(files.map(f=>base+f))};
 self.addEventListener('install', event => {event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));});
-self.addEventListener('activate', event => {event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith('woditor-review-') && key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim()));});
+self.addEventListener('activate', event => {event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith(PREFIX) && key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim()));});
 self.addEventListener('fetch', event => {
-  if (event.request.method!=='GET' || new URL(event.request.url).origin!==self.location.origin) return;
-  if (event.request.mode==='navigate') {event.respondWith(caches.open(CACHE).then(cache=>cache.match('/index.html')).then(response=>response || fetch(event.request)));return;}
+  const url = new URL(event.request.url);
+  if (event.request.method!=='GET' || url.origin!==self.location.origin || !url.pathname.startsWith(BASE)) return;
+  if (event.request.mode==='navigate') {event.respondWith(caches.open(CACHE).then(cache=>cache.match(BASE+'index.html')).then(response=>response || fetch(event.request)));return;}
   event.respondWith(caches.open(CACHE).then(cache=>cache.match(event.request)).then(response=>response || fetch(event.request)));
 });
 `);

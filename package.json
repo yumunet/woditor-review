@@ -11,6 +11,7 @@
     "test": "node --import tsx --test tests/*.test.ts",
     "test:python": "node scripts/python-tests.mjs",
     "test:e2e": "playwright test",
+    "test:pages": "playwright test --config playwright.pages.config.ts",
     "check": "npm run test:python && npm test && npm run build && npm run test:e2e"
   },
   "dependencies": {

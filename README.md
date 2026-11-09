@@ -24,6 +24,14 @@ npm run preview
 
 `http://127.0.0.1:4173/` を開き、読み込みが完了してから利用してください。別の端末で使う場合はHTTPSで公開する必要があります。
 
+## GitHub Pagesで公開
+
+リポジトリの `Settings → Pages → Source` を **GitHub Actions** にします。`main` へpushすると、追加した公開用ワークフローが `https://ユーザー名.github.io/woditor-review/` へデプロイします。
+
+クライアントIDを公開版へ組み込む場合は、`Settings → Secrets and variables → Actions` に `GOOGLE_CLIENT_ID` を登録してください。値はGitで追跡せず、ビルド時だけ設定ファイルへ書き込みます。公開後のJavaScriptにはIDが含まれます。未登録でも公開でき、アプリの接続設定から入力できます。
+
+Google側の「承認済みのJavaScript生成元」には `https://ユーザー名.github.io` を登録します。末尾の `/woditor-review/` は付けません。
+
 ## ファイルを読み込む
 
 メニューの「ファイルを読み込む」で、日本語と英語それぞれのUTF-8 TXTをまとめたZIPを指定します。対応するファイルの相対パスを揃えてください。
