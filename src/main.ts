@@ -4,7 +4,7 @@ import { escape as e, icon, folderTriangle, filterButtons, fileTree, compact, pe
 import { commandColor } from './command-colors';
 import { parseArchives, renderTranslations } from './parser-client';
 import { addComment, approveItem, deleteComment, discardRejectedChanges, editComment, latestPreview, nextAfterApproval, setResolved, undoApproval } from './review-state';
-import { backupJson, download, loadWorkspace, restoreJson, saveWorkspace } from './storage';
+import { backupFileName, backupJson, download, loadWorkspace, restoreJson, saveWorkspace } from './storage';
 import { chatInstructions, createRequest, importResponse, mergeFiles, reviewFileNames, sourceZip } from './exchange';
 import { characterDiff } from './diff';
 import { strToU8, zipSync } from 'fflate';
@@ -217,7 +217,7 @@ root.addEventListener('click', event => {
     const file = currentFile(), item = currentItem(); if (!file || !item) return;
     ask(action === 'split-group' ? 'コメントを行ごとに分割し、未確認に戻しますか？' : '次のコメントと結合し、未確認に戻しますか？', () => {currentId = action === 'split-group' ? splitGroup(file, item.id) : mergeGroup(file, item.id); persist(file.path); reconcileCurrent();}); return;
   }
-  else if (action === 'backup') {download('woditor-review-backup.json', backupJson(workspace)); toast('バックアップを出力しました'); return;}
+  else if (action === 'backup') {download(backupFileName(), backupJson(workspace)); toast('バックアップを出力しました'); return;}
   else if (['export-request', 'copy-instructions', 'english-zip'].includes(action!)) {void exportReview(action!); return;}
   else if (['load', 'items', 'comments', 'progress', 'diagnostics', 'restore', 'export', 'response', 'reload', 'english'].includes(action!)) {openSheet(action!); return;}
   render();

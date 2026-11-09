@@ -101,6 +101,12 @@ export function validateWorkspace(data: unknown): asserts data is Workspace {
   if (!data.importedResponses.every(str)) return fail();
 }
 export function backupJson(workspace: Workspace) {return JSON.stringify(workspace, null, 2);}
+export function backupFileName(date = new Date()) {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const day = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  const time = `${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}`;
+  return `woditor-review-backup_${day}_${time}.json`;
+}
 export function restoreJson(text: string): Workspace {
   if (text.length > 256 * 1024 * 1024) throw new Error('バックアップが大きすぎます');
   const data: unknown = JSON.parse(text); validateWorkspace(data); return data;

@@ -21,7 +21,10 @@ export function createRequest(workspace: Workspace, selected: string[]): ReviewR
   return request;
 }
 
-export const reviewFileNames = (request: Pick<ReviewRequest, 'requestId'>) => ({request: `review_request_${request.requestId}.json`, response: `review_response_${request.requestId}.json`});
+export const reviewFileNames = (request: Pick<ReviewRequest, 'requestId'>) => {
+  const id = request.requestId.replace(/-/g, '').slice(0, 12);
+  return {request: `review_request_${id}.json`, response: `review_response_${id}.json`};
+};
 
 export const chatInstructions = (request: ReviewRequest) => `添付の依頼JSON（requestId: ${request.requestId}）と英訳TXTを、コメント履歴・pendingChanges（未確定の前回案）を踏まえてレビューしてください。
 全commentIdに1件ずつ、accepted（採用）/ rejected（不採用）/ partial（一部採用）/ needs_review（要確認）と理由を回答。不確実な点は推測せず needs_review。

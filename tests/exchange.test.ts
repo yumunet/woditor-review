@@ -36,8 +36,11 @@ test('character-level difference preserves whitespace, Unicode, and escapes mark
 test('each request names its response uniquely and gives concise portable review instructions', {skip: !corpus}, () => {
   const {workspace}=setup(),first=createRequest(workspace,[workspace.files[0].path]),second=createRequest(workspace,[workspace.files[0].path]);
   assert.notEqual(reviewFileNames(first).response,reviewFileNames(second).response);
-  assert.equal(reviewFileNames(first).response,`review_response_${first.requestId}.json`);
-  assert.equal(reviewFileNames(first).request,`review_request_${first.requestId}.json`);
+  const shortId=first.requestId.replace(/-/g,'').slice(0,12);
+  assert.equal(reviewFileNames(first).response,`review_response_${shortId}.json`);
+  assert.equal(reviewFileNames(first).request,`review_request_${shortId}.json`);
+  assert.ok(reviewFileNames(first).request.length<=32);
+  assert.ok(chatInstructions(first).includes(first.requestId));
   const prompt=chatInstructions(first);
   assert.ok(prompt.includes(reviewFileNames(first).response));assert.ok(prompt.includes('woditor_review_tool.py'));
   assert.ok(!prompt.includes('python/woditor_review_tool.py'));assert.ok(!prompt.includes('review_response.json'));

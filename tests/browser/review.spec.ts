@@ -511,7 +511,7 @@ async function exportCurrentRequest(page:Page) {
   await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'レビューJSONを出力',exact:true}).click();
   const download=page.waitForEvent('download');await page.getByRole('button',{name:'JSONを出力',exact:true}).click();
   const file=await download,request=JSON.parse(readFileSync((await file.path())!,'utf8'));
-  expect(file.suggestedFilename()).toBe(`review_request_${request.requestId}.json`);
+  expect(file.suggestedFilename()).toBe(`review_request_${request.requestId.replace(/-/g,'').slice(0,12)}.json`);
   await expect(page.getByLabel('ChatGPT向け指示文')).toHaveCount(0);
   await page.getByRole('button',{name:'閉じる',exact:true}).click();return request;
 }
@@ -586,4 +586,15 @@ test('export sheets select all files, align output buttons, and preview copied i
   await page.keyboard.press('Shift+Tab');await expect(modal.locator('pre')).toBeFocused();await page.keyboard.press('Tab');await expect(page.getByRole('button',{name:'指示文を閉じる',exact:true})).toBeFocused();await page.screenshot({path:`docs/screenshots/${info.project.name}-instructions.png`});await page.keyboard.press('Escape');await expect(modal).toHaveCount(0);await expect(page.getByRole('dialog',{name:'レビューJSONを出力',exact:true})).toBeVisible();
   await page.evaluate(()=>{(window as any).failClipboard=true;});await page.getByRole('button',{name:'指示文をコピー',exact:true}).click();await expect(page.locator('.toast')).toContainText('コピーできませんでした');await page.getByRole('button',{name:'指示文を確認',exact:true}).click();await expect(modal.locator('pre')).toHaveText(copied);await page.getByRole('button',{name:'指示文を閉じる',exact:true}).click();
   await page.getByRole('button',{name:'閉じる',exact:true}).click();await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'英訳TXTを出力',exact:true}).click();await expect(files).toHaveCount(4);await expect(all).toBeChecked();await all.uncheck();await expect(page.getByRole('button',{name:'英訳TXTを出力',exact:true})).toBeDisabled();await files.last().check();expect(await all.evaluate((el:HTMLInputElement)=>el.indeterminate)).toBeTruthy();await all.check();await expect(page.locator('[data-export-path]:checked')).toHaveCount(4);
+});
+
+test.describe('backup timestamps',()=>{
+  test.use({timezoneId:'Pacific/Honolulu'});
+  test('backup download uses the device local date and time and can restore',async({page})=>{
+    test.skip(!corpus,'Private reference files not available');await loadReal(page);
+    await page.clock.setFixedTime(new Date('2026-11-10T05:06:07Z'));
+    await page.getByRole('button',{name:'メニュー',exact:true}).click();const event=page.waitForEvent('download');await page.getByRole('button',{name:'状態をバックアップ',exact:true}).click();const file=await event;
+    expect(file.suggestedFilename()).toBe('woditor-review-backup_2026-11-09_19-06-07.json');
+    const backup=await file.path();await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'バックアップを復元',exact:true}).click();await page.locator('input[name=backup]').setInputFiles(backup!);await page.getByRole('button',{name:'復元する',exact:true}).click();await page.getByRole('button',{name:'確定',exact:true}).click();await expect(page.locator('.file-row')).toContainText('MapData');
+  });
 });
