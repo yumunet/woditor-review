@@ -1,0 +1,446 @@
+{
+  "generatedAt": "2026-11-09T13:24:55.448553+09:00",
+  "sourceFiles": {
+    "database": 66,
+    "common": 225,
+    "map": 37
+  },
+  "pairedFiles": {
+    "database": 58,
+    "common": 172,
+    "map": 31
+  },
+  "rejectedFiles": {
+    "database": 8,
+    "common": 53,
+    "map": 6
+  },
+  "counts": {
+    "sourceOriginalSlots": 23719,
+    "sourceIncludedSlots": 18347,
+    "sourceExcludedSlots": 5372,
+    "sourceUnhandledLines": 0,
+    "pairedSlots": 10634,
+    "reviewItems": 10131,
+    "commentGroups": 320,
+    "selfVariablesWithMultipleUsages": 1642,
+    "slotsWithTokenWarnings": 220
+  },
+  "commandCounts": {
+    "103": 6045,
+    "300": 1164,
+    "111": 1823,
+    "401": 2617,
+    "122": 317,
+    "0": 3522,
+    "499": 1875,
+    "250": 2545,
+    "101": 254,
+    "121": 4226,
+    "179": 440,
+    "212": 68,
+    "172": 305,
+    "498": 478,
+    "420": 156,
+    "213": 134,
+    "171": 70,
+    "170": 38,
+    "176": 50,
+    "123": 59,
+    "180": 126,
+    "124": 49,
+    "270": 4,
+    "126": 6,
+    "290": 282,
+    "150": 807,
+    "112": 36,
+    "125": 1,
+    "201": 4,
+    "221": 9,
+    "160": 1,
+    "140": 32,
+    "106": 44,
+    "99": 49,
+    "210": 58,
+    "107": 1,
+    "211": 4,
+    "222": 2,
+    "220": 2,
+    "130": 5,
+    "102": 16,
+    "151": 10,
+    "421": 9,
+    "174": 1,
+    "280": 1,
+    "202": 1,
+    "175": 1
+  },
+  "excludedReasons": {
+    "コモンイベントの名前指定": 1164,
+    "DBのタイプ・データ・項目の名前指定": 4208
+  },
+  "unsupportedFiles": [
+    "BasicData/CDataBase/Header.txt",
+    "BasicData/CommonEvent/Header.txt",
+    "BasicData/DataBase/Header.txt",
+    "BasicData/Game.txt",
+    "BasicData/SysDataBase/Header.txt",
+    "BasicData/TileSetData/0000.txt",
+    "BasicData/TileSetData/0001.txt",
+    "BasicData/TileSetData/0002.txt",
+    "BasicData/TileSetData/0003.txt",
+    "BasicData/TileSetData/0004.txt",
+    "BasicData/TileSetData/0005.txt",
+    "BasicData/TileSetData/Header.txt",
+    "MapData/Dungeon/Event_Header.txt",
+    "MapData/Dungeon/Map.txt",
+    "MapData/SampleMapA/Event_Header.txt",
+    "MapData/SampleMapA/Map.txt",
+    "MapData/SampleMapB/Event_Header.txt",
+    "MapData/SampleMapB/Map.txt",
+    "MapData/TitleMap/Event_Header.txt",
+    "MapData/TitleMap/Map.txt"
+  ],
+  "errors": [
+    {
+      "path": "BasicData/CDataBase/00.txt",
+      "type": "database",
+      "reason": "原文部分の行数が一致しません: 日本語 669 / 英語 661"
+    },
+    {
+      "path": "BasicData/CDataBase/01.txt",
+      "type": "database",
+      "reason": "原文部分の行数が一致しません: 日本語 1291 / 英語 1015"
+    },
+    {
+      "path": "BasicData/CDataBase/04.txt",
+      "type": "database",
+      "reason": "原文部分の行数が一致しません: 日本語 4315 / 英語 715"
+    },
+    {
+      "path": "BasicData/CDataBase/10.txt",
+      "type": "database",
+      "reason": "原文部分の行数が一致しません: 日本語 687 / 英語 681"
+    },
+    {
+      "path": "BasicData/CDataBase/17.txt",
+      "type": "database",
+      "reason": "原文部分の行数が一致しません: 日本語 243 / 英語 241"
+    },
+    {
+      "path": "BasicData/CommonEvent/000.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 237 / 英語 231"
+    },
+    {
+      "path": "BasicData/CommonEvent/001.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 237 / 英語 231"
+    },
+    {
+      "path": "BasicData/CommonEvent/002.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 237 / 英語 231"
+    },
+    {
+      "path": "BasicData/CommonEvent/008.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 190 / 英語 180"
+    },
+    {
+      "path": "BasicData/CommonEvent/011.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 234 / 英語 228"
+    },
+    {
+      "path": "BasicData/CommonEvent/012.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 230 / 英語 224"
+    },
+    {
+      "path": "BasicData/CommonEvent/014.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 245 / 英語 216"
+    },
+    {
+      "path": "BasicData/CommonEvent/015.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 202 / 英語 173"
+    },
+    {
+      "path": "BasicData/CommonEvent/016.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 192 / 英語 168"
+    },
+    {
+      "path": "BasicData/CommonEvent/021.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 229 / 英語 225"
+    },
+    {
+      "path": "BasicData/CommonEvent/025.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 223 / 英語 208"
+    },
+    {
+      "path": "BasicData/CommonEvent/026.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 273 / 英語 265"
+    },
+    {
+      "path": "BasicData/CommonEvent/027.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 195 / 英語 168"
+    },
+    {
+      "path": "BasicData/CommonEvent/030.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 208 / 英語 185"
+    },
+    {
+      "path": "BasicData/CommonEvent/031.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 394 / 英語 382"
+    },
+    {
+      "path": "BasicData/CommonEvent/032.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 194 / 英語 168"
+    },
+    {
+      "path": "BasicData/CommonEvent/033.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 190 / 英語 170"
+    },
+    {
+      "path": "BasicData/CommonEvent/034.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 222 / 英語 218"
+    },
+    {
+      "path": "BasicData/CommonEvent/035.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 189 / 英語 175"
+    },
+    {
+      "path": "BasicData/CommonEvent/036.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 200 / 英語 168"
+    },
+    {
+      "path": "BasicData/CommonEvent/037.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 249 / 英語 246"
+    },
+    {
+      "path": "BasicData/CommonEvent/038.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 192 / 英語 168"
+    },
+    {
+      "path": "BasicData/CommonEvent/041.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 192 / 英語 168"
+    },
+    {
+      "path": "BasicData/CommonEvent/042.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 192 / 英語 168"
+    },
+    {
+      "path": "BasicData/CommonEvent/043.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 192 / 英語 168"
+    },
+    {
+      "path": "BasicData/CommonEvent/045.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 186 / 英語 168"
+    },
+    {
+      "path": "BasicData/CommonEvent/047.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 178 / 英語 168"
+    },
+    {
+      "path": "BasicData/CommonEvent/070.txt",
+      "type": "common",
+      "reason": "コマンド構造が一致しません（行 257）"
+    },
+    {
+      "path": "BasicData/CommonEvent/071.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 266 / 英語 260"
+    },
+    {
+      "path": "BasicData/CommonEvent/072.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 209 / 英語 205"
+    },
+    {
+      "path": "BasicData/CommonEvent/073.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 207 / 英語 203"
+    },
+    {
+      "path": "BasicData/CommonEvent/074.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 383 / 英語 377"
+    },
+    {
+      "path": "BasicData/CommonEvent/078.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 229 / 英語 223"
+    },
+    {
+      "path": "BasicData/CommonEvent/082.txt",
+      "type": "common",
+      "reason": "コマンド構造が一致しません（行 178）"
+    },
+    {
+      "path": "BasicData/CommonEvent/085.txt",
+      "type": "common",
+      "reason": "コマンド構造が一致しません（行 401）"
+    },
+    {
+      "path": "BasicData/CommonEvent/086.txt",
+      "type": "common",
+      "reason": "コマンド構造が一致しません（行 217）"
+    },
+    {
+      "path": "BasicData/CommonEvent/089.txt",
+      "type": "common",
+      "reason": "コマンド構造が一致しません（行 242）"
+    },
+    {
+      "path": "BasicData/CommonEvent/093.txt",
+      "type": "common",
+      "reason": "コマンド構造が一致しません（行 706）"
+    },
+    {
+      "path": "BasicData/CommonEvent/094.txt",
+      "type": "common",
+      "reason": "コマンド構造が一致しません（行 439）"
+    },
+    {
+      "path": "BasicData/CommonEvent/095.txt",
+      "type": "common",
+      "reason": "コマンド構造が一致しません（行 429）"
+    },
+    {
+      "path": "BasicData/CommonEvent/099.txt",
+      "type": "common",
+      "reason": "コマンド構造が一致しません（行 264）"
+    },
+    {
+      "path": "BasicData/CommonEvent/109.txt",
+      "type": "common",
+      "reason": "コマンド構造が一致しません（行 233）"
+    },
+    {
+      "path": "BasicData/CommonEvent/119.txt",
+      "type": "common",
+      "reason": "コマンド構造が一致しません（行 187）"
+    },
+    {
+      "path": "BasicData/CommonEvent/129.txt",
+      "type": "common",
+      "reason": "コマンド構造が一致しません（行 193）"
+    },
+    {
+      "path": "BasicData/CommonEvent/132.txt",
+      "type": "common",
+      "reason": "コマンド構造が一致しません（行 787）"
+    },
+    {
+      "path": "BasicData/CommonEvent/173.txt",
+      "type": "common",
+      "reason": "コマンド構造が一致しません（行 173）"
+    },
+    {
+      "path": "BasicData/CommonEvent/181.txt",
+      "type": "common",
+      "reason": "コマンド構造が一致しません（行 355）"
+    },
+    {
+      "path": "BasicData/CommonEvent/186.txt",
+      "type": "common",
+      "reason": "コマンド構造が一致しません（行 282）"
+    },
+    {
+      "path": "BasicData/CommonEvent/192.txt",
+      "type": "common",
+      "reason": "コマンド構造が一致しません（行 379）"
+    },
+    {
+      "path": "BasicData/CommonEvent/208.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 633 / 英語 617"
+    },
+    {
+      "path": "BasicData/CommonEvent/210.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 186 / 英語 168"
+    },
+    {
+      "path": "BasicData/CommonEvent/212.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 188 / 英語 170"
+    },
+    {
+      "path": "BasicData/CommonEvent/214.txt",
+      "type": "common",
+      "reason": "原文部分の行数が一致しません: 日本語 178 / 英語 172"
+    },
+    {
+      "path": "BasicData/DataBase/08.txt",
+      "type": "database",
+      "reason": "原文部分の行数が一致しません: 日本語 583 / 英語 581"
+    },
+    {
+      "path": "BasicData/DataBase/12.txt",
+      "type": "database",
+      "reason": "原文部分の行数が一致しません: 日本語 4315 / 英語 715"
+    },
+    {
+      "path": "BasicData/DataBase/13.txt",
+      "type": "database",
+      "reason": "原文部分の行数が一致しません: 日本語 253 / 英語 251"
+    },
+    {
+      "path": "MapData/SampleMapA/Event_0009.txt",
+      "type": "map",
+      "reason": "コマンド構造が一致しません（行 54）"
+    },
+    {
+      "path": "MapData/SampleMapA/Event_0013.txt",
+      "type": "map",
+      "reason": "コマンド構造が一致しません（行 62）"
+    },
+    {
+      "path": "MapData/SampleMapA/Event_0019.txt",
+      "type": "map",
+      "reason": "コマンド構造が一致しません（行 107）"
+    },
+    {
+      "path": "MapData/SampleMapA/Event_0023.txt",
+      "type": "map",
+      "reason": "原文部分の行数が一致しません: 日本語 59 / 英語 61"
+    },
+    {
+      "path": "MapData/SampleMapA/Event_0024.txt",
+      "type": "map",
+      "reason": "コマンド構造が一致しません（行 67）"
+    },
+    {
+      "path": "MapData/TitleMap/Event_0000.txt",
+      "type": "map",
+      "reason": "コマンド構造が一致しません（行 67）"
+    }
+  ],
+  "corpusSha256": {
+    "ja": "70ff681055c4a7f46a934b8c615906d4e49a71704643585f4887322587798105",
+    "en": "b86fb0ece149b22d9075a62fa362c804f4541d232d968c90e5454b471ee21034"
+  },
+  "nativeElapsedSeconds": 2.122
+}

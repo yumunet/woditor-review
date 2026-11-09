@@ -1,0 +1,198 @@
+#!/usr/bin/env python3
+"""Assemble and validate review JSON; write revised TXT only to a new folder.
+
+AI supplies decisions and translation edits. This helper only assembles,
+checks IDs/versions and applies explicit edits. Python 3.10+, stdlib only.
+"""
+from __future__ import annotations
+import argparse
+import json
+import re
+from pathlib import Path, PurePosixPath
+from review_parser import decode, digest, render_file
+from woditor_translation_tool import COMMAND, META, fields, tokens
+
+SCHEMAS = Path(__file__).resolve().parent.parent / 'docs/schemas'
+
+
+def read(path: str | Path):
+    return json.loads(Path(path).read_text(encoding='utf-8-sig'))
+
+
+def check_schema(data, schema: dict, root: dict | None = None, location: str = '$'):
+    root = root or schema
+    if '$ref' in schema:
+        target = root
+        for key in schema['$ref'].removeprefix('#/').split('/'):
+            target = target[key]
+        return check_schema(data, target, root, location)
+    types = {'object': dict, 'array': list, 'string': str, 'integer': int}
+    if 'type' in schema and (not isinstance(data, types[schema['type']]) or schema['type'] == 'integer' and isinstance(data, bool)):
+        raise ValueError(f'{location}: expected {schema["type"]}')
+    if 'const' in schema and (type(data) is not type(schema['const']) or data != schema['const']):
+        raise ValueError(f'{location}: invalid constant')
+    if 'enum' in schema and data not in schema['enum']:
+        raise ValueError(f'{location}: unknown value')
+    if isinstance(data, str):
+        if len(data) < schema.get('minLength', 0) or 'pattern' in schema and not re.search(schema['pattern'], data):
+            raise ValueError(f'{location}: invalid string')
+    if isinstance(data, int) and data < schema.get('minimum', data):
+        raise ValueError(f'{location}: below minimum')
+    if isinstance(data, dict):
+        for key in schema.get('required', []):
+            if key not in data:
+                raise ValueError(f'{location}: missing {key}')
+        props = schema.get('properties', {})
+        if schema.get('additionalProperties') is False and set(data) - set(props):
+            raise ValueError(f'{location}: unexpected fields')
+        for key, value in data.items():
+            if key in props:
+                check_schema(value, props[key], root, f'{location}.{key}')
+    if isinstance(data, list) and 'items' in schema:
+        for i, value in enumerate(data):
+            check_schema(value, schema['items'], root, f'{location}[{i}]')
+
+
+def validate(request: dict, response: dict):
+    check_schema(request, read(SCHEMAS / 'review-request.schema.json'))
+    check_schema(response, read(SCHEMAS / 'review-response.schema.json'))
+    if request['requestId'] != response['requestId']:
+        raise ValueError('Request ID mismatch')
+    entries = {e['commentId']: e for e in request['entries']}
+    if len(entries) != len(request['entries']):
+        raise ValueError('Duplicate request comment ID')
+    answers, changed = set(), set()
+    for answer in response['responses']:
+        cid = answer['commentId']
+        if cid in answers or cid not in entries:
+            raise ValueError('Duplicate or unknown response comment ID')
+        answers.add(cid)
+        entry = entries[cid]
+        for key in ('path', 'itemId', 'fileVersion'):
+            if answer[key] != entry[key]:
+                raise ValueError(f'Mismatched {key}')
+        slots = {s['id']: s for s in entry['slots']}
+        for edit in answer['changes']:
+            key = (answer['path'], edit['slotId'])
+            if key in changed or edit['slotId'] not in slots or slots[edit['slotId']]['translation'] != edit['before']:
+                raise ValueError('Duplicate/unknown slot or changed before text')
+            if any(c in edit['after'] for c in ('\0', '\r', '\n')):
+                raise ValueError('Use encoded newlines, not literal newlines')
+            changed.add(key)
+    if answers != set(entries):
+        raise ValueError('Response is missing comment IDs')
+    suggestions = set()
+    for suggestion in response['suggestions']:
+        if suggestion['id'] in suggestions or suggestion['id'] in entries:
+            raise ValueError('Duplicate suggestion ID')
+        suggestions.add(suggestion['id'])
+        # A proposal must reference an item/version known from this request.
+        options = [e for e in entries.values() if all(e[k] == suggestion[k] for k in ('path', 'itemId', 'fileVersion'))]
+        if not options:
+            raise ValueError('Unknown suggestion item/version')
+        slots = {s['id']: s for s in options[0]['slots']}
+        for edit in suggestion['changes']:
+            key = (suggestion['path'], edit['slotId'])
+            if key in changed or edit['slotId'] not in slots or edit['before'] != slots[edit['slotId']]['translation']:
+                raise ValueError('Invalid suggestion edit')
+            if any(c in edit['after'] for c in ('\0', '\r', '\n')):
+                raise ValueError('Use encoded newlines, not literal newlines')
+            changed.add(key)
+
+
+def build(request: dict, decisions: dict) -> dict:
+    entries = {e['commentId']: e for e in request['entries']}
+    result = {'schemaVersion': 1, 'requestId': request['requestId'], 'responses': [], 'suggestions': decisions.get('suggestions', [])}
+    for decision in decisions['responses']:
+        cid = decision['commentId']
+        if cid not in entries:
+            raise ValueError('Unknown comment ID')
+        entry = entries[cid]
+        result['responses'].append({**{k: entry[k] for k in ('path', 'itemId', 'fileVersion')}, **decision, 'changes': decision.get('changes', [])})
+    validate(request, result)
+    return result
+
+
+def apply_files(request: dict, response: dict, english_root: Path, output_root: Path):
+    validate(request, response)
+    if output_root.exists():
+        raise ValueError('Output directory already exists; choose a new directory')
+    src, dst = english_root.resolve(), output_root.resolve()
+    if dst == src or src in dst.parents or dst in src.parents:
+        raise ValueError('Output must be separate from input')
+    writes = {}
+    for answer in response['responses'] + response['suggestions']:
+        path = PurePosixPath(answer['path'])
+        if path.is_absolute() or '..' in path.parts or any(':' in p or '\\' in p for p in path.parts):
+            raise ValueError('Unsafe relative path')
+        entry = next(e for e in request['entries'] if e['path'] == answer['path'] and e['itemId'] == answer['itemId'])
+        target = (src / path).resolve()
+        if src not in target.parents:
+            raise ValueError('Input path escapes root')
+        text, bom = decode(target.read_bytes())
+        if digest(text) != answer['fileVersion']:
+            raise ValueError(f'File version mismatch: {path}')
+        if str(path) not in writes:
+            writes[str(path)] = (text, bom, [])
+        by_id = {s['id']: s for s in entry['slots']}
+        for edit in answer['changes']:
+            slot = by_id[edit['slotId']]
+            line = text.splitlines()[slot['line'] - 1]
+            if slot['kind'] == 'metadata':
+                match = META.fullmatch(line)
+                if not match or match[1] != slot['key']:
+                    raise ValueError('Metadata position mismatch')
+                actual = match[2]
+            else:
+                match = COMMAND.fullmatch(line)
+                spans = fields(match['args']) if match else None
+                if spans is None or not slot.get('position') or slot['position'] > len(spans):
+                    raise ValueError('Command position mismatch')
+                a, b = spans[slot['position'] - 1]
+                actual = match['args'][a:b]
+            if actual != edit['before']:
+                raise ValueError('Before text does not match the actual English TXT')
+            if tokens(actual) != tokens(edit['after']):
+                raise ValueError('Protected control tokens changed')
+            writes[str(path)][2].append({**by_id[edit['slotId']], 'translation': edit['after']})
+    rendered = {path: (b'\xef\xbb\xbf' if bom else b'') + render_file(text, slots)['text'].encode('utf-8') for path, (text, bom, slots) in writes.items()}
+    for path, raw in rendered.items():
+        out = dst / path
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(raw)
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__)
+    subs = p.add_subparsers(dest='command', required=True)
+    for command in ('build', 'validate', 'apply'):
+        sub = subs.add_parser(command)
+        sub.add_argument('--request', required=True)
+        if command == 'build':
+            sub.add_argument('--decisions', required=True)
+            sub.add_argument('--out', required=True)
+        else:
+            sub.add_argument('--response', required=True)
+        if command == 'apply':
+            sub.add_argument('--english-root', required=True)
+            sub.add_argument('--out-root', required=True)
+    args = p.parse_args()
+    try:
+        request = read(args.request)
+        if args.command == 'build':
+            result = build(request, read(args.decisions))
+            with Path(args.out).open('x', encoding='utf-8') as stream:
+                json.dump(result, stream, indent=2, ensure_ascii=False)
+        else:
+            response = read(args.response)
+            if args.command == 'apply':
+                apply_files(request, response, Path(args.english_root), Path(args.out_root))
+            else:
+                validate(request, response)
+        print('OK')
+    except (ValueError, KeyError, TypeError, OSError) as error:
+        p.exit(1, f'ERROR: {error}\n')
+
+
+if __name__ == '__main__':
+    main()

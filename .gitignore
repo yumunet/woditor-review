@@ -1,1 +1,9 @@
 /.reference/
+node_modules/
+dist/
+.tools/
+__pycache__/
+test-results/
+playwright-report/
+.venv/
+public/pyodide/

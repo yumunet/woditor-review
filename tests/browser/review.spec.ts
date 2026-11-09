@@ -1,0 +1,280 @@
+import { test, expect, type Page } from '@playwright/test';
+import { readFileSync, existsSync, readdirSync, mkdirSync, writeFileSync } from 'node:fs';
+import { zipSync, unzipSync } from 'fflate';
+const real = '.reference/ja-JP/texts/MapData/SampleMapA/Event_0000.txt';
+const corpus = existsSync(real);
+const sourcePath = 'MapData/SampleMapA/Event_0000.txt';
+export async function loadReal(page: Page) {
+  await page.goto('/');
+  await page.getByRole('button', {name: 'ファイルを読み込む', exact: true}).click();
+  for (const [name, lang] of [['ja', 'ja-JP'], ['en', 'en-US']]) {
+    const buffer = Buffer.from(zipSync({[`extra/${lang}/texts/${sourcePath}`]: readFileSync(`.reference/${lang}/texts/${sourcePath}`)}));
+    await page.locator(`input[name=${name}]`).setInputFiles({name: `${lang}.zip`, mimeType: 'application/zip', buffer});
+  }
+  await page.getByRole('button', {name: '読み込む', exact: true}).click();
+  await expect(page.locator('.busy')).toHaveCount(0, {timeout: 90_000});
+  if (await page.getByRole('dialog').count()) await page.getByRole('button', {name: '閉じる', exact: true}).click();
+  for (const name of ['MapData', 'SampleMapA', 'Event_0000.txt']) await page.locator('.file-row').filter({has: page.locator('.row-name', {hasText: name})}).click();
+  await expect(page.locator('.source')).toContainText('夕一');
+}
+
+test('real ZIP -> folders -> compare -> context -> filtered empty state', async ({page}) => {
+  test.skip(!corpus, 'Private reference files not available');
+  const errors: string[] = [];
+  page.on('pageerror', err => errors.push(String(err)));
+  await loadReal(page);
+  await expect(page.locator('.entry-title')).toHaveText('イベント名');
+  await page.getByRole('button', {name: '次の項目', exact: true}).click();
+  await expect(page.locator('.translation')).toContainText('Yuichi');
+  await expect(page.locator('.command.current')).toContainText('Show Message');
+  await expect(page.locator('.command.current')).toHaveCSS('background-color', 'rgb(255, 255, 250)');
+  await page.getByLabel('コマンド表示言語').selectOption('ja');
+  await expect(page.locator('.command.current')).toContainText('■文章');
+  await page.locator('.entry-open').click();
+  await page.getByRole('button', {name: '確認済み', exact: true}).click();
+  await expect(page.getByRole('dialog')).toContainText('対象の項目はありません');
+  await page.getByRole('button', {name: '閉じる', exact: true}).click();
+  await expect(page.locator('.counter')).toHaveText('0 / 0');
+  await expect(page.getByRole('button', {name: '次の項目', exact: true})).toBeDisabled();
+  expect(errors).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+});
+
+test('comments, reply preview, confirmations, persistence and backup restore', async ({page}) => {
+  test.skip(!corpus, 'Private reference files not available');
+  await loadReal(page);
+  await page.getByRole('button', {name: 'コメント', exact: true}).click();
+  await page.getByLabel('コメント内容').fill('名前の表記を確認');
+  await page.getByRole('button', {name: '送信', exact: true}).click();
+  await page.getByRole('button', {name: '編集', exact: true}).click();
+  await page.getByLabel('コメント内容').fill('名前の表記を再確認');
+  await page.getByRole('button', {name: '保存', exact: true}).click();
+  await expect(page.locator('.post-text')).toHaveText('名前の表記を再確認');
+  await page.getByRole('button', {name: '返信', exact: true}).click();
+  await page.getByLabel('コメント内容').fill('最新の返信');
+  await page.getByRole('button', {name: '送信', exact: true}).click();
+  await page.getByRole('button', {name: '閉じる', exact: true}).click();
+  await expect(page.locator('.float-preview')).toHaveText('最新の返信');
+  const preview = await page.locator('.float-comment').boundingBox(), approve = await page.locator('.approve').boundingBox(), footer = await page.locator('.bottom').boundingBox();
+  expect(approve!.y + approve!.height).toBeLessThan(preview!.y);
+  expect(preview!.y + preview!.height).toBeLessThan(footer!.y);
+  await page.getByRole('button', {name: '承認', exact: true}).click();
+  await expect(page.getByRole('alertdialog')).toContainText('未解決コメントを解決にしますか？');
+  await page.getByRole('button', {name: 'キャンセル', exact: true}).click();
+  await expect(page.locator('.float-comment')).toBeVisible();
+  await page.getByRole('button', {name: '承認', exact: true}).click();
+  await page.getByRole('button', {name: '確定', exact: true}).click();
+  await expect(page.locator('.entry-title')).toHaveText('文章の表示 1');
+  await page.getByRole('button', {name: '前の項目', exact: true}).click();
+  await page.getByRole('button', {name: '未確認に戻す', exact: true}).click();
+  await page.getByRole('button', {name: 'キャンセル', exact: true}).click();
+  await expect(page.locator('.status')).toHaveText('確認済み');
+  await page.getByRole('button', {name: '未確認に戻す', exact: true}).click();
+  await page.getByRole('button', {name: '確定', exact: true}).click();
+  await expect(page.locator('.entry-title')).toHaveText('イベント名');
+  await expect(page.locator('.status')).toHaveText('未確認');
+  await page.getByRole('button', {name: 'メニュー', exact: true}).click();
+  const downloadEvent = page.waitForEvent('download');
+  await page.getByRole('button', {name: '状態をバックアップ', exact: true}).click();
+  const backup = await downloadEvent;
+  const backupPath = await backup.path();
+  await page.reload();
+  for (const name of ['MapData', 'SampleMapA', 'Event_0000.txt']) await page.locator('.file-row').filter({has: page.locator('.row-name', {hasText: name})}).click();
+  await page.getByRole('button', {name: /コメント/}).first().click();
+  await page.getByRole('button', {name: 'すべてのコメント', exact: true}).click();
+  await expect(page.locator('.post-text')).toContainText(['名前の表記を再確認', '最新の返信']);
+  await page.getByRole('button', {name: '再開', exact: true}).click();
+  await page.getByRole('button', {name: '閉じる', exact: true}).click();
+  await page.getByRole('button', {name: 'メニュー', exact: true}).click();
+  await page.getByRole('button', {name: 'バックアップを復元', exact: true}).click();
+  await page.locator('input[name=backup]').setInputFiles(backupPath!);
+  await page.getByRole('button', {name: '復元する', exact: true}).click();
+  await page.getByRole('button', {name: '確定', exact: true}).click();
+  await expect(page.locator('.file-row')).toContainText('MapData');
+});
+
+test('review JSON and revised TXT round trip, AI resolve/reopen and persistence', async ({page}) => {
+  test.skip(!corpus, 'Private reference files not available');
+  await loadReal(page);
+  await page.getByRole('button', {name: 'コメント', exact: true}).click();
+  await page.getByLabel('コメント内容').fill('Please correct this name');
+  await page.getByRole('button', {name: '送信', exact: true}).click();
+  await page.getByRole('button', {name: '閉じる', exact: true}).click();
+  await page.getByRole('button', {name: 'メニュー', exact: true}).click();
+  await page.getByRole('button', {name: 'レビューJSONを出力', exact: true}).click();
+  const downloadEvent = page.waitForEvent('download');
+  await page.getByRole('button', {name: 'JSONを出力', exact: true}).click();
+  const downloaded = await downloadEvent;
+  const request = JSON.parse(readFileSync((await downloaded.path())!, 'utf8'));
+  expect(request.entries).toHaveLength(1);
+  await expect(page.getByLabel('ChatGPT向け指示文')).toHaveValue(new RegExp(request.requestId));
+  const row = request.entries[0];
+  const response = {schemaVersion: 1, requestId: request.requestId, suggestions: [], responses: [{commentId: row.commentId, path: row.path, itemId: row.itemId, fileVersion: row.fileVersion, decision: 'accepted', reason: 'Adjusted the name.', changes: [{slotId: row.slots[0].id, before: row.slots[0].translation, after: 'Revised Name'}]}]};
+  await page.getByRole('button', {name: '閉じる', exact: true}).click();
+  await page.getByRole('button', {name: 'メニュー', exact: true}).click();
+  await page.getByRole('button', {name: 'レビューJSONを読み込む', exact: true}).click();
+  await page.locator('input[name=answer]').setInputFiles({name: 'review_response.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(response))});
+  const revised = readFileSync(`.reference/en-US/texts/${sourcePath}`, 'utf8').replace(/EVENT_NAME=[^\r\n]*/, 'EVENT_NAME=Revised Name');
+  await page.locator('input[name=revised]').setInputFiles({name: 'revised.zip', mimeType: 'application/zip', buffer: Buffer.from(zipSync({[`en-US/texts/${sourcePath}`]: Buffer.from(revised)}))});
+  await page.getByRole('button', {name: '回答を読み込む', exact: true}).click();
+  await expect(page.locator('.translation-after')).toHaveText('Revised Name');
+  await expect(page.locator('.diff-added')).not.toHaveCount(0);
+  await expect(page.locator('.diff-deleted')).not.toHaveCount(0);
+  await page.getByRole('button', {name: /コメント/}).first().click();
+  await expect(page.getByRole('button', {name: '編集', exact: true})).toHaveCount(0);
+  await expect(page.getByRole('button', {name: '削除', exact: true})).toHaveCount(0);
+  await page.getByRole('button', {name: '解決', exact: true}).click();
+  await page.getByRole('button', {name: '閉じる', exact: true}).click();
+  await expect(page.locator('.translation-after')).toHaveCount(0);
+  await expect(page.locator('.translation')).toHaveText('Revised Name');
+  await page.getByRole('button', {name:'メニュー',exact:true}).click();
+  await page.getByRole('button', {name:'英訳TXTを出力',exact:true}).click();
+  const zipEvent=page.waitForEvent('download');
+  await page.getByRole('button', {name:'英訳TXTを出力',exact:true}).click();
+  const zipped=unzipSync(readFileSync((await (await zipEvent).path())!));
+  const exported=Buffer.from(zipped[`en-US/texts/${sourcePath}`]).toString('utf8');
+  expect(exported).toContain('EVENT_NAME=Revised Name');
+  const original=readFileSync(`.reference/en-US/texts/${sourcePath}`,'utf8');
+  expect(exported.split('[COMMAND_TEXT_START]')[1]).toBe(original.split('[COMMAND_TEXT_START]')[1]);
+  await page.getByRole('button', {name:'閉じる',exact:true}).click();
+  await page.reload();
+  for (const name of ['MapData', 'SampleMapA', 'Event_0000.txt']) await page.locator('.file-row').filter({has: page.locator('.row-name', {hasText: name})}).click();
+  await expect(page.locator('.translation')).toHaveText('Revised Name');
+  await page.getByRole('button', {name: /コメント/}).first().click();
+  await page.getByRole('button', {name: 'すべてのコメント', exact: true}).click();
+  await page.getByRole('button', {name: '再開', exact: true}).click();
+  await page.getByRole('button', {name: '閉じる', exact: true}).click();
+  await expect(page.locator('.translation')).toHaveText(row.slots[0].translation);
+  await expect(page.locator('.translation-after')).toHaveText('Revised Name');
+  await page.getByRole('button', {name: '承認', exact: true}).click();
+  await page.getByRole('button', {name: '確定', exact: true}).click();
+  await page.getByRole('button', {name: '前の項目', exact: true}).click();
+  await expect(page.locator('.status')).toHaveText('確認済み');
+  await expect(page.locator('.translation')).toHaveText('Revised Name');
+});
+
+test('full real corpus in worker, diagnostics, all folder progress and restart', async ({page}, info) => {
+  test.skip(!corpus, 'Private reference files not available');
+  const external: string[] = [];
+  page.on('request', request => {if (new URL(request.url()).origin !== 'http://127.0.0.1:4173') external.push(request.url());});
+  await page.goto('/');
+  await page.getByRole('button', {name: 'ファイルを読み込む', exact: true}).click();
+  for (const [name, lang] of [['ja', 'ja-JP'], ['en', 'en-US']]) {
+    const directory = `.reference/${lang}/texts`;
+    const entries = Object.fromEntries(readdirSync(directory, {recursive:true}).map(String).filter(f=>f.endsWith('.txt')).map(f=>[`${lang}/texts/${f.replaceAll('\\','/')}`, readFileSync(`${directory}/${f}`)]));
+    await page.locator(`input[name=${name}]`).setInputFiles({name:`${lang}.zip`,mimeType:'application/zip',buffer:Buffer.from(zipSync(entries,{level:1}))});
+  }
+  await page.evaluate(() => {(window as any).ticks=0; (window as any).timer=setInterval(()=>(window as any).ticks++,10);});
+  const start = Date.now();
+  await page.getByRole('button', {name: '読み込む', exact: true}).click();
+  await expect(page.locator('.busy')).toHaveCount(0, {timeout:90_000});
+  const elapsedMs=Date.now()-start;
+  expect(await page.evaluate(() => {clearInterval((window as any).timer);return (window as any).ticks;})).toBeGreaterThan(10);
+  await expect(page.locator('.diagnostic.error')).toHaveCount(67);
+  const summary = await page.evaluate(async () => {
+    const db=await new Promise<IDBDatabase>((resolve,reject)=>{const r=indexedDB.open('woditor-review');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
+    const files:any[]=await new Promise(resolve=>{const r=db.transaction('files').objectStore('files').getAll();r.onsuccess=()=>resolve(r.result);});db.close();
+    return {files:files.length,items:files.reduce((n,f)=>n+f.items.length,0),slots:files.reduce((n,f)=>n+f.slots.length,0),types:files.reduce((a,f)=>({...a,[f.type]:(a[f.type]||0)+1}),{}), usages:files.reduce((n,f)=>n+Object.values(f.usages).filter((hits:any)=>hits.length>1).length,0)};
+  });
+  expect(summary.files).toBe(261); expect(summary.types).toEqual({common:172,database:58,map:31}); expect(summary.usages).toBeGreaterThan(0);
+  mkdirSync('test-results',{recursive:true});writeFileSync(`test-results/corpus-${info.project.name}.json`,JSON.stringify({...summary,elapsedMs},null,2));
+  await page.getByRole('button', {name:'閉じる',exact:true}).click();
+  await page.getByRole('button', {name:'全体の進捗',exact:true}).click();
+  await expect(page.locator('.progress-detail')).toContainText(['全体','BasicData','CDataBase','CommonEvent','DataBase','SysDataBase','MapData','Dungeon','SampleMapA','SampleMapB']);
+  await page.getByRole('button', {name:'閉じる',exact:true}).click();
+  await page.reload(); await expect(page.locator('.file-row')).toHaveCount(2);
+  expect(external).toEqual([]);
+});
+
+test('offline restart, local Python rendering, and saved review operations', async ({page,context}) => {
+  test.skip(!corpus, 'Private reference files not available');
+  await loadReal(page);
+  await page.evaluate(async()=>{await navigator.serviceWorker.ready;if(!navigator.serviceWorker.controller)await new Promise<void>(resolve=>navigator.serviceWorker.addEventListener('controllerchange',()=>resolve(),{once:true}));});
+  await context.setOffline(true);
+  await page.reload();
+  for(const name of ['MapData','SampleMapA','Event_0000.txt']) await page.locator('.file-row').filter({has:page.locator('.row-name',{hasText:name})}).click();
+  await page.getByRole('button',{name:'コメント',exact:true}).click();
+  await page.getByLabel('コメント内容').fill('オフラインで保存したコメント');
+  await page.getByRole('button',{name:'送信',exact:true}).click();
+  await page.getByRole('button',{name:'閉じる',exact:true}).click();
+  await expect(page.locator('.float-preview')).toHaveText('オフラインで保存したコメント');
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();
+  await page.getByRole('button',{name:'レビューJSONを出力',exact:true}).click();
+  const downloaded=page.waitForEvent('download');await page.getByRole('button',{name:'JSONを出力',exact:true}).click();
+  const request=JSON.parse(readFileSync((await (await downloaded).path())!,'utf8'));expect(request.entries[0].posts[0].text).toContain('オフライン');
+  await page.getByRole('button',{name:'閉じる',exact:true}).click();
+  await page.reload();
+  for(const name of ['MapData','SampleMapA','Event_0000.txt']) await page.locator('.file-row').filter({has:page.locator('.row-name',{hasText:name})}).click();
+  await expect(page.locator('.float-preview')).toHaveText('オフラインで保存したコメント');
+});
+
+test('bottom sheets swipe, normal scrolling, keyboard and review screenshot', async ({page,context},info) => {
+  test.skip(!corpus, 'Private reference files not available');
+  await loadReal(page);
+  await page.locator('.entry-open').click();
+  const session=await context.newCDPSession(page);
+  async function swipe(selector:string) {
+    const box=await page.locator(selector).boundingBox(), x=box!.x+box!.width/2,y=box!.y+Math.min(20,box!.height/2);
+    await session.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
+    for(let dy=20;dy<=120;dy+=20) await session.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y:y+dy}]});
+    await session.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+  }
+  await page.locator('.sheet-body').evaluate(el=>{el.scrollTop=160;});
+  await swipe('.sheet-body');await expect(page.getByRole('dialog')).toBeVisible();
+  await page.locator('.sheet-body').evaluate(el=>{el.scrollTop=0;});
+  await swipe('.sheet-body');await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.getByRole('button',{name:'コメント',exact:true}).click();
+  await swipe('.handle');await expect(page.getByRole('dialog')).toHaveCount(0);
+  if(info.project.name==='desktop') {
+    await page.keyboard.press('ArrowRight');await expect(page.locator('.entry-title')).toHaveText('文章の表示 1');
+  } else await page.getByRole('button',{name:'次の項目',exact:true}).click();
+  await page.getByRole('button',{name:'コメント',exact:true}).click();
+  await page.getByLabel('コメント内容').fill('この表現を確認してください');
+  await page.keyboard.press('ArrowRight');await expect(page.locator('.entry-title')).toHaveText('文章の表示 1');
+  await page.getByRole('button',{name:'送信',exact:true}).click();
+  await page.getByRole('button',{name:'閉じる',exact:true}).click();
+  mkdirSync('docs/screenshots',{recursive:true});
+  await page.screenshot({path:`docs/screenshots/${info.project.name}-review.png`});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+});
+
+test('undo retains a filtered-out item; comment deletion requires confirmation', async ({page}) => {
+  test.skip(!corpus, 'Private reference files not available');
+  await loadReal(page);
+  await page.getByRole('button',{name:'承認',exact:true}).click();
+  await page.getByRole('button',{name:'前の項目',exact:true}).click();
+  await page.locator('.entry-open').click();
+  await page.getByRole('button',{name:'確認済み',exact:true}).click();
+  await page.getByRole('button',{name:'閉じる',exact:true}).click();
+  await expect(page.locator('.counter')).toHaveText('1 / 1');
+  await page.getByRole('button',{name:'未確認に戻す',exact:true}).click();
+  await page.getByRole('button',{name:'確定',exact:true}).click();
+  await expect(page.locator('.entry-title')).toHaveText('イベント名');
+  await expect(page.locator('.counter')).toHaveText('0 / 0');
+  await page.locator('.entry-open').click();await page.getByRole('button',{name:'すべて',exact:true}).click();await page.getByRole('button',{name:'閉じる',exact:true}).click();
+  await page.getByRole('button',{name:'コメント',exact:true}).click();
+  await page.getByLabel('コメント内容').fill('削除テスト');await page.getByRole('button',{name:'送信',exact:true}).click();
+  await page.getByRole('button',{name:'削除',exact:true}).click();await page.getByRole('button',{name:'キャンセル',exact:true}).click();
+  await expect(page.locator('.post-text')).toHaveText('削除テスト');
+  await page.getByRole('button',{name:'削除',exact:true}).click();await page.getByRole('button',{name:'確定',exact:true}).click();
+  await expect(page.locator('.post-text')).toHaveCount(0);
+});
+
+test('manual comment split and merge', async ({page}) => {
+  test.skip(!corpus, 'Private reference files not available');
+  await loadReal(page);
+  const grouped=await page.evaluate(async()=>{
+    const db=await new Promise<IDBDatabase>(resolve=>{const r=indexedDB.open('woditor-review');r.onsuccess=()=>resolve(r.result);});
+    const file:any=await new Promise(resolve=>{const r=db.transaction('files').objectStore('files').get('MapData/SampleMapA/Event_0000.txt');r.onsuccess=()=>resolve(r.result);});db.close();
+    const item=file.items.find((i:any)=>i.slotIds.length>1);return {title:item.title,count:file.items.length};
+  });
+  await page.locator('.entry-open').click();await page.locator('.pick-row').filter({hasText:grouped.title}).first().click();
+  const source=await page.locator('.source').textContent();expect(source).toContain('\n');
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();
+  await page.getByRole('button',{name:'コメントを行ごとに分割',exact:true}).click();await page.getByRole('button',{name:'確定',exact:true}).click();
+  expect(await page.locator('.source').textContent()).not.toContain('\n');
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();
+  await page.getByRole('button',{name:'次のコメントと結合',exact:true}).click();await page.getByRole('button',{name:'確定',exact:true}).click();
+  await expect(page.locator('.source')).toHaveText(source!);
+  await expect(page.locator('.counter')).toHaveText(new RegExp(` / ${grouped.count}$`));
+});

@@ -1,0 +1,28 @@
+{
+  "name": "woditor-review",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "predev": "node scripts/vendor.mjs",
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && node scripts/vendor.mjs && vite build && node scripts/pwa.mjs",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "test:python": "node scripts/python-tests.mjs",
+    "test:e2e": "playwright test",
+    "check": "npm run test:python && npm test && npm run build && npm run test:e2e"
+  },
+  "dependencies": {
+    "diff": "8.0.4",
+    "fflate": "0.8.3",
+    "pyodide": "0.28.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "vite": "^7.2.0"
+  }
+}

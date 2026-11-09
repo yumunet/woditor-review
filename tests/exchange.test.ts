@@ -1,0 +1,106 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { createRequest, importResponse, mergeFiles, type ReviewResponse } from '../src/exchange';
+import { emptyWorkspace, isDone, type ReviewFile, type Workspace } from '../src/model';
+import { addComment, approveItem, canEdit, setResolved } from '../src/review-state';
+import { backupJson, restoreJson } from '../src/storage';
+import { characterDiff } from '../src/diff';
+import { canMerge, mergeGroup, splitGroup } from '../src/grouping';
+
+const corpus = existsSync('.reference/ja-JP/texts/MapData/SampleMapA/Event_0000.txt');
+function realFile(): ReviewFile {
+  const local = '.tools/python';
+  const command = process.env.PYTHON || (existsSync(local) ? readdirSync(local).map(p => join(local, p, 'python.exe')).find(existsSync) : null) || (process.platform === 'win32' ? 'py' : 'python3');
+  const result = spawnSync(command, ['-c', "import json;from pathlib import Path;from review_parser import pair_file;p='MapData/SampleMapA/Event_0000.txt';print(json.dumps(pair_file(p,(Path('.reference/ja-JP/texts')/p).read_bytes(),(Path('.reference/en-US/texts')/p).read_bytes())))"], {encoding: 'utf8', env: {...process.env, PYTHONPATH: 'python', PYTHONUTF8: '1'}});
+  if (result.status !== 0) throw new Error(result.stderr); return JSON.parse(result.stdout);
+}
+const reference = corpus ? realFile() : null;
+function setup() {
+  const workspace: Workspace = {...emptyWorkspace(), files: [structuredClone(reference!)]};
+  const file = workspace.files[0], item = file.items[0], thread = addComment(item, 'Please fix the name');
+  const request = createRequest(workspace, [file.path]); workspace.requests.push(request);
+  const response: ReviewResponse = {schemaVersion: 1, requestId: request.requestId, suggestions: [], responses: [{commentId: thread.id, path: file.path, itemId: item.id, fileVersion: file.version, decision: 'accepted', reason: 'Corrected spelling', changes: [{slotId: file.slots[0].id, before: file.slots[0].translation, after: 'Yuichi, revised'}]}]};
+  return {workspace, file, item, thread, response};
+}
+test('character-level difference preserves whitespace, Unicode, and escapes markup', () => {
+  const d = characterDiff('cat 😺 <x>\n', 'cut 😺 <y>\n');
+  assert.equal(d.before, 'c<span class="diff-deleted">a</span>t 😺 &lt;<span class="diff-deleted">x</span>&gt;\n');
+  assert.equal(d.after, 'c<span class="diff-added">u</span>t 😺 &lt;<span class="diff-added">y</span>&gt;\n');
+});
+test('AI proposal -> resolve -> backup -> reopen -> resolve; another thread does not commit', {skip: !corpus}, () => {
+  const {workspace, response, thread} = setup();
+  const next = importResponse(workspace, response), f = next.files[0], i = f.items[0], old = f.slots[0].translation;
+  const other = addComment(i, 'Other issue');
+  setResolved(i, f.slots, other.id, true); assert.equal(i.changes[0].status, 'pending');
+  assert.equal(canEdit(i.threads[0], i.threads[0].posts[0].id), false);
+  setResolved(i, f.slots, thread.id, true); assert.equal(f.slots[0].translation, 'Yuichi, revised');
+  const restored = restoreJson(backupJson(next)), rf = restored.files[0], ri = rf.items[0];
+  setResolved(ri, rf.slots, thread.id, false); assert.equal(rf.slots[0].translation, old); assert.equal(isDone(ri), false);
+  setResolved(ri, rf.slots, thread.id, true); assert.equal(rf.slots[0].translation, 'Yuichi, revised');
+  approveItem(ri, rf.slots); assert.equal(isDone(ri), true);
+});
+test('ID/version/slot/duplicate/missing conflicts apply no changes', {skip: !corpus}, () => {
+  for (const corrupt of [(r: ReviewResponse) => {r.responses[0].commentId = 'bad';}, (r: ReviewResponse) => {r.responses[0].fileVersion = 'f'.repeat(64);}, (r: ReviewResponse) => {r.responses[0].changes[0].before = 'bad';}, (r: ReviewResponse) => {r.responses.push(r.responses[0]);}, (r: ReviewResponse) => {r.responses = [];}]) {
+    const {workspace, response} = setup(), before = JSON.stringify(workspace); corrupt(response);
+    assert.throws(() => importResponse(workspace, response)); assert.equal(JSON.stringify(workspace), before);
+  }
+  const {workspace, response} = setup(), next = importResponse(workspace, response);
+  assert.throws(() => importResponse(next, response), /既に/);
+});
+test('edits to a comment after export invalidate its response', {skip: !corpus}, () => {
+  const {workspace, response, thread} = setup(); thread.posts[0].text = 'Changed';
+  assert.throws(() => importResponse(workspace, response), /変更/);
+});
+test('revised TXT must agree with response; undeclared changes need manual review', {skip: !corpus}, () => {
+  const {workspace, response} = setup(), revised = structuredClone(workspace.files[0]);
+  revised.slots[0].translation = response.responses[0].changes[0].after;
+  revised.slots[1].translation += ' changed';
+  const next = importResponse(workspace, response, [revised]);
+  assert.equal(next.files[0].items[0].changes[0].status, 'pending');
+  assert.equal(next.files[0].items[1].threads[0].posts[0].decision, 'needs_review');
+  revised.slots[0].translation = 'conflict'; assert.throws(() => importResponse(workspace, response, [revised]));
+});
+test('reload keeps unchanged approval and comments; changes await re-review', {skip: !corpus}, () => {
+  const {workspace, file, item} = setup();
+  item.threads = []; approveItem(item, file.slots); approveItem(file.items[1], file.slots);
+  const incoming = structuredClone(file); incoming.slots[0].translation += ' new';
+  const next = mergeFiles(workspace, [incoming]), f = next.files[0];
+  assert.equal(f.items[0].approved, false); assert.equal(f.items[1].approved, true);
+  assert.equal(f.slots[0].translation, file.slots[0].translation); assert.equal(f.items[0].changes[0].status, 'pending');
+  approveItem(f.items[0], f.slots); assert.equal(f.slots[0].translation, incoming.slots[0].translation);
+});
+test('line shifts preserve unique review IDs; ambiguous source changes retain prior file', {skip: !corpus}, () => {
+  const {workspace, file, item, thread} = setup(), incoming = structuredClone(file);
+  incoming.sourceVersion = 'b'.repeat(64);
+  incoming.slots[0].id = 'L00003:EVENT_NAME'; incoming.slots[0].line++;
+  incoming.items[0].slotIds = [incoming.slots[0].id]; incoming.items[0].id = 'new';
+  const next = mergeFiles(workspace, [incoming]);
+  assert.equal(next.files[0].items[0].id, item.id); assert.equal(next.files[0].items[0].threads[0].id, thread.id);
+  incoming.slots[0].fingerprint = 'c'.repeat(64);
+  const unsafe = mergeFiles(workspace, [incoming]);
+  assert.equal(unsafe.files[0].sourceVersion, file.sourceVersion); assert.match(unsafe.diagnostics[0].message, /対応付け/);
+});
+test('malformed backup references are refused before replacement', {skip: !corpus}, () => {
+  const {workspace} = setup(); workspace.files[0].items[0].slotIds = ['bad'];
+  assert.throws(() => restoreJson(backupJson(workspace)));
+});
+test('manual comment split/merge keeps Slots, reload grouping, backup and history boundaries', {skip: !corpus}, () => {
+  const {workspace, file} = setup(), grouped = file.items.find(i => i.slotIds.length > 1)!;
+  const count = file.items.length, ids = [...grouped.slotIds];
+  const first = splitGroup(file, grouped.id);
+  assert.equal(file.items.length, count + ids.length - 1);
+  assert.equal(file.items.find(i => i.id === first)!.slotIds.length, 1);
+  assert.equal(canMerge(file, file.items.find(i => i.id === first)!), true);
+  const reloaded = mergeFiles(workspace, [structuredClone(reference!)]);
+  assert.deepEqual(reloaded.files[0].manualGroups, file.manualGroups);
+  assert.equal(reloaded.files[0].items.length, file.items.length);
+  const restored = restoreJson(backupJson(reloaded)), rf = restored.files[0];
+  mergeGroup(rf, first);
+  assert.deepEqual(rf.items.find(i => i.id === first)!.slotIds, ids);
+  addComment(rf.items.find(i => i.id === first)!, 'Locked group');
+  assert.throws(() => splitGroup(rf, first), /履歴/);
+});
