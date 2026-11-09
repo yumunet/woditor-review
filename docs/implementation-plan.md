@@ -45,6 +45,8 @@ WOLF RPGエディター（ウディタ）のプロジェクトデータを、日
 
 ### 今回は実装しない機能
 
+追記（2026年11月10日）：初期計画では対象外だったGoogle Drive同期は、追加依頼により実装。現在の設定・動作は [google-drive.md](google-drive.md) を参照。
+
 - Google Driveとの同期
 - HTMLマニュアルの解析・レビュー
 - OpenAI APIやChatGPT APIとの直接通信

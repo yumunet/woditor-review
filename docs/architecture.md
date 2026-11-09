@@ -40,4 +40,4 @@
 
 JSONは `schemaVersion: 1`。依頼にはpath、fileVersion、itemId、slotIds、commentId、原文と英訳、全投稿、周辺情報を含む。回答は同じID・バージョンを必須とし、判断・理由・必要ならSlot別変更を持つ。AI判断とユーザー承認は別。変更は対応AIコメントと結び、解決で確定、再開で旧訳に戻す。バックアップはファイル・状態・履歴をすべて含む。
 
-UIは単一カラムのTypeScript、解析はローカル配信PyodideをWeb Workerで実行。ZIPはfflate、保存はIndexedDB、PWAはローカルリソースだけをキャッシュする。外部サービスに翻訳データを送信しない。
+UIは単一カラムのTypeScript、解析はローカル配信PyodideをWeb Workerで実行。ZIPはfflate、保存はIndexedDB、PWAはローカルリソースだけをキャッシュする。通常のレビューは端末内で完結する。任意のGoogle Drive同期に接続した場合は、アプリ専用領域へレビュー全体を送受信する。同期の設計は [development.md](development.md#drive同期の実装)、設定手順は [google-drive.md](google-drive.md) を参照。

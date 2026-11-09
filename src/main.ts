@@ -17,6 +17,9 @@ import {newlineWarning,slotWarnings} from './translation-warnings';
 import {itemRows} from './item-picker';
 import {createTextView,paintTextView,targetLine,textLineHeight,textViewMarkup,type TextView,type TextLanguage} from './text-viewer';
 import {navigationQuestion,navigationTarget} from './navigation';
+import {DriveController} from './drive-controller';
+import {driveView} from './drive-view';
+import {workspaceHash} from './drive-sync';
 
 const root = document.querySelector<HTMLDivElement>('#app')!;
 let workspace: Workspace = emptyWorkspace();
@@ -39,6 +42,18 @@ let exportSelection = new Set<string>(), preparedRequest: ReviewRequest | null =
 const sheetTitles: Record<string,string> = {load: 'ファイルを読み込む', items: '翻訳項目', comments: 'コメント', progress: '全体の進捗', diagnostics: '読み込み結果', restore: 'バックアップを復元', export: 'レビューJSONを出力', response: 'レビューJSONを読み込む', reload: '英訳TXTを再読み込み', english: '英訳TXTを出力'};
 sheetTitles.source = '原文を補う';
 sheetTitles.text = 'テキスト表示';
+sheetTitles.drive = 'Google Drive同期';
+const drive = new DriveController({getWorkspace: () => workspace,
+  applyWorkspace: async (next, expectedHash) => {
+    if (busy || confirmation || instructionsPreview || sheet && sheet !== 'drive') throw new Error('編集中の画面を閉じてから、もう一度同期してください');
+    busy = 'Driveの変更を保存中…'; render();
+    try {
+      if (await workspaceHash(workspace) !== expectedHash) throw new Error('同期中に端末のデータが変わりました。もう一度同期してください');
+      await saveWorkspace(next); workspace = next; path = currentId = null; preparedRequest = null; textView = null;
+    } finally {busy = ''; render();}
+  }, canAutoSync: () => !busy && !sheet && !confirmation && !instructionsPreview && document.visibilityState === 'visible',
+  changed: () => {if (sheet === 'drive') render();},
+});
 const currentFile = () => workspace.files.find(f => f.path === path);
 const currentItem = () => currentFile()?.items.find(i => i.id === currentId);
 const targets = () => currentFile()?.items.filter(i => matches(i, itemFilter)) ?? [];
@@ -116,6 +131,7 @@ function progressRows(node: TreeNode, depth = 0): string {
   return `<div class="progress-detail" style="--depth:${depth}"><span>${e(node.name)}</span><span>${node.done.toLocaleString()} / ${node.total.toLocaleString()}</span></div>${node.children.filter(c => !c.file).map(c => progressRows(c, depth + 1)).join('')}`;
 }
 function sheetBody() {
+  if (sheet === 'drive') return driveView(drive.state);
   if(sheet==='text' && textView) return textViewMarkup(textView);
   if (sheet === 'source') {
     const file=currentFile(), item=currentItem();
@@ -141,6 +157,7 @@ function render() {
   root.innerHTML = `<header class="top">${file ? `<button class="icon" aria-label="戻る" data-action="home">${icon('back')}</button>` : ''}<h1 title="${e(file?.path ?? '翻訳レビュー')}">${e(file?.path.split('/').at(-1) ?? '翻訳レビュー')}</h1>${!file ? `<button class="overall" data-action="progress" aria-label="全体の進捗"><span class="ring" style="--progress:${p ?? 0}%"></span>${p === null ? '—' : p + '%'}</button>` : ''}<button class="icon" aria-label="メニュー" data-action="menu" aria-expanded="${menu}">${icon('menu')}</button></header>${menu ? `<nav class="menu" aria-label="メニュー"><button data-action="load">ファイルを読み込む</button><button data-action="diagnostics">読み込み結果 (エラー${workspace.diagnostics.filter(d => d.severity === 'error').length})</button><button data-action="export">レビューJSONを出力</button><button data-action="response">レビューJSONを読み込む</button><button data-action="reload">英訳TXTを再読み込み</button><button data-action="backup">状態をバックアップ</button><button data-action="restore">バックアップを復元</button></nav>` : ''}${file ? review(file) : `${filterButtons(homeFilter, 'home')}<main class="scroll file-scroll">${workspace.files.length ? treeRows(tree) || '<div class="empty">対象のファイルはありません</div>' : `<div class="empty">日本語と英語のTXTを読み込んでください<br><button class="primary" data-action="load">${icon('upload')} ファイルを読み込む</button></div>`}</main>`}${sheet ? `<div class="scrim" data-action="close"></div><section class="sheet" role="dialog" aria-modal="true" aria-label="${e(({load: 'ファイルを読み込む', items: '翻訳項目', comments: 'コメント', progress: '全体の進捗', diagnostics: '読み込み結果'} as Record<string,string>)[sheet] ?? '')}"><button class="handle" aria-label="下にスワイプして閉じる" tabindex="-1"></button><div class="sheet-head"><h2>${({load: 'ファイルを読み込む', items: '翻訳項目', comments: 'コメント', progress: '全体の進捗', diagnostics: '読み込み結果'} as Record<string,string>)[sheet] ?? ''}</h2><button class="icon" aria-label="閉じる" data-action="close">${icon('close')}</button></div>${sheetBody()}</section>` : ''}${toastMarkup()}${busy ? `<div class="busy" role="status"><div class="spinner"></div><div>${e(busy)}</div></div>` : ''}`;
   root.querySelector('.sheet')?.setAttribute('aria-label', sheetTitles[sheet ?? ''] ?? '');
   root.querySelector('.menu [data-action="backup"]')?.insertAdjacentHTML('beforebegin', '<button data-action="english">英訳TXTを出力</button>');
+  root.querySelector('.menu [data-action="backup"]')?.insertAdjacentHTML('beforebegin', '<button data-action="drive">Google Drive同期</button>');
   const group = currentItem();
   if (file && group?.code === 103) root.querySelector('.menu')?.insertAdjacentHTML('beforeend', `<button data-action="split-group" ${canSplit(group) ? '' : 'disabled'}>コメントを行ごとに分割</button><button data-action="merge-group" ${canMerge(file, group) ? '' : 'disabled'}>次のコメントと結合</button>`);
   const heading = root.querySelector('.sheet h2'); if (heading) heading.textContent = sheetTitles[sheet ?? ''] ?? '';
@@ -166,6 +183,16 @@ root.addEventListener('click', event => {
   if (confirmation) return;
   if (action === 'menu') {menu = !menu; render(); return;}
   menu = false;
+  if (action === 'drive') {openSheet('drive'); void drive.prepare(); return;}
+  if (action === 'drive-connect') {void drive.connect(); return;}
+  if (action === 'drive-disconnect') {drive.disconnect(); return;}
+  if (action === 'drive-sync') {void drive.sync(); return;}
+  if (action === 'drive-recovery' && drive.state.recovery) {download(backupFileName(), backupJson(drive.state.recovery)); return;}
+  if (action === 'drive-use-local' || action === 'drive-use-remote') {
+    const expectedHeads = drive.state.conflicts.map(r => r.id);
+    ask(action === 'drive-use-local' ? 'この端末の状態をDriveにも採用しますか？' : '選んだDriveの状態をこの端末に反映しますか？同期前の端末データは復旧用に保存します。',
+      () => drive.sync({use: action === 'drive-use-local' ? 'local' : 'remote', revision: value, expectedHeads})); return;
+  }
   if (action === 'home') {path = null; currentId = null; sheet = null;}
   else if (action === 'folder') {if (expanded.has(value!)) expanded.delete(value!); else expanded.add(value!);}
   else if (action === 'file') {path = value!; itemFilter = homeFilter; itemQuery=''; selectItem(targets()[0]?.id ?? '');}
@@ -233,9 +260,12 @@ root.addEventListener('scroll',event=>{
   const element=event.target as HTMLElement;
   if(sheet==='text' && textView && element.matches('.text-scroll')) paintTextView(textView,element);
 },true);
-root.addEventListener('change', event => {const el = event.target as HTMLInputElement; if (el.id === 'export-all') {exportSelection = new Set(el.checked ? exportFiles().map(f => f.path) : []); preparedRequest = null; render(); return;} if (el.id === 'context-lang') {contextLang = el.value as 'en' | 'ja'; render();} if (el.dataset.exportPath) {if (el.checked) exportSelection.add(el.dataset.exportPath); else exportSelection.delete(el.dataset.exportPath); preparedRequest = null; render();}});
+root.addEventListener('change', event => {const el = event.target as HTMLInputElement; if (el.id === 'drive-auto') {void drive.setAutomatic(el.checked).catch(error => toast(String(error))); return;} if (el.id === 'export-all') {exportSelection = new Set(el.checked ? exportFiles().map(f => f.path) : []); preparedRequest = null; render(); return;} if (el.id === 'context-lang') {contextLang = el.value as 'en' | 'ja'; render();} if (el.dataset.exportPath) {if (el.checked) exportSelection.add(el.dataset.exportPath); else exportSelection.delete(el.dataset.exportPath); preparedRequest = null; render();}});
 root.addEventListener('submit', async event => {
   const form = event.target as HTMLFormElement;
+  if (form.id === 'drive-config-form') {
+    event.preventDefault(); try {await drive.configure(String(new FormData(form).get('clientId') ?? ''));} catch (error) {toast(String(error));} return;
+  }
   if (form.id === 'source-form') {
     event.preventDefault(); const file=currentFile(), item=currentItem(); if(!file || !item) return;
     try {updateManualSources(file,item,new Map([...new FormData(form)].map(([id,text])=>[id,String(text)]))); persist(file.path); closeSheet();} catch(error){toast(String(error));} return;
@@ -343,5 +373,5 @@ root.addEventListener('touchend', event => {
   swipe = null;
 });
 busy = '保存したデータを読み込み中…'; render();
-void loadWorkspace().then(saved => {if (saved) workspace = saved;}).catch(error => {notice = `保存データを読み込めません：${String(error)}`;}).finally(() => {busy = ''; render();});
+void Promise.all([loadWorkspace(), drive.initialize()]).then(([saved]) => {if (saved) workspace = saved;}).catch(error => {notice = `保存データを読み込めません：${String(error)}`;}).finally(() => {busy = ''; render();});
 registerPwa(toast);

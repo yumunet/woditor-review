@@ -19,6 +19,17 @@ export async function loadWorkspace(): Promise<Workspace | null> {
   } finally {db.close();}
 }
 let saving: Promise<void> = Promise.resolve();
+export async function readSetting<T>(key: string): Promise<T | undefined> {
+  const db = await open();
+  try {return await value<T>(db.transaction('meta', 'readonly').objectStore('meta').get(key));} finally {db.close();}
+}
+export async function writeSetting(key: string, data: unknown): Promise<void> {
+  const db = await open();
+  try {await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction('meta', 'readwrite'); tx.objectStore('meta').put(data, key);
+    tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error);
+  });} finally {db.close();}
+}
 export function saveWorkspace(workspace: Workspace, changedPath?: string): Promise<void> {
   workspace.updatedAt = new Date().toISOString();
   const {files, ...meta} = workspace;
