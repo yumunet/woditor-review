@@ -3,11 +3,12 @@ import {GoogleDrive, DriveAuthError, type DriveRevision} from './drive-api';
 import {authorizeDrive, loadGoogleIdentity} from './drive-auth';
 import {synchronize, workspaceHash, type SyncBase, type SyncResolution} from './drive-sync';
 import {readSetting, writeSetting, restoreJson} from './storage';
-export interface DriveState {clientId: string; ready: boolean; working: boolean; email: string; connected: boolean; automatic: boolean; message: string; lastSync?: string; conflicts: DriveRevision[]; recovery?: Workspace}
+export interface DriveState {clientId: string; hasEmbeddedClientId: boolean; ready: boolean; working: boolean; email: string; connected: boolean; automatic: boolean; message: string; lastSync?: string; conflicts: DriveRevision[]; recovery?: Workspace}
 interface Options {getWorkspace(): Workspace; applyWorkspace(workspace: Workspace, expectedHash: string): Promise<void>; canAutoSync(): boolean; changed(): void}
 const message = (error: unknown) => error instanceof Error ? error.message : String(error);
+export function resolveDriveClientId(embedded: string | undefined, stored: unknown) {return embedded?.trim() || (typeof stored === 'string' ? stored.trim() : '');}
 export class DriveController {
-  state: DriveState = {clientId: '', ready: false, working: false, email: '', connected: false, automatic: false, message: 'Googleに接続すると、別の端末とレビューを同期できます。', conflicts: []};
+  state: DriveState = {clientId: '', hasEmbeddedClientId: false, ready: false, working: false, email: '', connected: false, automatic: false, message: 'Googleに接続すると、別の端末とレビューを同期できます。', conflicts: []};
   private session?: {token: string; expiresAt: number};
   private base?: SyncBase;
   private accountKey = '';
@@ -18,7 +19,9 @@ export class DriveController {
   constructor(private options: Options) {}
   async initialize() {
     const config = await readSetting<{clientId?: string; automatic?: boolean}>('drive-config');
-    this.state.clientId = typeof config?.clientId === 'string' ? config.clientId : import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
+    const embedded = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    this.state.hasEmbeddedClientId = !!embedded?.trim();
+    this.state.clientId = resolveDriveClientId(embedded, config?.clientId);
     this.state.automatic = config?.automatic === true;
     const recovery = await readSetting<string>('drive-recovery');
     if (typeof recovery === 'string') {try {this.state.recovery = restoreJson(recovery);} catch {/* Ignore an invalid recovery record. */}}

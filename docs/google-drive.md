@@ -13,7 +13,7 @@
 
 これはブラウザからGoogle Identity Servicesのポップアップで認可する方式。サーバー、APIキー、サービスアカウントは不要。同じGoogle Cloudプロジェクトの同じクライアントIDを、同期させる端末で使用する。
 
-サイト側にIDを組み込む場合は `.env.example` を `.env.local` へコピーし、`VITE_GOOGLE_CLIENT_ID` に実際のIDを設定してからビルドする。Viteを起動済みなら再起動する。公開してよいクライアントIDだけを設定し、トークンやシークレットは書かない。アプリで保存した接続設定は、この端末のビルド時既定値より優先される。
+サイト側にIDを組み込む場合は `.env.example` を `.env.local` へコピーし、`VITE_GOOGLE_CLIENT_ID` に実際のIDを設定してからビルドする。Viteを起動済みなら再起動する。公開してよいクライアントIDだけを設定し、トークンやシークレットは書かない。埋め込みIDがある場合は保存済み設定より優先し、接続設定の入力欄を表示しない。埋め込みIDがない場合だけ、各端末でIDを入力・保存する。
 
 Googleの設定は[公式セットアップ手順](https://developers.google.com/identity/oauth2/web/guides/get-google-api-clientid)を参照。
 
