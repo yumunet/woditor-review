@@ -1,7 +1,7 @@
 {
   "id": "./",
   "name": "Woditor Review",
-  "short_name": "翻訳レビュー",
+  "short_name": "Woditor Review",
   "description": "ウディタの日本語原文と英訳TXTのレビュー",
   "lang": "ja",
   "start_url": "./",
