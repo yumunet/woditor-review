@@ -1,0 +1,141 @@
+# 開発・運用と画面仕様
+
+利用手順は [README](../README.md)、解析・状態モデルは [architecture.md](architecture.md)、検証結果は [validation.md](validation.md) を参照。
+
+## 実行環境と配信
+
+UIはTypeScript、解析はWeb Worker上のPython / Pyodide、状態保存はIndexedDB。サーバーDBや外部APIは使用しない。初回は同一ホストから約12MBのPyodideランタイムを取得する。本番ビルドは14ローカルリソースを含むPWAを生成する。
+
+静的公開は dist/ 一式をHTTPSサイトのルートへ配置する。file:// やサブディレクトリへの配置は非対応。インストールとオフライン確認は npm run build と npm run preview を使用する。
+
+## 読込仕様
+
+右上メニューの「ファイルを読み込む」で、日本語と英語それぞれのZIPを指定します。例：
+
+```text
+japanese.zip
+└─ ja-JP/texts/BasicData/CommonEvent/042.txt
+english.zip
+└─ en-US/texts/BasicData/CommonEvent/042.txt
+```
+
+余分な親フォルダ、`texts/` 始まり、`BasicData/`・`MapData/` 始まりも認識します。相対パスの重複・不正なパスは拒否します。ZIPは128MB、展開後のTXT合計は256MB、1 TXTは16MB、5,000 TXTまでです。
+
+- `COMMON_ID=`、`TYPE_ID=`、`EVENT_ID=` で形式を判定し、Header・Map本体・タイルセット等はスキップします。
+- UTF-8専用です。BOM・改行・空白・制御記号を保持します。
+- 日本語のSlotを基準に、英語のキー・コマンド構造・文字列位置を照合します。
+- 設定キーと前後のコマンド列から行ずれを補正します。無効化・削除された設定、英語版だけのコメントやコマンド、旧形式の追加引数は警告として記録し、入力を変更せず読み込みます。
+- 対応候補が複数ある項目はエラーとして除外し、同じファイルの確実な項目は読み込みます。ファイル自体のIDや形式が異なる場合はファイルを拒否します。
+- CSVはレビュー対象外です。表示用コマンドはコンテキスト専用で、翻訳単位とは分離します。
+- 再度読み込むと既存レビューを照合・維持します。原文変更の対応が曖昧なファイルは適用せず、以前のデータを残します。
+
+提供された328ファイルをすべて読み込み、13,589レビュー項目を生成します。原文の対応が曖昧な英訳14項目も原文を空にして登録し、周辺コマンドを参照して「原文を補う」から入力できます。補完内容は保存・バックアップ・再読み込みで保持します。日本語側の対応不明10箇所の診断記録は残します。各警告・エラーは [docs/validation-corpus.json](validation-corpus.json) に記録しています。
+
+「読み込み結果 (エラー10)」のようにエラー件数を表示し、「エラー」「警告」「対象外」のタブで切り替えます。初期表示は「エラー」です。再読み込みが成功したファイルの古いエラーは置き換えます。
+
+各診断をタップするとアプリ内のテキスト表示を開き、日本語・英語を切り替えて閲覧できます。行が特定できる診断は該当行（英語側は対応位置または近い周辺コマンド）へ移動して強調表示します。読み込めなかったファイルのテキストも端末内に保存し、再起動・バックアップ復元後も閲覧できます。古いバックアップに未解析ファイルの本文がない場合はZIPを再読み込みしてください。
+
+## レビュー画面の動作
+
+フォルダを展開してファイルを選びます。項目タイトルをタップすると項目一覧、下部のコメントボタンでコメントシートを開けます。
+
+- 連続するコメントコマンドは1項目にまとめ、元のSlotを個別に保持します。
+- コメント・変更履歴のないグループはメニューから行ごとに分割でき、隣接した同じ深さのコメントと結合できます。承認は解除されます。手動のグループ構成も保存・再読み込み・バックアップで維持します。
+- 項目フィルターに応じて件数と前後移動を更新します。PCでは左右キーでも移動でき、入力中は干渉しません。
+- 先頭・末尾で前後移動すると、フォルダビューのフィルターと自然順に従って前後のファイルを確認付きで開けます。別フォルダへ移る場合はフォルダ移動を確認します。移動先ではフォルダ側のフィルターを適用し、次へなら先頭、前へなら末尾の対象項目を開きます。
+- 項目一覧の検索窓で原文・英訳・保留中の新訳を検索できます。検索は一覧の表示だけに適用し、下部カウンターと前後移動の対象件数には影響しません。
+- ファイルを開くとフォルダビューの状態フィルターを項目一覧に引き継ぎます。項目側で変えたフィルターはフォルダビューへ戻しません。
+- 項目一覧では項目名の下に原文の先頭1行を薄く表示し、長い原文は末尾を省略します。
+- 未解決コメントがある項目は未確認です。承認するときは中央ダイアログで一括解決を確認し、次の対象項目へ移動します。
+- 「コメントあり」フィルターでは、解決や承認で未解決コメントが0件になっても現在の項目を表示し続けます。対象件数は即更新し、表示項目が対象外ならカウンターは `0 / 対象件数` です。前後移動で次の対象へ離れます。ほかのフィルターでは承認後の自動移動を維持します。
+- 「未確認に戻す」は確認後に実行し、表示項目を維持します。確認済みフィルターから外れた場合もこの項目を表示し、カウンターは `0 / 対象件数` になります。
+- コメント・返信・解決・再開に対応します。自分の投稿は、その後にAI返信がない間だけ編集・削除できます。
+- AIの再審で以前の案が不採用になった場合も回答JSONと元の英訳ZIPを読み込めます。「不採用の変更を破棄」で案を取り下げてからコメントを解決してください。破棄後も会話・変更履歴は残り、コメントを再開しても案は復活しません。再審で別の案が返った場合は、そのコメントの以前の保留案を置き換えます。
+- コメントの「返信・編集・削除・解決」は1行に横並びで表示します。返信投稿の編集・削除も、その投稿の下に横並びで表示します。
+- 項目・コメントのシートはハンドルから下スワイプで閉じます。内容部分はスクロール位置が先頭の場合に下スワイプで閉じます。
+- セルフ変数は数値オペランドと `\cself[n]` の直接参照だけを表示します。間接参照は推測しません。
+- 改行制御だけの差は薄い「改行が異なります」として表示します。それ以外の制御文字・置換文字列の差は通常の警告を表示します。
+
+## 出力画面・通知・ファイル名
+
+- レビューJSON出力は未解決コメントのあるファイルだけを列挙。英訳TXT出力は全ファイルを列挙する。「すべて選択」は各画面の対象だけを操作し、部分選択では indeterminate とする。
+- JSONと英訳TXTの出力ボタンは同じ行。指示文はインライン表示せず、コピー通知の確認ボタンから中央ダイアログで全文を表示する。コピー拒否時も全文を手動コピーできる。Escapeで閉じ、Tabのフォーカスはダイアログ内に制限する。
+- 原文・英訳・新訳ボックスは白。不採用案の説明と破棄ボタンは同じpair領域に置き、ボックスとの間に余白を設ける。承認ボタンは円で囲ったチェックアイコン。
+- 依頼・回答のファイル名は `review_request_<短縮ID>.json` / `review_response_<短縮ID>.json`。UUIDのハイフンを除いた先頭12文字をファイル名に使用し、JSON内部のrequestIdは完全なUUIDを保持する。同じ出力シート内では依頼・コピー指示文でIDを共有する。
+- バックアップ名は woditor-review-backup_YYYY-MM-DD_HH-mm-ss.json。端末のローカル日時で生成し、UTCへ変換しない。
+
+## JSON形式とPython補助ツール
+
+依頼・回答の `schemaVersion` は1です。
+
+- [review-request.schema.json](schemas/review-request.schema.json)：依頼ID、相対パス、版（UTF-8 BOMを除いたテキストのSHA-256）、項目ID、Slot ID・英語側の位置・原文・現訳、コメントID・全投稿、周辺コマンド、再審用の保留案 `pendingChanges`。内部では日本語側の `line` と英語側の `enLine` を分離し、依頼JSONの `line` は英語側の行番号です。
+- [review-response.schema.json](schemas/review-response.schema.json)：各コメントへの判断・理由・Slot別変更と新規改善案。既存IDと版をそのまま返します。
+- バックアップ：`schemaVersion`、全ファイル、原文・英訳・BOM、Slot、グループ、コメント、保留／確定変更、依頼履歴、取り込み済み回答ID、診断情報を含みます。復元時に参照関係を検証します。
+
+回答例（実際にはエクスポートしたIDと64桁の版を使います）：
+
+```json
+{
+  "schemaVersion": 1,
+  "requestId": "依頼ID",
+  "responses": [{
+    "commentId": "コメントID",
+    "path": "BasicData/CommonEvent/042.txt",
+    "itemId": "項目ID",
+    "fileVersion": "依頼に含まれる64桁のSHA-256",
+    "decision": "accepted",
+    "reason": "表記を統一しました。",
+    "changes": [{"slotId": "Slot ID", "before": "Old text", "after": "New text"}]
+  }],
+  "suggestions": []
+}
+```
+
+`decision` は `accepted` / `rejected` / `partial` / `needs_review`。変更がなければ `changes: []` にします。保留案の維持・修正も `slots.translation` を変更前とする最終案を `changes` に指定し、撤回は `rejected` と `changes: []` で返します。回答は依頼の全コメントに1件ずつ必要です。同じSlotへの変更は1つの回答に集約します。新規改善案は依頼に含まれる項目を対象に `{id,path,itemId,fileVersion,reason,changes}` で指定します。
+
+Python 3.10以降で、判断内容から形式を組み立て・検証できます。`decisions.json` は `responses` に `commentId,decision,reason,changes` を持ちます。パス・項目・版は依頼から補完します。
+
+```powershell
+python python/woditor_review_tool.py build --request review_request_ID.json --decisions decisions.json --out review_response_ID.json
+python python/woditor_review_tool.py validate --request review_request_ID.json --response review_response_ID.json
+python python/woditor_review_tool.py apply --request review_request_ID.json --response review_response_ID.json --english-root en-US/texts --out-root revised-texts
+```
+
+上記はリポジトリからの実行例です。`ID` は出力ファイル名の12文字の短縮IDに置き換えます。`apply` は英訳ファイルの版・変更前の文字列・保護トークンを検証し、新しい出力フォルダにのみ書き込みます。既存フォルダへの書き込みは拒否します。出力は回答に関係するファイルです。既存翻訳CLIも `python/woditor_translation_tool.py` で引き続き利用できます。
+
+補助ツールを別の作業場所へ渡す場合は、python/ の woditor_review_tool.py・review_parser.py・review_alignment.py・woditor_translation_tool.py と、隣接する docs/schemas/ の依頼・回答スキーマを同じ相対構成で用意する。指示文には実行時の作業場所を固定せず woditor_review_tool.py とだけ記載する。
+
+## 検証
+
+```powershell
+npm run test:python
+npm test
+npm run build
+npm run test:e2e
+```
+
+Python実行ファイルは `PYTHON` 環境変数で指定できます。Windowsでは既定でEdgeを使います。必要に応じて `PLAYWRIGHT_CHANNEL=chrome` に変更できます。Windows以外では `npx playwright install chromium` でテスト用ブラウザを用意してください。
+
+実データの再検査：
+
+```powershell
+python scripts/corpus-report.py
+```
+
+参考ファイルは `.reference/` に置き、Git管理しません。参考データがない環境では実データ依存のテストはスキップされます。本実装の検証ではすべて参考データを使って実行しています。
+
+## 構成
+
+```text
+src/                    TypeScript UI・状態・保存・JSON受け渡し
+src/parser.worker.ts    ZIP処理とPyodideのWorker
+python/                 元の翻訳CLI・読み取り用解析層・レビュー用CLI
+scripts/                ランタイム同梱・PWA生成・実データレポート
+docs/schemas/           JSONスキーマ
+tests/python/           解析・実データ・Python補助ツールのテスト
+tests/browser/          実ZIP・保存・AI差分・PWA・操作テスト
+public/                 アイコンとManifest
+dist/                   静的配信用ビルド（生成物）
+```
+
+現在の対象はローカルの翻訳レビューです。Drive同期、マニュアル解析、AI API通信、共同編集は実装していません。
