@@ -373,3 +373,15 @@ test('item search filters rows by either language without changing counters or n
   await search.fill('no such translation');await expect(page.locator('.pick-row')).toHaveCount(0);await expect(page.locator('.counter')).toHaveText(`2 / ${count}`);
   await page.getByRole('button',{name:'閉じる',exact:true}).click();await page.getByRole('button',{name:'次の項目',exact:true}).click();await expect(page.locator('.counter')).toHaveText(`3 / ${count}`);
 });
+test('folder status filters flow into item filters in one direction',async({page})=>{
+  test.skip(!corpus,'Private reference files not available');await loadReal(page);
+  await page.getByRole('button',{name:'承認',exact:true}).click();await page.getByRole('button',{name:'戻る',exact:true}).click();
+  await page.getByRole('button',{name:'確認済み',exact:true}).click();await page.locator('.file-row').filter({has:page.locator('.row-name',{hasText:'Event_0000.txt'})}).click();
+  await expect(page.locator('.entry-title')).toHaveText('イベント名');await expect(page.locator('.counter')).toHaveText('1 / 1');
+  await page.locator('.entry-open').click();await expect(page.getByRole('button',{name:'確認済み',exact:true})).toHaveAttribute('aria-pressed','true');
+  await page.getByRole('button',{name:'未確認',exact:true}).click();await page.getByRole('button',{name:'閉じる',exact:true}).click();
+  await page.getByRole('button',{name:'戻る',exact:true}).click();await expect(page.getByRole('button',{name:'確認済み',exact:true})).toHaveAttribute('aria-pressed','true');
+  await page.getByRole('button',{name:'未確認',exact:true}).click();await page.locator('.file-row').filter({has:page.locator('.row-name',{hasText:'Event_0000.txt'})}).click();
+  await expect(page.locator('.entry-title')).toHaveText('文章の表示 1');await page.locator('.entry-open').click();
+  await expect(page.getByRole('button',{name:'未確認',exact:true})).toHaveAttribute('aria-pressed','true');
+});

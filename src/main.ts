@@ -126,7 +126,7 @@ root.addEventListener('click', event => {
   menu = false;
   if (action === 'home') {path = null; currentId = null; sheet = null;}
   else if (action === 'folder') {if (expanded.has(value!)) expanded.delete(value!); else expanded.add(value!);}
-  else if (action === 'file') {path = value!; itemFilter = 'all'; itemQuery=''; selectItem(currentFile()!.items[0]?.id ?? '');}
+  else if (action === 'file') {path = value!; itemFilter = homeFilter; itemQuery=''; selectItem(targets()[0]?.id ?? '');}
   else if (action === 'filter') {if (scope === 'home') homeFilter = value as Filter; else {itemFilter = value as Filter; if (!targets().some(i => i.id === currentId)) currentId = targets()[0]?.id ?? null;}}
   else if (action === 'pick') {selectItem(value!); closeSheet(); return;}
   else if (action === 'close') {closeSheet(); return;}
