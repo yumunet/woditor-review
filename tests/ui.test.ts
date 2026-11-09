@@ -10,7 +10,13 @@ test('all 42 exact prefix pairs and defaults', () => {
     assert.equal(commandColor(en + 'x'), `rgb(${color})`);
   }
   assert.equal(commandColor('■Key Input:x'), 'rgb(40, 40, 60)');
-  assert.equal(commandColor(' |▼ note'), 'rgb(40, 40, 60)');
+  assert.equal(commandColor(' |▼ note'), 'rgb(0, 160, 0)');
+  for(const [ja,en,color] of commandColors) for(const prefix of [ja,en]) {
+    assert.equal(commandColor(' | | |'+prefix+'x'),`rgb(${color})`);
+  }
+  assert.equal(commandColor(' | |■Key Input:x'),'rgb(40, 40, 60)');
+  assert.equal(commandColor('  ▼ note'),'rgb(40, 40, 60)');
+  assert.equal(commandColor('|▼ note'),'rgb(40, 40, 60)');
   assert.equal(commandColor('other'), 'rgb(40, 40, 60)');
 });
 test('compact counts and zero denominator', () => {

@@ -1,4 +1,4 @@
-// Exact strings from implementation-plan §4.6. Do not trim or normalize text.
+// Exact command prefixes; only repeated WOLF " |" indent markers are skipped.
 export const commandColors: [string, string, string][] = [
   ['■デバッグ', '■Debug', '60, 165, 120'], ['▼', '▼', '0, 160, 0'],
   ['■条件分岐', '■Condition', '30, 0, 120'], ['■変数操作', '■Set Variable', '130, 0, 0'],
@@ -24,4 +24,7 @@ export const commandColors: [string, string, string][] = [
 ];
 const prefixes = commandColors.flatMap(([ja, en, color]) => [[ja, color], [en, color]])
   .sort((a, b) => b[0].length - a[0].length);
-export const commandColor = (text: string) => `rgb(${prefixes.find(([prefix]) => text.startsWith(prefix))?.[1] ?? '40, 40, 60'})`;
+export const commandColor = (text: string) => {
+  const body=text.replace(/^(?: \|)+/,'');
+  return `rgb(${prefixes.find(([prefix]) => body.startsWith(prefix))?.[1] ?? '40, 40, 60'})`;
+};
