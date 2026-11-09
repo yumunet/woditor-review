@@ -385,3 +385,15 @@ test('folder status filters flow into item filters in one direction',async({page
   await expect(page.locator('.entry-title')).toHaveText('文章の表示 1');await page.locator('.entry-open').click();
   await expect(page.getByRole('button',{name:'未確認',exact:true})).toHaveAttribute('aria-pressed','true');
 });
+test('item rows show a compact one-line original preview with ellipsis',async({page},info)=>{
+  test.skip(!corpus,'Private reference files not available');await loadReal(page);
+  const source=await page.locator('.source').textContent();await page.locator('.entry-open').click();
+  await expect(page.locator('.pick-source').first()).toHaveText(source!);
+  await expect(page.locator('.pick-source').first()).toHaveCSS('white-space','nowrap');await expect(page.locator('.pick-source').first()).toHaveCSS('text-overflow','ellipsis');
+  const rows=await page.locator('.pick-row').evaluateAll(nodes=>nodes.map(node=>node.getBoundingClientRect().height));expect(Math.max(...rows)).toBeLessThanOrEqual(60);
+  await page.setViewportSize({width:320,height:844});
+  expect(await page.locator('.pick-source').evaluateAll(nodes=>nodes.some(node=>node.scrollWidth>node.clientWidth))).toBeTruthy();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+  await page.setViewportSize(info.project.name==='mobile'?{width:390,height:844}:{width:1280,height:900});
+  mkdirSync('docs/screenshots',{recursive:true});await page.screenshot({path:`docs/screenshots/${info.project.name}-items.png`});
+});
