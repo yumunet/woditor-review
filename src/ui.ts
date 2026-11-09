@@ -26,7 +26,7 @@ const paths: Record<string, string> = {
 };
 export const icon = (name: string) => `<svg class="svg" viewBox="0 0 24 24" aria-hidden="true">${paths[name] ?? paths.file}</svg>`;
 export const folderTriangle = () => '<svg class="folder-triangle" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2 8 5 2 8Z"/></svg>';
-const menuIcons: Record<string,string> = {load:'upload',diagnostics:'alert',export:'spark',response:'download',reload:'refresh',english:'file',drive:'cloud',backup:'download',restore:'undo','split-group':'split','merge-group':'merge'};
+const menuIcons: Record<string,string> = {load:'upload',diagnostics:'alert',export:'spark',response:'download',english:'file',drive:'cloud',backup:'download',restore:'undo','split-group':'split','merge-group':'merge'};
 export const menuIcon = (action: string) => icon(menuIcons[action] ?? 'file');
 export const filters: [Filter, string][] = [['all', 'すべて'], ['pending', '未確認'], ['comment', 'コメントあり'], ['done', '確認済み']];
 export const filterButtons = (filter: Filter, scope: string) => `<div class="filters" aria-label="${scope === 'home' ? 'ファイル' : '項目'}フィルター">${filters.map(([key, label]) => `<button class="pill ${key === filter ? 'active' : ''}" data-action="filter" data-scope="${scope}" data-value="${key}" aria-pressed="${key === filter}">${label}</button>`).join('')}</div>`;

@@ -40,7 +40,7 @@ let editTarget: {threadId: string; postId: string} | null = null;
 let confirmation: {question: string; run: () => void | Promise<void>} | null = null;
 let exportSelection = new Set<string>(), preparedRequest: ReviewRequest | null = null;
 let reviewMode: ReviewMode = 'comments';
-const sheetTitles: Record<string,string> = {load: 'ファイルを読み込む', items: '翻訳項目', comments: 'コメント', progress: '全体の進捗', diagnostics: '読み込み結果', restore: 'バックアップを復元', export: 'AIレビューを依頼', response: 'AIレビュー結果を読み込む', reload: '英訳TXTを再読み込み', english: '英訳TXTを出力'};
+const sheetTitles: Record<string,string> = {load: 'ファイルを読み込む', items: '翻訳項目', comments: 'コメント', progress: '全体の進捗', diagnostics: '読み込み結果', restore: 'バックアップを復元', export: 'AIレビューを依頼', response: 'AIレビュー結果を読み込む', english: '英訳TXTを出力'};
 sheetTitles.source = '原文を補う';
 sheetTitles.text = 'テキスト表示';
 sheetTitles.drive = 'Google Drive同期';
@@ -140,7 +140,7 @@ function sheetBody() {
     if (!file || !item) return '';
     return `<form class="form source-edit" id="source-form">${file.slots.filter(s=>item.slotIds.includes(s.id) && s.sourceMissing).map(s=>`<label>原文<textarea name="${e(s.id)}" aria-label="補完する原文">${e(sourceText(s))}</textarea></label>`).join('')}<button class="primary" type="submit">保存</button></form>`;
   }
-  if (sheet === 'load') return `<form class="form" id="load-form"><label>日本語原文 ZIP<input type="file" name="ja" accept=".zip,application/zip" required></label><label>英訳済み ZIP<input type="file" name="en" accept=".zip,application/zip" required></label><button class="primary" type="submit">読み込む</button></form>`;
+  if (sheet === 'load') return `<form class="form" id="load-form"><label>日本語原文 ZIP${workspace.files.length ? '（省略すると現在の原文を使用）' : ''}<input type="file" name="ja" accept=".zip,application/zip" ${workspace.files.length ? '' : 'required'}></label><label>英訳済み ZIP<input type="file" name="en" accept=".zip,application/zip" required></label><button class="primary" type="submit">読み込む</button></form>`;
   if (sheet === 'items') return `${filterButtons(itemFilter, 'item')}<div class="item-search"><input type="search" id="item-search" aria-label="翻訳項目を検索" placeholder="原文・英訳を検索" value="${e(itemQuery)}"></div><div class="sheet-body">${itemRows(currentFile()!,targets(),currentId,itemQuery)}</div>`;
   if (sheet === 'progress') return `<div class="sheet-body">${progressRows(fileTree(workspace.files, 'all'))}</div>`;
   if (sheet === 'diagnostics') return diagnosticsView(workspace.diagnostics, diagnosticTab);
@@ -149,14 +149,13 @@ function sheetBody() {
   if (sheet === 'export') return `<fieldset class="review-mode"><legend>依頼内容</legend><label><input type="radio" name="review-mode" value="initial" ${reviewMode === 'initial' ? 'checked' : ''}>英訳をチェックして指摘を作る</label><label><input type="radio" name="review-mode" value="comments" ${reviewMode === 'comments' ? 'checked' : ''}>既存コメントに回答・修正する</label></fieldset>${exportRows()}<div class="sheet-foot"><div class="export-actions"><button class="primary" data-action="export-request" ${!exportSelection.size ? 'disabled' : ''}>JSONを出力</button><button class="text-act" data-action="english-zip" ${!exportSelection.size ? 'disabled' : ''}>英訳TXTを出力</button></div><div class="send-row"><button class="text-act" data-action="copy-instructions" ${!exportSelection.size ? 'disabled' : ''}>${icon('copy')}指示文をコピー</button></div></div>`;
   if (sheet === 'response') return '<form class="form" id="response-form"><label>回答JSON<input type="file" name="answer" accept=".json,application/json" required></label><label>修正済み英訳 ZIP（任意）<input type="file" name="revised" accept=".zip,application/zip"></label><button class="primary" type="submit">回答を読み込む</button></form>';
   if (sheet === 'english') return `${exportRows()}<div class="sheet-foot"><button class="primary" data-action="english-zip" ${!exportSelection.size ? 'disabled' : ''}>英訳TXTを出力</button></div>`;
-  if (sheet === 'reload') return '<form class="form" id="reload-form"><label>修正済み英訳 ZIP<input type="file" name="revised" accept=".zip,application/zip" required></label><button class="primary" type="submit">英訳を再読み込み</button></form>';
   return '<div class="sheet-body"><div class="empty">コメントはありません</div></div>';
 }
 function render() {
   const scroll = root.querySelector('.scroll')?.scrollTop ?? 0;
   const sheetScroll = root.querySelector('.sheet-body')?.scrollTop ?? 0;
   const file = currentFile(), tree = fileTree(workspace.files, homeFilter), p = percent(tree.done, tree.total);
-  root.innerHTML = `<header class="top">${file ? `<button class="icon" aria-label="戻る" data-action="home">${icon('back')}</button>` : ''}<h1 title="${e(file?.path ?? '翻訳レビュー')}">${e(file?.path.split('/').at(-1) ?? '翻訳レビュー')}</h1>${!file ? `<button class="overall" data-action="progress" aria-label="全体の進捗"><span class="ring" style="--progress:${p ?? 0}%"></span>${p === null ? '—' : p + '%'}</button>` : ''}<button class="icon" aria-label="メニュー" data-action="menu" aria-expanded="${menu}">${icon('menu')}</button></header>${menu ? `<nav class="menu" aria-label="メニュー"><button data-action="load">ファイルを読み込む</button><button data-action="diagnostics">読み込み結果 (エラー${workspace.diagnostics.filter(d => d.severity === 'error').length})</button><button data-action="export">AIレビューを依頼</button><button data-action="response">AIレビュー結果を読み込む</button><button data-action="reload">英訳TXTを再読み込み</button><button data-action="backup">状態をバックアップ</button><button data-action="restore">バックアップを復元</button></nav>` : ''}${file ? review(file) : `${filterButtons(homeFilter, 'home')}<main class="scroll file-scroll">${workspace.files.length ? treeRows(tree) || '<div class="empty">対象のファイルはありません</div>' : `<div class="empty">日本語と英語のTXTを読み込んでください<br><button class="primary" data-action="load">${icon('upload')} ファイルを読み込む</button></div>`}</main>`}${sheet ? `<div class="scrim" data-action="close"></div><section class="sheet" role="dialog" aria-modal="true" aria-label="${e(({load: 'ファイルを読み込む', items: '翻訳項目', comments: 'コメント', progress: '全体の進捗', diagnostics: '読み込み結果'} as Record<string,string>)[sheet] ?? '')}"><button class="handle" aria-label="下にスワイプして閉じる" tabindex="-1"></button><div class="sheet-head"><h2>${({load: 'ファイルを読み込む', items: '翻訳項目', comments: 'コメント', progress: '全体の進捗', diagnostics: '読み込み結果'} as Record<string,string>)[sheet] ?? ''}</h2><button class="icon" aria-label="閉じる" data-action="close">${icon('close')}</button></div>${sheetBody()}</section>` : ''}${toastMarkup()}${busy ? `<div class="busy" role="status"><div class="spinner"></div><div>${e(busy)}</div></div>` : ''}`;
+  root.innerHTML = `<header class="top">${file ? `<button class="icon" aria-label="戻る" data-action="home">${icon('back')}</button>` : ''}<h1 title="${e(file?.path ?? '翻訳レビュー')}">${e(file?.path.split('/').at(-1) ?? '翻訳レビュー')}</h1>${!file ? `<button class="overall" data-action="progress" aria-label="全体の進捗"><span class="ring" style="--progress:${p ?? 0}%"></span>${p === null ? '—' : p + '%'}</button>` : ''}<button class="icon" aria-label="メニュー" data-action="menu" aria-expanded="${menu}">${icon('menu')}</button></header>${menu ? `<nav class="menu" aria-label="メニュー"><button data-action="load">ファイルを読み込む</button><button data-action="diagnostics">読み込み結果 (エラー${workspace.diagnostics.filter(d => d.severity === 'error').length})</button><button data-action="export">AIレビューを依頼</button><button data-action="response">AIレビュー結果を読み込む</button><button data-action="backup">状態をバックアップ</button><button data-action="restore">バックアップを復元</button></nav>` : ''}${file ? review(file) : `${filterButtons(homeFilter, 'home')}<main class="scroll file-scroll">${workspace.files.length ? treeRows(tree) || '<div class="empty">対象のファイルはありません</div>' : `<div class="empty">日本語と英語のTXTを読み込んでください<br><button class="primary" data-action="load">${icon('upload')} ファイルを読み込む</button></div>`}</main>`}${sheet ? `<div class="scrim" data-action="close"></div><section class="sheet" role="dialog" aria-modal="true" aria-label="${e(({load: 'ファイルを読み込む', items: '翻訳項目', comments: 'コメント', progress: '全体の進捗', diagnostics: '読み込み結果'} as Record<string,string>)[sheet] ?? '')}"><button class="handle" aria-label="下にスワイプして閉じる" tabindex="-1"></button><div class="sheet-head"><h2>${({load: 'ファイルを読み込む', items: '翻訳項目', comments: 'コメント', progress: '全体の進捗', diagnostics: '読み込み結果'} as Record<string,string>)[sheet] ?? ''}</h2><button class="icon" aria-label="閉じる" data-action="close">${icon('close')}</button></div>${sheetBody()}</section>` : ''}${toastMarkup()}${busy ? `<div class="busy" role="status"><div class="spinner"></div><div>${e(busy)}</div></div>` : ''}`;
   root.querySelector('.sheet')?.setAttribute('aria-label', sheetTitles[sheet ?? ''] ?? '');
   root.querySelector('.menu [data-action="backup"]')?.insertAdjacentHTML('beforebegin', '<button data-action="english">英訳TXTを出力</button>');
   root.querySelector('.menu [data-action="backup"]')?.insertAdjacentHTML('beforebegin', '<button data-action="drive">Google Drive同期</button>');
@@ -249,7 +248,7 @@ root.addEventListener('click', event => {
   }
   else if (action === 'backup') {download(backupFileName(), backupJson(workspace)); toast('バックアップを出力しました'); return;}
   else if (['export-request', 'copy-instructions', 'english-zip'].includes(action!)) {void exportReview(action!); return;}
-  else if (['load', 'items', 'comments', 'progress', 'diagnostics', 'restore', 'export', 'response', 'reload', 'english'].includes(action!)) {openSheet(action!); return;}
+  else if (['load', 'items', 'comments', 'progress', 'diagnostics', 'restore', 'export', 'response', 'english'].includes(action!)) {openSheet(action!); return;}
   render();
 });
 root.addEventListener('input',event=>{
@@ -283,11 +282,11 @@ root.addEventListener('submit', async event => {
     event.preventDefault(); const file = new FormData(form).get('backup') as File;
     try {const restored = restoreJson(await file.text()); ask('現在の作業状態をバックアップで置き換えますか？', async () => {await saveWorkspace(restored); workspace = restored; path = currentId = null; sheet = null; expanded.clear(); render(); toast('バックアップを復元しました');});} catch (error) {toast(String(error));} return;
   }
-  if (form.id === 'response-form' || form.id === 'reload-form') {
+  if (form.id === 'response-form') {
     event.preventDefault(); const data = new FormData(form), answer = data.get('answer') as File, revised = data.get('revised') as File;
     busy = '修正データを確認中…'; render();
     try {
-      const answerValue = form.id === 'response-form' ? JSON.parse(await answer.text()) : null;
+      const answerValue = JSON.parse(await answer.text());
       const initialReview = workspace.requests.some(r => r.requestId === answerValue?.requestId && r.mode === 'initial');
       if (initialReview && revised?.size) throw new Error('初回レビューでは指摘JSONだけを指定してください');
       let parsed: ReviewFile[] | undefined;
@@ -302,8 +301,7 @@ root.addEventListener('submit', async event => {
         diagnostics = result.diagnostics;
         documents=replaceDiagnosticDocuments(documents,result.diagnosticDocuments,[...result.files.map(f=>f.path),...result.diagnostics.map(d=>d.path)]);
       }
-      if (form.id === 'response-form') workspace = importResponse(workspace, answerValue, parsed);
-      else workspace = mergeFiles({...workspace, diagnostics: withoutReplacedDiagnostics(workspace.diagnostics, parsed!.map(f => f.path))}, parsed!);
+      workspace = importResponse(workspace, answerValue, parsed);
       workspace.diagnostics.push(...diagnostics);
       workspace.diagnosticDocuments=documents;
       await saveWorkspace(workspace); sheet = null; reconcileCurrent(); busy = ''; render(); toast(initialReview ? `AIの指摘を${answerValue.suggestions.length}件読み込みました` : '変更を読み込みました。再確認してください');
@@ -312,10 +310,12 @@ root.addEventListener('submit', async event => {
   if (form.id !== 'load-form') return;
   event.preventDefault();
   const data = new FormData(form), ja = data.get('ja') as File, en = data.get('en') as File;
-  if (!ja?.size || !en?.size) return;
+  if (!en?.size || !ja?.size && !workspace.files.length) return;
+  const englishOnly = !ja?.size;
   busy = '読み込み中…'; sheet = null; render();
   try {
-    const result = await parseArchives(await ja.arrayBuffer(), await en.arrayBuffer(), updateBusy);
+    const original = englishOnly ? sourceZip(workspace).buffer as ArrayBuffer : await ja.arrayBuffer();
+    const result = await parseArchives(original, await en.arrayBuffer(), updateBusy, englishOnly);
     diagnosticTab = 'error';
     const documents=replaceDiagnosticDocuments(workspace.diagnosticDocuments,result.diagnosticDocuments,[...result.files.map(f=>f.path),...result.diagnostics.map(d=>d.path)]);
     if (!result.files.length) {workspace.diagnostics = result.diagnostics;workspace.diagnosticDocuments=documents;await saveWorkspace(workspace);sheet = 'diagnostics'; busy = ''; render(); return;}
@@ -325,7 +325,7 @@ root.addEventListener('submit', async event => {
       workspace.diagnostics.push(...result.diagnostics);
     } else workspace = {...emptyWorkspace(), ...result};
     workspace.diagnosticDocuments=documents;
-    path = currentId = null;
+    if (englishOnly) reconcileCurrent(); else path = currentId = null;
     await saveWorkspace(workspace);
     if (result.diagnostics.length) sheet = 'diagnostics';
   } catch (error) {notice = String(error);}

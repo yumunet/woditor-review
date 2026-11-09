@@ -20,6 +20,26 @@ export async function loadReal(page: Page, importPath = sourcePath) {
   else await expect(page.locator('.source')).toBeVisible();
 }
 
+test('unified import accepts English alone and preserves comments and other files',async({page})=>{
+  test.skip(!corpus,'Private reference files not available');
+  await page.goto('/');await page.getByRole('button',{name:'ファイルを読み込む',exact:true}).click();
+  await expect(page.locator('input[name=ja]')).toHaveAttribute('required');await closeReviewSheet(page);
+  await loadNavigationFiles(page);await openTreeFile(page,navigationPaths[0]);await postReviewComment(page,'Keep this comment');
+  const oldText=await page.locator('.translation').textContent();
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();
+  await expect(page.getByRole('button',{name:'英訳TXTを再読み込み',exact:true})).toHaveCount(0);
+  await page.getByRole('button',{name:'ファイルを読み込む',exact:true}).click();
+  await expect(page.locator('input[name=ja]')).not.toHaveAttribute('required');
+  const text=readFileSync(`.reference/en-US/texts/${navigationPaths[0]}`,'utf8').replace(/COMMON_NAME=[^\r\n]*/,'COMMON_NAME=Updated name');
+  expect(text).toContain('COMMON_NAME=Updated name');
+  await page.locator('input[name=en]').setInputFiles({name:'revised.zip',mimeType:'application/zip',buffer:Buffer.from(zipSync({[`en-US/texts/${navigationPaths[0]}`]:Buffer.from(text)}))});
+  await page.getByRole('button',{name:'読み込む',exact:true}).click();await expect(page.locator('.busy')).toHaveCount(0,{timeout:90_000});
+  if(await page.getByRole('dialog').count()) await closeReviewSheet(page);
+  await expect(page.locator('h1')).toHaveText('000.txt');await expect(page.locator('.translation')).toHaveText(oldText!);await expect(page.locator('.translation-after')).toHaveText('Updated name');
+  await page.locator('.comment-trigger').click();await expect(page.locator('.post-text')).toHaveText('Keep this comment');await closeReviewSheet(page);
+  await openTreeFile(page,navigationPaths[1]);await expect(page.locator('.source')).toBeVisible();
+});
+
 test('real ZIP -> folders -> compare -> context -> filtered empty state', async ({page}) => {
   test.skip(!corpus, 'Private reference files not available');
   const errors: string[] = [];
@@ -543,7 +563,7 @@ test('rejected reassessment ZIP imports and discarded proposals stay discarded a
   await resolveCurrentComment(page);await page.locator('.comment-trigger').click();await page.getByRole('button',{name:'すべてのコメント',exact:true}).click();await page.getByRole('button',{name:'再開',exact:true}).click();await expect(page.locator('.post-text')).toContainText(['Correct the name','Corrected spelling','Please withdraw the previous proposal','Withdrawn after reconsideration']);await page.getByRole('button',{name:'閉じる',exact:true}).click();await expect(page.locator('.translation-after')).toHaveCount(0);
   await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'英訳TXTを出力',exact:true}).click();const zipEvent=page.waitForEvent('download');await page.getByRole('button',{name:'英訳TXTを出力',exact:true}).click();
   const zip=readFileSync((await (await zipEvent).path())!);expect(Buffer.from(unzipSync(zip)[`en-US/texts/${sourcePath}`]).toString('utf8')).toContain(`EVENT_NAME=${slot.translation}`);await page.getByRole('button',{name:'閉じる',exact:true}).click();
-  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'英訳TXTを再読み込み',exact:true}).click();await page.locator('input[name=revised]').setInputFiles({name:'reviewed.zip',mimeType:'application/zip',buffer:zip});await page.getByRole('button',{name:'英訳を再読み込み',exact:true}).click();await expect(page.locator('.busy')).toHaveCount(0);await expect(page.locator('.translation-after')).toHaveCount(0);await expect(page.locator('.translation')).toHaveText(slot.translation);
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'ファイルを読み込む',exact:true}).click();await page.locator('input[name=en]').setInputFiles({name:'reviewed.zip',mimeType:'application/zip',buffer:zip});await expect(page.locator('input[name=ja]')).not.toHaveAttribute('required');await page.getByRole('button',{name:'読み込む',exact:true}).click();await expect(page.locator('.busy')).toHaveCount(0);await expect(page.locator('.translation-after')).toHaveCount(0);await expect(page.locator('.translation')).toHaveText(slot.translation);
 });
 test('resolved comment-filter items stay visible while counters update until arrow navigation',async({page})=>{
   test.skip(!corpus,'Private reference files not available');await loadReal(page);
