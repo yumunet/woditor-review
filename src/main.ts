@@ -1,6 +1,6 @@
 import './styles.css';
 import { emptyWorkspace, isDone, matches, sourceText, unresolved, type Workspace, type ReviewFile, type Item, type Filter, type ReviewRequest, type ReviewMode } from './model';
-import { escape as e, icon, folderTriangle, filterButtons, fileTree, compact, percent, initialContext, type TreeNode } from './ui';
+import { escape as e, icon, menuIcon, folderTriangle, filterButtons, fileTree, compact, percent, initialContext, type TreeNode } from './ui';
 import { commandColor } from './command-colors';
 import { parseArchives, renderTranslations } from './parser-client';
 import { addComment, approveItem, deleteComment, discardRejectedChanges, editComment, latestPreview, nextAfterApproval, setResolved, undoApproval } from './review-state';
@@ -163,6 +163,7 @@ function render() {
   const group = currentItem();
   if (file && group?.code === 103) root.querySelector('.menu')?.insertAdjacentHTML('beforeend', `<button data-action="split-group" ${canSplit(group) ? '' : 'disabled'}>コメントを行ごとに分割</button><button data-action="merge-group" ${canMerge(file, group) ? '' : 'disabled'}>次のコメントと結合</button>`);
   const heading = root.querySelector('.sheet h2'); if (heading) heading.textContent = sheetTitles[sheet ?? ''] ?? '';
+  root.querySelectorAll<HTMLButtonElement>('.menu [data-action]').forEach(button => button.insertAdjacentHTML('afterbegin', menuIcon(button.dataset.action!)));
   root.querySelector('.scroll')?.scrollTo(0, scroll);
   root.querySelector('.sheet-body')?.scrollTo(0, sheetScroll);
   const all = root.querySelector<HTMLInputElement>('#export-all');

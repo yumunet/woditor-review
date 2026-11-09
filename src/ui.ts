@@ -16,9 +16,18 @@ const paths: Record<string, string> = {
   trash: '<path d="M3 6h18M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7"/>',
   copy: '<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V3H3v13h5"/>',
   upload: '<path d="M12 16V3m-5 5 5-5 5 5M3 15v6h18v-6"/>',
+  download: '<path d="M12 3v13m-5-5 5 5 5-5M3 16v5h18v-5"/>',
+  spark: '<path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z"/>',
+  cloud: '<path d="M6 18a4 4 0 0 1-1-7.9 7 7 0 0 1 13.4-1.4A4.7 4.7 0 0 1 18 18Z"/>',
+  refresh: '<path d="M20 7v5h-5M4 17v-5h5M5 8a8 8 0 0 1 13-3l2 2M4 17l2 2a8 8 0 0 0 13-3"/>',
+  alert: '<path d="M12 3 2 21h20ZM12 9v5M12 17h.01"/>',
+  split: '<path d="M12 21v-7M5 3v4l7 7 7-7V3M2 6l3-3 3 3M16 6l3-3 3 3"/>',
+  merge: '<path d="m5 21 7-7 7 7M12 14V3M8 7l4-4 4 4"/>',
 };
 export const icon = (name: string) => `<svg class="svg" viewBox="0 0 24 24" aria-hidden="true">${paths[name] ?? paths.file}</svg>`;
 export const folderTriangle = () => '<svg class="folder-triangle" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2 8 5 2 8Z"/></svg>';
+const menuIcons: Record<string,string> = {load:'upload',diagnostics:'alert',export:'spark',response:'download',reload:'refresh',english:'file',drive:'cloud',backup:'download',restore:'undo','split-group':'split','merge-group':'merge'};
+export const menuIcon = (action: string) => icon(menuIcons[action] ?? 'file');
 export const filters: [Filter, string][] = [['all', 'すべて'], ['pending', '未確認'], ['comment', 'コメントあり'], ['done', '確認済み']];
 export const filterButtons = (filter: Filter, scope: string) => `<div class="filters" aria-label="${scope === 'home' ? 'ファイル' : '項目'}フィルター">${filters.map(([key, label]) => `<button class="pill ${key === filter ? 'active' : ''}" data-action="filter" data-scope="${scope}" data-value="${key}" aria-pressed="${key === filter}">${label}</button>`).join('')}</div>`;
 export const compact = (n: number) => n < 1000 ? String(n) : `${Math.round(n / 100) / 10}K`;
