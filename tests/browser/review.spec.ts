@@ -344,3 +344,20 @@ test('comment action buttons stay in one row at mobile and narrow widths',async(
   await expect(actions.getByRole('button')).toHaveText(['編集','削除','再開']);
   await actions.getByRole('button',{name:'再開',exact:true}).click();await checkRow();
 });
+
+test('ambiguous English translations can be reviewed with a manually supplied original',async({page})=>{
+  test.skip(!corpus,'Private reference files not available');
+  const path='MapData/TitleMap/Event_0000.txt';await loadReal(page,path);
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();
+  await expect(page.getByRole('button',{name:'読み込み結果 (エラー7)',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'読み込み結果 (エラー7)',exact:true}).click();
+  await expect(page.getByRole('dialog',{name:'読み込み結果',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'閉じる',exact:true}).click();
+  await page.locator('.entry-open').click();await page.locator('.pick-row[data-value="R:E00058:S1"]').click();
+  await expect(page.locator('.source')).toHaveText('');await expect(page.locator('.translation')).toHaveText('[About the Blue [S] Mark]');
+  await expect(page.locator('.command.current')).toContainText('[About the Blue [S] Mark]');
+  await page.getByRole('button',{name:'原文を補う',exact:true}).click();await page.getByLabel('補完する原文').fill('青いSマークについて');
+  await page.getByRole('button',{name:'保存',exact:true}).click();await expect(page.locator('.source')).toHaveText('青いSマークについて');
+  await page.reload();for(const name of path.split('/')) await page.locator('.file-row').filter({has:page.locator('.row-name',{hasText:name})}).click();
+  await page.locator('.entry-open').click();await page.locator('.pick-row[data-value="R:E00058:S1"]').click();await expect(page.locator('.source')).toHaveText('青いSマークについて');
+});

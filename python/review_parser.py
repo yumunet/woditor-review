@@ -165,6 +165,30 @@ def pair_file(path: str, ja_raw: bytes, en_raw: bytes) -> dict:
         structure = command_mask(a[s['line'] - 1]) if s['command'] else s['key']
         slots.append({**s, 'enLine': en_line, 'translation': translation, 'warnings': issues,
                       'fingerprint': digest(s['key'] + '\0' + s['source'] + '\0' + (structure or ''))})
+    # Keep English candidates available for human review without inventing a
+    # Japanese counterpart. Their negative context line identifies the existing
+    # English-only display row; writes always use their real English line.
+    for en_line in sorted(alignment['ambiguousEn']):
+        raw = b[en_line - 1]
+        if match := META.fullmatch(raw):
+            key, value = match.groups()
+            values = [(key, value, None, 'metadata')] if metadata_allowed(data['type'], key) else []
+        else:
+            info = alignment['enCommands'][en_line]
+            values = [(f'S{index}', value, index, 'command_string')
+                      for index, value in enumerate(info['strings'], 1)
+                      if value and slot_policy(info, index)[0]]
+        for key, value, position, kind in values:
+            if not value:
+                continue
+            info = alignment['enCommands'].get(en_line) if kind == 'command_string' else None
+            structure = command_mask(raw) if info else key
+            slots.append({'id': f'E{en_line:05d}:{key}', 'line': -en_line, 'enLine': en_line,
+                          'start': 0, 'end': 0, 'source': '', 'sourceMissing': True,
+                          'translation': value, 'kind': kind, 'key': key, 'position': position,
+                          'command': info, 'title': (info['kind'] or 'コマンド文字列') if info else metadata_title(key),
+                          'warnings': [], 'fingerprint': digest('unpaired\0' + key + '\0' + (structure or ''))})
+    slots.sort(key=lambda slot: (slot['enLine'], slot.get('position') or 0))
     items, serial = [], Counter()
     for s in slots:
         info = s['command']

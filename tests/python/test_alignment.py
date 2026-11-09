@@ -90,7 +90,10 @@ class AlignmentTests(unittest.TestCase):
         result = pair_file(path, ja, ''.join(lines).encode('utf-8'))
         self.assertTrue(result['errors'])
         self.assertTrue(result['items'])
-        self.assertFalse(any(s['translation'] == 'Additional English message' for s in result['slots']))
+        unpaired = [s for s in result['slots'] if s.get('sourceMissing')]
+        self.assertTrue(any(s['translation'] == 'Additional English message' for s in unpaired))
+        self.assertTrue(all(s['source'] == '' for s in unpaired))
+        self.assertEqual(render_file(result['enText'],result['slots'])['text'],result['enText'])
 
     def test_different_event_identity_remains_an_error(self):
         path = 'MapData/SampleMapA/Event_0000.txt'

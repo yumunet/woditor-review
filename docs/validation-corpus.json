@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-09T17:24:02.810967+09:00",
+  "generatedAt": "2026-11-09T17:58:31.642352+09:00",
   "sourceFiles": {
     "database": 66,
     "common": 225,
@@ -18,8 +18,9 @@
     "sourceUnhandledLines": 0,
     "unmatchedSlots": 10,
     "alignmentExcludedSlots": 3863,
-    "pairedSlots": 14484,
-    "reviewItems": 13575,
+    "pairedSlots": 14498,
+    "slotsWithoutSource": 14,
+    "reviewItems": 13589,
     "commentGroups": 478,
     "selfVariablesWithMultipleUsages": 2226,
     "slotsWithTokenWarnings": 587,
@@ -1049,5 +1050,5 @@
     "ja": "70ff681055c4a7f46a934b8c615906d4e49a71704643585f4887322587798105",
     "en": "b86fb0ece149b22d9075a62fa362c804f4541d232d968c90e5454b471ee21034"
   },
-  "nativeElapsedSeconds": 3.182
+  "nativeElapsedSeconds": 2.901
 }

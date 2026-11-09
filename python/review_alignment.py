@@ -75,11 +75,11 @@ def changed_span(a, b):
     """Return forced matches, definite deletions, and ambiguous source rows."""
     n, m = len(a), len(b)
     if not n:
-        return {}, set(), set()
+        return {}, set(), set(), set()
     if not m:
-        return {}, set(range(n)), set()
+        return {}, set(range(n)), set(), set()
     if n * m > 1000000:
-        return {}, set(), set(range(n))
+        return {}, set(), set(range(n)), set(range(m))
     costs = [[pair_cost(x, y) for y in b] for x in a]
     forward = [array('I', (4 * j for j in range(m + 1)))]
     for i in range(n):
@@ -97,7 +97,7 @@ def changed_span(a, b):
             row[j] = min(following[j + 1] + costs[i][j], following[j] + 4, row[j + 1] + 4)
         backward[i] = row
     best = forward[n][m]
-    mapping, removed, ambiguous = {}, set(), set()
+    mapping, removed, ambiguous, ambiguous_en = {}, set(), set(), set()
     for i in range(n):
         candidates = [j for j in range(m) if forward[i][j] + costs[i][j] + backward[i + 1][j + 1] == best]
         deletion = any(forward[i][j] + 4 + backward[i + 1][j] == best for j in range(m + 1))
@@ -107,26 +107,30 @@ def changed_span(a, b):
             removed.add(i)
         else:
             ambiguous.add(i)
-    return mapping, removed, ambiguous
+            ambiguous_en.update(candidates)
+    if ambiguous:
+        ambiguous_en.update(set(range(m)) - set(mapping.values()))
+    return mapping, removed, ambiguous, ambiguous_en
 
 
 def align_commands(a, b):
     if list(map(command_key, a)) == list(map(command_key, b)):
-        return dict(enumerate(range(len(a)))), set(), set()
+        return dict(enumerate(range(len(a)))), set(), set(), set()
     anchors = unique_anchors(a, b)
     if not anchors:
         return changed_span(a, b)
-    mapping, removed, ambiguous = {}, set(), set()
+    mapping, removed, ambiguous, ambiguous_en = {}, set(), set(), set()
     lo_a = lo_b = 0
     for i, j in anchors + [(len(a), len(b))]:
-        pairs, deleted, uncertain = align_commands(a[lo_a:i], b[lo_b:j])
+        pairs, deleted, uncertain, uncertain_en = align_commands(a[lo_a:i], b[lo_b:j])
         mapping.update({lo_a + x: lo_b + y for x, y in pairs.items()})
         removed.update(lo_a + x for x in deleted)
         ambiguous.update(lo_a + x for x in uncertain)
+        ambiguous_en.update(lo_b + x for x in uncertain_en)
         if i < len(a):
             mapping[i] = j
         lo_a, lo_b = i + 1, j + 1
-    return mapping, removed, ambiguous
+    return mapping, removed, ambiguous, ambiguous_en
 
 
 def inactive(key, meta):
@@ -165,7 +169,7 @@ def align(ja, en, kind, parse):
     for record in bm:
         bmap[record['scope'], record['key']].append(record)
     en_meta = {m['key']: m['value'] for m in bm if m['scope'] is None}
-    line_map, excluded, uncertain = {}, {}, set()
+    line_map, excluded, uncertain, uncertain_en = {}, {}, set(), set()
     summary = Counter()
     for key, source in amap.items():
         target = bmap.get(key, [])
@@ -183,9 +187,10 @@ def align(ja, en, kind, parse):
                 summary[excluded[record['line']]] += 1
         else:
             uncertain.update(record['line'] for record in source)
+            uncertain_en.update(record['line'] for record in target)
     for key in bmap.keys() - amap.keys():
         summary['英語版だけの設定を保持'] += len(bmap[key])
-    pairs, removed, ambiguous = align_commands(ac, bc)
+    pairs, removed, ambiguous, ambiguous_en = align_commands(ac, bc)
     for i, j in pairs.items():
         a, b = ac[i], bc[j]
         line_map[a['line']] = b['line']
@@ -199,6 +204,7 @@ def align(ja, en, kind, parse):
         excluded[ac[i]['line']] = '英語版で削除されたコマンド'
         summary['英語版で削除されたコマンド'] += 1
     uncertain.update(ac[i]['line'] for i in ambiguous)
+    uncertain_en.update(bc[i]['line'] for i in ambiguous_en)
     matched_en = set(pairs.values())
     for j, command in enumerate(bc):
         if j not in matched_en:
@@ -214,5 +220,5 @@ def align(ja, en, kind, parse):
     warnings = [f'{label}: {count}件' for label, count in summary.items()]
     if len(source_lines(ja)) != len(source_lines(en)):
         warnings.insert(0, f'原文部分の行数差を自動補正しました（日本語 {len(source_lines(ja))} / 英語 {len(source_lines(en))}）')
-    return {'lines': line_map, 'excluded': excluded, 'ambiguous': uncertain,
+    return {'lines': line_map, 'excluded': excluded, 'ambiguous': uncertain, 'ambiguousEn': uncertain_en,
             'warnings': warnings, 'commands': display_pairs, 'enCommands': {c['line']: c for c in bc}}

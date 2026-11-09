@@ -7,6 +7,8 @@ export interface Command {
 }
 export interface Slot {
   enLine?: number;
+  sourceMissing?: boolean;
+  sourceOverride?: string;
   id: string; line: number; start: number; end: number; source: string; translation: string;
   kind: string; key: string; title: string; position?: number; command: Command | null;
   fingerprint: string; warnings: string[];
@@ -42,6 +44,7 @@ export interface Workspace {
   importedResponses: string[]; updatedAt: string;
 }
 export const emptyWorkspace = (): Workspace => ({schemaVersion: 1, files: [], diagnostics: [], requests: [], importedResponses: [], updatedAt: new Date().toISOString()});
+export const sourceText = (slot: Slot) => slot.sourceOverride ?? slot.source;
 export const unresolved = (item: Item) => item.threads.filter(t => !t.resolved);
 export const isDone = (item: Item) => item.approved && !unresolved(item).length && !item.changes.some(c => c.status === 'pending');
 export const matches = (item: Item, filter: Filter) => filter === 'all' || (filter === 'done' ? isDone(item) : filter === 'pending' ? !isDone(item) : unresolved(item).length > 0);

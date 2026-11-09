@@ -1,5 +1,5 @@
 import type { Change, Decision, Item, ReviewFile, ReviewRequest, Workspace } from './model';
-import { unresolved } from './model';
+import { sourceText, unresolved } from './model';
 import { now, uid } from './review-state';
 import { initialContext } from './ui';
 import { zipSync, strToU8 } from 'fflate';
@@ -12,7 +12,7 @@ export function createRequest(workspace: Workspace, selected: string[]): ReviewR
     const line = slots[0].command ? slots[0].line : file.usages[slots[0].id]?.[0];
     for (const thread of unresolved(item)) request.entries.push({path: file.path, fileVersion: file.version,
       itemId: item.id, slotIds: [...item.slotIds], commentId: thread.id,
-      slots: slots.map(s => ({id: s.id, source: s.source, translation: s.translation, line: s.enLine ?? s.line, key: s.key, kind: s.kind, position: s.position})),
+      slots: slots.map(s => ({id: s.id, source: sourceText(s), translation: s.translation, line: s.enLine ?? s.line, key: s.key, kind: s.kind, position: s.position})),
       posts: structuredClone(thread.posts), context: line === undefined ? [] : initialContext(file, line, 3, 3)});
   }
   if (!request.entries.length) throw new Error('選択したファイルに未解決コメントがありません');
@@ -135,9 +135,12 @@ export function mergeFiles(workspace: Workspace, incoming: ReviewFile[]): Worksp
       const file = structuredClone(candidate), map = new Map<string, string>();
       const sameSource = file.sourceVersion === old.sourceVersion;
       for (const slot of file.slots) {
-        const options = old.slots.filter(s => s.fingerprint === slot.fingerprint && (!sameSource || s.id === slot.id));
+        const options = old.slots.filter(s => s.fingerprint === slot.fingerprint && (slot.sourceMissing
+          ? (old.version === file.version ? s.id === slot.id : s.translation === slot.translation)
+          : !sameSource || s.id === slot.id));
         if (options.length === 1) map.set(slot.id, options[0].id);
       }
+      if (old.slots.some(s=>s.sourceOverride !== undefined && ![...map.values()].includes(s.id))) throw new Error('補完した原文を一意に対応付けできません');
       preserveGroups(file, old, map);
       const matched = new Set<string>();
       for (const item of file.items) {
@@ -147,6 +150,7 @@ export function mergeFiles(workspace: Workspace, incoming: ReviewFile[]): Worksp
         const prior = previous[0]; matched.add(prior.id);
         for (const id of item.slotIds) {
           const target = file.slots.find(s => s.id === id)!, source = old.slots.find(s => s.id === map.get(id))!;
+          if (source.sourceOverride !== undefined) target.sourceOverride=source.sourceOverride;
           const existing = prior.changes.find(c => c.slotId === source.id && c.status === 'pending');
           if (existing && target.translation !== existing.after && target.translation !== source.translation) throw new Error('保留中の変更と異なる新訳があります');
         }

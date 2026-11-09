@@ -5,17 +5,18 @@ import { spawnSync } from 'node:child_process';
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { createRequest, importResponse, mergeFiles, type ReviewResponse } from '../src/exchange';
-import { emptyWorkspace, isDone, type ReviewFile, type Workspace } from '../src/model';
+import { emptyWorkspace, isDone, sourceText, type ReviewFile, type Workspace } from '../src/model';
 import { addComment, approveItem, canEdit, setResolved } from '../src/review-state';
 import { backupJson, restoreJson } from '../src/storage';
 import { characterDiff } from '../src/diff';
 import { canMerge, mergeGroup, splitGroup } from '../src/grouping';
+import {updateManualSources} from '../src/source-edit';
 
 const corpus = existsSync('.reference/ja-JP/texts/MapData/SampleMapA/Event_0000.txt');
-function realFile(): ReviewFile {
+function realFile(path='MapData/SampleMapA/Event_0000.txt'): ReviewFile {
   const local = '.tools/python';
   const command = process.env.PYTHON || (existsSync(local) ? readdirSync(local).map(p => join(local, p, 'python.exe')).find(existsSync) : null) || (process.platform === 'win32' ? 'py' : 'python3');
-  const result = spawnSync(command, ['-c', "import json;from pathlib import Path;from review_parser import pair_file;p='MapData/SampleMapA/Event_0000.txt';print(json.dumps(pair_file(p,(Path('.reference/ja-JP/texts')/p).read_bytes(),(Path('.reference/en-US/texts')/p).read_bytes())))"], {encoding: 'utf8', env: {...process.env, PYTHONPATH: 'python', PYTHONUTF8: '1'}});
+  const result = spawnSync(command, ['-c', `import json;from pathlib import Path;from review_parser import pair_file;p=${JSON.stringify(path)};print(json.dumps(pair_file(p,(Path('.reference/ja-JP/texts')/p).read_bytes(),(Path('.reference/en-US/texts')/p).read_bytes())))`], {encoding: 'utf8', env: {...process.env, PYTHONPATH: 'python', PYTHONUTF8: '1'}});
   if (result.status !== 0) throw new Error(result.stderr); return JSON.parse(result.stdout);
 }
 const reference = corpus ? realFile() : null;
@@ -103,4 +104,16 @@ test('manual comment split/merge keeps Slots, reload grouping, backup and histor
   assert.deepEqual(rf.items.find(i => i.id === first)!.slotIds, ids);
   addComment(rf.items.find(i => i.id === first)!, 'Locked group');
   assert.throws(() => splitGroup(rf, first), /履歴/);
+});
+test('unmatched English candidates keep manual originals across backup, reload and request export',{skip:!corpus},()=>{
+  const file=realFile('MapData/TitleMap/Event_0000.txt'),workspace={...emptyWorkspace(),files:[file]};
+  const candidate=structuredClone(file),slot=file.slots.find(s=>s.sourceMissing && s.translation.includes('[About'))!;
+  const item=file.items.find(i=>i.slotIds.includes(slot.id))!;
+  assert.equal(sourceText(slot),'');assert.ok(file.commands.some(c=>c.line===slot.line && c.en.includes('[About')));
+  updateManualSources(file,item,new Map([[slot.id,'青いSマークについて']]));
+  addComment(item,'確認してください');
+  const request=createRequest(workspace,[file.path]);
+  assert.equal(request.entries[0].slots[0].source,'青いSマークについて');assert.equal(request.entries[0].slots[0].line,slot.enLine);
+  const restored=restoreJson(backupJson(workspace));assert.equal(sourceText(restored.files[0].slots.find(s=>s.id===slot.id)!),sourceText(slot));
+  const reloaded=mergeFiles(workspace,[candidate]);assert.equal(sourceText(reloaded.files[0].slots.find(s=>s.id===slot.id)!),sourceText(slot));
 });

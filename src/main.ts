@@ -1,5 +1,5 @@
 import './styles.css';
-import { emptyWorkspace, isDone, matches, unresolved, type Workspace, type ReviewFile, type Item, type Filter, type ReviewRequest } from './model';
+import { emptyWorkspace, isDone, matches, sourceText, unresolved, type Workspace, type ReviewFile, type Item, type Filter, type ReviewRequest } from './model';
 import { escape as e, icon, filterButtons, fileTree, compact, percent, initialContext, type TreeNode } from './ui';
 import { commandColor } from './command-colors';
 import { parseArchives, renderTranslations } from './parser-client';
@@ -12,6 +12,7 @@ import { registerPwa } from './pwa';
 import { canMerge, canSplit, mergeGroup, splitGroup } from './grouping';
 import { diagnosticsView, withoutReplacedDiagnostics } from './diagnostics';
 import { threadView } from './comments';
+import { updateManualSources } from './source-edit';
 
 const root = document.querySelector<HTMLDivElement>('#app')!;
 let workspace: Workspace = emptyWorkspace();
@@ -28,7 +29,8 @@ let diagnosticTab: 'error' | 'warning' | 'skip' = 'error';
 let editTarget: {threadId: string; postId: string} | null = null;
 let confirmation: {question: string; run: () => void | Promise<void>} | null = null;
 let exportSelection = new Set<string>(), preparedRequest: ReviewRequest | null = null;
-const sheetTitles: Record<string,string> = {load: 'ファイルを読み込む', items: '翻訳項目', comments: 'コメント', progress: '全体の進捗', diagnostics: '読み込み結果・警告', restore: 'バックアップを復元', export: 'レビューJSONを出力', response: 'レビューJSONを読み込む', reload: '英訳TXTを再読み込み', english: '英訳TXTを出力'};
+const sheetTitles: Record<string,string> = {load: 'ファイルを読み込む', items: '翻訳項目', comments: 'コメント', progress: '全体の進捗', diagnostics: '読み込み結果', restore: 'バックアップを復元', export: 'レビューJSONを出力', response: 'レビューJSONを読み込む', reload: '英訳TXTを再読み込み', english: '英訳TXTを出力'};
+sheetTitles.source = '原文を補う';
 const currentFile = () => workspace.files.find(f => f.path === path);
 const currentItem = () => currentFile()?.items.find(i => i.id === currentId);
 const targets = () => currentFile()?.items.filter(i => matches(i, itemFilter)) ?? [];
@@ -63,7 +65,7 @@ function review(file: ReviewFile) {
     const pending = item.changes.filter(c => c.status === 'pending');
     const oldText = slots.map(s => s.translation).join('\n');
     const diff = pending.length ? characterDiff(oldText, slots.map(s => pending.find(c => c.slotId === s.id)?.after ?? s.translation).join('\n')) : null;
-    body = `<button class="entry-open" data-action="items"><span class="entry-title">${e(item.title)}</span><span class="status ${isDone(item) ? 'done' : ''}">${isDone(item) ? '確認済み' : '未確認'}</span>${icon('list')}</button><div class="pair"><div><div class="label">原文</div><div class="text-box source">${e(slots.map(s => s.source).join('\n'))}</div></div><div><div class="label">${diff ? '変更前の英訳' : '英訳'}</div><div class="text-box translation">${diff?.before ?? e(oldText)}</div>${slots.flatMap(s => s.warnings).map(w => `<p class="slot-warning">${e(w)}</p>`).join('')}</div>${diff ? `<div><div class="label">変更後の英訳</div><div class="text-box translation-after">${diff.after}</div></div>` : ''}</div>${context(file, item)}`;
+    body = `<button class="entry-open" data-action="items"><span class="entry-title">${e(item.title)}</span><span class="status ${isDone(item) ? 'done' : ''}">${isDone(item) ? '確認済み' : '未確認'}</span>${icon('list')}</button><div class="pair"><div><div class="label">原文</div><div class="text-box source">${e(slots.map(sourceText).join('\n'))}</div>${slots.some(s=>s.sourceMissing) ? '<button class="text-act" data-action="source-edit">原文を補う</button>' : ''}</div><div><div class="label">${diff ? '変更前の英訳' : '英訳'}</div><div class="text-box translation">${diff?.before ?? e(oldText)}</div>${slots.flatMap(s => s.warnings).map(w => `<p class="slot-warning">${e(w)}</p>`).join('')}</div>${diff ? `<div><div class="label">変更後の英訳</div><div class="text-box translation-after">${diff.after}</div></div>` : ''}</div>${context(file, item)}`;
   }
   return `<main class="scroll review">${!item ? `<button class="entry-open" data-action="items">項目を選択${icon('list')}</button>` : ''}${body}</main><footer class="bottom"><button class="comment-trigger" data-action="comments" ${!item ? 'disabled' : ''}>${icon('comment')}コメント${item?.threads.length ? `<span class="bubble">${item.threads.length}</span>` : ''}</button><span class="counter" aria-live="polite">${index + 1} / ${list.length}</span><button class="prevnext" data-action="prev" aria-label="前の項目" ${index <= 0 ? 'disabled' : ''}>${icon('back')}</button><button class="prevnext next" data-action="next" aria-label="次の項目" ${index < 0 || index >= list.length - 1 ? 'disabled' : ''}>${icon('next')}</button></footer>${item && unresolved(item).length ? `<button class="float-comment" data-action="comments"><div class="float-head">未解決 ${unresolved(item).length}件</div><div class="float-preview">${e(latestPreview(item))}</div></button>` : ''}${item ? `<button class="approve ${isDone(item) ? 'undo' : ''}" data-action="approve">${icon(isDone(item) ? 'undo' : 'check')}${isDone(item) ? '未確認に戻す' : '承認'}</button>` : ''}`;
 }
@@ -77,6 +79,11 @@ function progressRows(node: TreeNode, depth = 0): string {
   return `<div class="progress-detail" style="--depth:${depth}"><span>${e(node.name)}</span><span>${node.done.toLocaleString()} / ${node.total.toLocaleString()}</span></div>${node.children.filter(c => !c.file).map(c => progressRows(c, depth + 1)).join('')}`;
 }
 function sheetBody() {
+  if (sheet === 'source') {
+    const file=currentFile(), item=currentItem();
+    if (!file || !item) return '';
+    return `<form class="form source-edit" id="source-form">${file.slots.filter(s=>item.slotIds.includes(s.id) && s.sourceMissing).map(s=>`<label>原文<textarea name="${e(s.id)}" aria-label="補完する原文">${e(sourceText(s))}</textarea></label>`).join('')}<button class="primary" type="submit">保存</button></form>`;
+  }
   if (sheet === 'load') return `<form class="form" id="load-form"><label>日本語原文 ZIP<input type="file" name="ja" accept=".zip,application/zip" required></label><label>英訳済み ZIP<input type="file" name="en" accept=".zip,application/zip" required></label><button class="primary" type="submit">読み込む</button></form>`;
   if (sheet === 'items') return `${filterButtons(itemFilter, 'item')}<div class="sheet-body">${targets().map(i => `<button class="pick-row ${i.id === currentId ? 'active' : ''}" data-action="pick" data-value="${e(i.id)}"><span class="dot ${isDone(i) ? 'done' : unresolved(i).length ? 'comment' : ''}"></span><span>${e(i.title)}</span><span class="pick-meta">${isDone(i) ? '確認済み' : '未確認'}</span></button>`).join('') || '<div class="empty">対象の項目はありません</div>'}</div>`;
   if (sheet === 'progress') return `<div class="sheet-body">${progressRows(fileTree(workspace.files, 'all'))}</div>`;
@@ -93,7 +100,7 @@ function render() {
   const scroll = root.querySelector('.scroll')?.scrollTop ?? 0;
   const sheetScroll = root.querySelector('.sheet-body')?.scrollTop ?? 0;
   const file = currentFile(), tree = fileTree(workspace.files, homeFilter), p = percent(tree.done, tree.total);
-  root.innerHTML = `<header class="top">${file ? `<button class="icon" aria-label="戻る" data-action="home">${icon('back')}</button>` : ''}<h1 title="${e(file?.path ?? '翻訳レビュー')}">${e(file?.path.split('/').at(-1) ?? '翻訳レビュー')}</h1>${!file ? `<button class="overall" data-action="progress" aria-label="全体の進捗"><span class="ring" style="--progress:${p ?? 0}%"></span>${p === null ? '—' : p + '%'}</button>` : ''}<button class="icon" aria-label="メニュー" data-action="menu" aria-expanded="${menu}">${icon('menu')}</button></header>${menu ? `<nav class="menu" aria-label="メニュー"><button data-action="load">ファイルを読み込む</button><button data-action="diagnostics">読み込み結果・警告 (${workspace.diagnostics.filter(d => d.severity === 'error').length})</button><button data-action="export">レビューJSONを出力</button><button data-action="response">レビューJSONを読み込む</button><button data-action="reload">英訳TXTを再読み込み</button><button data-action="backup">状態をバックアップ</button><button data-action="restore">バックアップを復元</button></nav>` : ''}${file ? review(file) : `${filterButtons(homeFilter, 'home')}<main class="scroll file-scroll">${workspace.files.length ? treeRows(tree) || '<div class="empty">対象のファイルはありません</div>' : `<div class="empty">日本語と英語のTXTを読み込んでください<br><button class="primary" data-action="load">${icon('upload')} ファイルを読み込む</button></div>`}</main>`}${sheet ? `<div class="scrim" data-action="close"></div><section class="sheet" role="dialog" aria-modal="true" aria-label="${e(({load: 'ファイルを読み込む', items: '翻訳項目', comments: 'コメント', progress: '全体の進捗', diagnostics: '読み込み結果・警告'} as Record<string,string>)[sheet] ?? '')}"><button class="handle" aria-label="下にスワイプして閉じる" tabindex="-1"></button><div class="sheet-head"><h2>${({load: 'ファイルを読み込む', items: '翻訳項目', comments: 'コメント', progress: '全体の進捗', diagnostics: '読み込み結果・警告'} as Record<string,string>)[sheet] ?? ''}</h2><button class="icon" aria-label="閉じる" data-action="close">${icon('close')}</button></div>${sheetBody()}</section>` : ''}${notice ? `<div class="toast" role="status">${e(notice)}</div>` : ''}${busy ? `<div class="busy" role="status"><div class="spinner"></div><div>${e(busy)}</div></div>` : ''}`;
+  root.innerHTML = `<header class="top">${file ? `<button class="icon" aria-label="戻る" data-action="home">${icon('back')}</button>` : ''}<h1 title="${e(file?.path ?? '翻訳レビュー')}">${e(file?.path.split('/').at(-1) ?? '翻訳レビュー')}</h1>${!file ? `<button class="overall" data-action="progress" aria-label="全体の進捗"><span class="ring" style="--progress:${p ?? 0}%"></span>${p === null ? '—' : p + '%'}</button>` : ''}<button class="icon" aria-label="メニュー" data-action="menu" aria-expanded="${menu}">${icon('menu')}</button></header>${menu ? `<nav class="menu" aria-label="メニュー"><button data-action="load">ファイルを読み込む</button><button data-action="diagnostics">読み込み結果 (エラー${workspace.diagnostics.filter(d => d.severity === 'error').length})</button><button data-action="export">レビューJSONを出力</button><button data-action="response">レビューJSONを読み込む</button><button data-action="reload">英訳TXTを再読み込み</button><button data-action="backup">状態をバックアップ</button><button data-action="restore">バックアップを復元</button></nav>` : ''}${file ? review(file) : `${filterButtons(homeFilter, 'home')}<main class="scroll file-scroll">${workspace.files.length ? treeRows(tree) || '<div class="empty">対象のファイルはありません</div>' : `<div class="empty">日本語と英語のTXTを読み込んでください<br><button class="primary" data-action="load">${icon('upload')} ファイルを読み込む</button></div>`}</main>`}${sheet ? `<div class="scrim" data-action="close"></div><section class="sheet" role="dialog" aria-modal="true" aria-label="${e(({load: 'ファイルを読み込む', items: '翻訳項目', comments: 'コメント', progress: '全体の進捗', diagnostics: '読み込み結果'} as Record<string,string>)[sheet] ?? '')}"><button class="handle" aria-label="下にスワイプして閉じる" tabindex="-1"></button><div class="sheet-head"><h2>${({load: 'ファイルを読み込む', items: '翻訳項目', comments: 'コメント', progress: '全体の進捗', diagnostics: '読み込み結果'} as Record<string,string>)[sheet] ?? ''}</h2><button class="icon" aria-label="閉じる" data-action="close">${icon('close')}</button></div>${sheetBody()}</section>` : ''}${notice ? `<div class="toast" role="status">${e(notice)}</div>` : ''}${busy ? `<div class="busy" role="status"><div class="spinner"></div><div>${e(busy)}</div></div>` : ''}`;
   root.querySelector('.sheet')?.setAttribute('aria-label', sheetTitles[sheet ?? ''] ?? '');
   root.querySelector('.menu [data-action="backup"]')?.insertAdjacentHTML('beforebegin', '<button data-action="english">英訳TXTを出力</button>');
   const group = currentItem();
@@ -146,6 +153,7 @@ root.addEventListener('click', event => {
     try {setResolved(item, file.slots, thread.id, !thread.resolved); persist(file.path); reconcileCurrent();} catch (error) {toast(String(error)); return;}
   }
   else if (action === 'cancel-compose') {replyTarget = null; editTarget = null;}
+  else if (action === 'source-edit') {openSheet('source'); return;}
   else if (action === 'split-group' || action === 'merge-group') {
     const file = currentFile(), item = currentItem(); if (!file || !item) return;
     ask(action === 'split-group' ? 'コメントを行ごとに分割し、未確認に戻しますか？' : '次のコメントと結合し、未確認に戻しますか？', () => {currentId = action === 'split-group' ? splitGroup(file, item.id) : mergeGroup(file, item.id); persist(file.path); reconcileCurrent();}); return;
@@ -158,6 +166,10 @@ root.addEventListener('click', event => {
 root.addEventListener('change', event => {const el = event.target as HTMLInputElement; if (el.id === 'context-lang') {contextLang = el.value as 'en' | 'ja'; render();} if (el.dataset.exportPath) {if (el.checked) exportSelection.add(el.dataset.exportPath); else exportSelection.delete(el.dataset.exportPath); preparedRequest = null; render();}});
 root.addEventListener('submit', async event => {
   const form = event.target as HTMLFormElement;
+  if (form.id === 'source-form') {
+    event.preventDefault(); const file=currentFile(), item=currentItem(); if(!file || !item) return;
+    try {updateManualSources(file,item,new Map([...new FormData(form)].map(([id,text])=>[id,String(text)]))); persist(file.path); closeSheet();} catch(error){toast(String(error));} return;
+  }
   if (form.id === 'comment-form') {
     event.preventDefault(); const item = currentItem(), file = currentFile(); if (!item || !file) return;
     const text = new FormData(form).get('text') as string;

@@ -52,7 +52,8 @@ export function validateWorkspace(data: unknown): asserts data is Workspace {
     paths.add(f.path);
     const slots = new Set(), items = new Set(), assigned = new Set();
     for (const s of f.slots) {
-      if (!object(s) || !str(s.id) || slots.has(s.id) || !str(s.source) || !str(s.translation) || !str(s.key) || !str(s.kind) || !hash(s.fingerprint) || !arr(s.warnings) || !s.warnings.every(str) || !Number.isInteger(s.line) || s.line < 1 || !Number.isInteger(s.start) || !Number.isInteger(s.end) || s.start < 0 || s.end < s.start) return fail();
+      if (!object(s) || !str(s.id) || slots.has(s.id) || !str(s.source) || !str(s.translation) || !str(s.key) || !str(s.kind) || !hash(s.fingerprint) || !arr(s.warnings) || !s.warnings.every(str) || !Number.isInteger(s.line) || (s.line < 1 && !(s.sourceMissing === true && s.line === -s.enLine)) || !Number.isInteger(s.start) || !Number.isInteger(s.end) || s.start < 0 || s.end < s.start) return fail();
+      if (s.sourceMissing !== undefined && typeof s.sourceMissing !== 'boolean' || s.sourceOverride !== undefined && (!s.sourceMissing || !str(s.sourceOverride))) return fail();
       slots.add(s.id);
       if (s.enLine !== undefined && (!Number.isInteger(s.enLine) || s.enLine < 1)) return fail();
     }

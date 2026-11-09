@@ -56,6 +56,7 @@ def main():
         if result['warnings']:
             warnings.append({'path': path, 'messages': result['warnings']})
         counts['pairedSlots'] += len(result['slots'])
+        counts['slotsWithoutSource'] += sum(bool(s.get('sourceMissing')) for s in result['slots'])
         counts['reviewItems'] += len(result['items'])
         counts['commentGroups'] += sum(len(i['slotIds']) > 1 for i in result['items'])
         counts['selfVariablesWithMultipleUsages'] += sum(len(hits) > 1 for hits in result['usages'].values())
