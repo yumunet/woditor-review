@@ -21,15 +21,14 @@ export function createRequest(workspace: Workspace, selected: string[]): ReviewR
   return request;
 }
 
-export const chatInstructions = (request: ReviewRequest) => `添付のWoditor Review依頼JSON（schemaVersion: 1 / requestId: ${request.requestId}）と英訳TXTをレビューしてください。
-各指摘への判断 accepted（採用）/ rejected（不採用）/ partial（一部採用）/ needs_review（要確認）、理由、必要な修正を作成してください。
-完成した英訳TXT一式と review_response.json の両方を出力してください。JSONの組み立てと検証は python/woditor_review_tool.py を使用してください。
-回答形式: {"schemaVersion":1,"requestId":"${request.requestId}","responses":[{"commentId":"依頼のcommentId","path":"依頼のpath","itemId":"依頼のitemId","fileVersion":"依頼のfileVersion","decision":"accepted","reason":"判断理由","changes":[{"slotId":"対象Slot ID","before":"現在の英訳","after":"新訳"}]}],"suggestions":[]}。
-responses は依頼の全commentIdに1件ずつ回答し、ID・相対パス・バージョンを変更しないでください。変更しない場合は changes: [] としてください。
-新規改善案は suggestions に {id,path,itemId,fileVersion,reason,changes} として記載してください。
-1つのSlotへの重複した変更は避け、変更は担当する1つの指摘に集約してください。グループ化されたコメントもSlotごとに変更を指定してください。
-コマンド構造・メタデータのキー・CSV・表示用COMMAND_TEXTセクション・BOM・改行形式・制御文字・置換文字列を保持してください。名前指定フィールドは変更しないでください。
-不確実な対応付けや翻訳は推測せず needs_review としてください。AI判断はユーザー承認ではありません。`;
+export const reviewFileNames = (request: Pick<ReviewRequest, 'requestId'>) => ({request: `review_request_${request.requestId}.json`, response: `review_response_${request.requestId}.json`});
+
+export const chatInstructions = (request: ReviewRequest) => `添付の依頼JSON（requestId: ${request.requestId}）と英訳TXTを、コメント履歴・pendingChanges（未確定の前回案）を踏まえてレビューしてください。
+全commentIdに1件ずつ、accepted（採用）/ rejected（不採用）/ partial（一部採用）/ needs_review（要確認）と理由を回答。不確実な点は推測せず needs_review。
+提供の woditor_review_tool.py の build → validate → apply を使い、${reviewFileNames(request).response} と修正済み英訳ZIPを出力してください。
+build用の判断JSON: {"responses":[{"commentId":"依頼のID","decision":"accepted","reason":"理由","changes":[{"slotId":"対象ID","before":"slots.translation","after":"最終案"}]}],"suggestions":[]}。
+changesはSlotごと・全回答で重複なし。保留案を維持・修正する場合も最終案を記載し、撤回は rejected と changes: []。変更なしも changes: []。追加案は suggestions に {id,path,itemId,fileVersion,reason,changes}。
+依頼のID・相対パス・バージョン、TXTのコマンド構造・メタデータキー・CSV・COMMAND_TEXT・BOM・改行形式・制御文字・置換文字列・名前指定フィールドを保持。AI判断はユーザー承認と区別してください。`;
 
 interface Edit {slotId: string; before: string; after: string}
 interface Answer {commentId: string; path: string; itemId: string; fileVersion: string; decision: Decision; reason: string; explanation?: string; changes: Edit[]}

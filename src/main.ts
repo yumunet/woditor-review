@@ -5,7 +5,7 @@ import { commandColor } from './command-colors';
 import { parseArchives, renderTranslations } from './parser-client';
 import { addComment, approveItem, deleteComment, discardRejectedChanges, editComment, latestPreview, nextAfterApproval, setResolved, undoApproval } from './review-state';
 import { backupJson, download, loadWorkspace, restoreJson, saveWorkspace } from './storage';
-import { chatInstructions, createRequest, importResponse, mergeFiles, sourceZip } from './exchange';
+import { chatInstructions, createRequest, importResponse, mergeFiles, reviewFileNames, sourceZip } from './exchange';
 import { characterDiff } from './diff';
 import { strToU8, zipSync } from 'fflate';
 import { registerPwa } from './pwa';
@@ -290,7 +290,7 @@ async function exportReview(action: string) {
     if (action === 'english-zip') download('en-US-reviewed.zip', zipSync(Object.fromEntries(files.map(f => [`en-US/texts/${f.path}`, strToU8((f.enBom ? '\uFEFF' : '') + f.enText)]))), 'application/zip');
     else {
       if (!preparedRequest) {preparedRequest = createRequest(workspace, [...exportSelection]); workspace.requests.push(preparedRequest);}
-      if (action === 'export-request') download('review_request.json', JSON.stringify(preparedRequest, null, 2));
+      if (action === 'export-request') download(reviewFileNames(preparedRequest).request, JSON.stringify(preparedRequest, null, 2));
       else {try {await navigator.clipboard.writeText(chatInstructions(preparedRequest));} catch {notice = 'コピーできない場合は、指示文欄を選択してコピーしてください';}}
     }
     await saveWorkspace(workspace);

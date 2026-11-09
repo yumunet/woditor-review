@@ -507,7 +507,10 @@ async function resolveCurrentComment(page:Page) {
 async function exportCurrentRequest(page:Page) {
   await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'レビューJSONを出力',exact:true}).click();
   const download=page.waitForEvent('download');await page.getByRole('button',{name:'JSONを出力',exact:true}).click();
-  const request=JSON.parse(readFileSync((await (await download).path())!,'utf8'));
+  const file=await download,request=JSON.parse(readFileSync((await file.path())!,'utf8'));
+  expect(file.suggestedFilename()).toBe(`review_request_${request.requestId}.json`);
+  const instructions=await page.getByLabel('ChatGPT向け指示文').inputValue();
+  expect(instructions).toContain(`review_response_${request.requestId}.json`);expect(instructions).not.toContain('python/woditor_review_tool.py');
   await page.getByRole('button',{name:'閉じる',exact:true}).click();return request;
 }
 async function importRevisedAnswer(page:Page,request:any,decision:string,translation:string,changes:any[]) {

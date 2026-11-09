@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { createRequest, importResponse, mergeFiles, type ReviewResponse } from '../src/exchange';
+import { chatInstructions, createRequest, importResponse, mergeFiles, reviewFileNames, type ReviewResponse } from '../src/exchange';
 import { emptyWorkspace, isDone, sourceText, type ReviewFile, type Workspace } from '../src/model';
 import { addComment, approveItem, canEdit, discardRejectedChanges, setResolved } from '../src/review-state';
 import { backupJson, restoreJson } from '../src/storage';
@@ -31,6 +31,18 @@ test('character-level difference preserves whitespace, Unicode, and escapes mark
   const d = characterDiff('cat 😺 <x>\n', 'cut 😺 <y>\n');
   assert.equal(d.before, 'c<span class="diff-deleted">a</span>t 😺 &lt;<span class="diff-deleted">x</span>&gt;\n');
   assert.equal(d.after, 'c<span class="diff-added">u</span>t 😺 &lt;<span class="diff-added">y</span>&gt;\n');
+});
+
+test('each request names its response uniquely and gives concise portable review instructions', {skip: !corpus}, () => {
+  const {workspace}=setup(),first=createRequest(workspace,[workspace.files[0].path]),second=createRequest(workspace,[workspace.files[0].path]);
+  assert.notEqual(reviewFileNames(first).response,reviewFileNames(second).response);
+  assert.equal(reviewFileNames(first).response,`review_response_${first.requestId}.json`);
+  assert.equal(reviewFileNames(first).request,`review_request_${first.requestId}.json`);
+  const prompt=chatInstructions(first);
+  assert.ok(prompt.includes(reviewFileNames(first).response));assert.ok(prompt.includes('woditor_review_tool.py'));
+  assert.ok(!prompt.includes('python/woditor_review_tool.py'));assert.ok(!prompt.includes('review_response.json'));
+  for(const required of ['全commentId','pendingChanges','changes: []','slots.translation','build → validate → apply','needs_review','COMMAND_TEXT','BOM','名前指定フィールド']) assert.ok(prompt.includes(required),required);
+  assert.ok(prompt.length<1100,`instructions too long: ${prompt.length}`);
 });
 test('AI proposal -> resolve -> backup -> reopen -> resolve; another thread does not commit', {skip: !corpus}, () => {
   const {workspace, response, thread} = setup();

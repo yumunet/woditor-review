@@ -75,13 +75,15 @@ english.zip
 ## ChatGPTとの受け渡し
 
 1. 指摘をコメントとして投稿します。
-2. メニュー「レビューJSONを出力」でファイルを選び、`review_request.json` を出力します。
+2. メニュー「レビューJSONを出力」でファイルを選び、`review_request_<依頼ID>.json` を出力します。
 3. 同じシートの「英訳TXTを出力」で現在の正式な英訳をZIPにし、「指示文をコピー」と一緒にChatGPTへ渡します。
-4. ChatGPTが作成した `review_response.json` と修正済み英訳ZIPを「レビューJSONを読み込む」で指定します。回答内のSlot別 `changes` だけでも取り込めます。
+4. ChatGPTが作成した `review_response_<依頼ID>.json` と修正済み英訳ZIPを「レビューJSONを読み込む」で指定します。回答内のSlot別 `changes` だけでも取り込めます。
 5. 新訳は保留中の差分として表示します。対応コメントを解決すると確定し、再開すると旧訳と差分に戻ります。AI判断だけでは承認しません。
 6. メニュー「英訳TXTを出力」から正式な英訳を出力できます。未確定の提案は出力に含めません。元のファイルを上書きしません。
 
 修正済み英訳ZIPだけを読み込む場合は「英訳TXTを再読み込み」を使います。変更前・変更後を保持して未確認に戻し、承認時に確定します。既存コメント、未変更項目の承認、変更履歴は維持します。
+
+依頼を作るたびにIDが変わり、依頼JSONと回答JSONを同じIDで識別できます。同じ出力シート内でJSON出力と指示文コピーを行う間はIDを共有します。約800字の指示文には回答ファイル名と、提供する `woditor_review_tool.py` の使い方を記載します。
 
 回答のID重複・欠落、古いファイル版、依頼後に変更されたコメント、既存の保留変更との競合、JSONとTXTの新訳の食い違いは、回答全体を適用せずエラー表示します。回答で説明されないTXT変更には「要確認」のAIスレッドを作り、手動解決を待ちます。後続の変更がある古いAI履歴の解決状態は、別の変更を上書きしないよう変更を止めます。
 
@@ -89,7 +91,7 @@ english.zip
 
 依頼・回答の `schemaVersion` は1です。
 
-- [review-request.schema.json](docs/schemas/review-request.schema.json)：依頼ID、相対パス、版（UTF-8 BOMを除いたテキストのSHA-256）、項目ID、Slot ID・英語側の位置・原文・現訳、コメントID・全投稿、周辺コマンド。内部では日本語側の `line` と英語側の `enLine` を分離し、依頼JSONの `line` は英語側の行番号です。
+- [review-request.schema.json](docs/schemas/review-request.schema.json)：依頼ID、相対パス、版（UTF-8 BOMを除いたテキストのSHA-256）、項目ID、Slot ID・英語側の位置・原文・現訳、コメントID・全投稿、周辺コマンド、再審用の保留案 `pendingChanges`。内部では日本語側の `line` と英語側の `enLine` を分離し、依頼JSONの `line` は英語側の行番号です。
 - [review-response.schema.json](docs/schemas/review-response.schema.json)：各コメントへの判断・理由・Slot別変更と新規改善案。既存IDと版をそのまま返します。
 - バックアップ：`schemaVersion`、全ファイル、原文・英訳・BOM、Slot、グループ、コメント、保留／確定変更、依頼履歴、取り込み済み回答ID、診断情報を含みます。復元時に参照関係を検証します。
 
@@ -112,17 +114,17 @@ english.zip
 }
 ```
 
-`decision` は `accepted` / `rejected` / `partial` / `needs_review`。変更がなければ `changes: []` にします。回答は依頼の全コメントに1件ずつ必要です。同じSlotへの変更は1つの回答に集約します。新規改善案は依頼に含まれる項目を対象に `{id,path,itemId,fileVersion,reason,changes}` で指定します。
+`decision` は `accepted` / `rejected` / `partial` / `needs_review`。変更がなければ `changes: []` にします。保留案の維持・修正も `slots.translation` を変更前とする最終案を `changes` に指定し、撤回は `rejected` と `changes: []` で返します。回答は依頼の全コメントに1件ずつ必要です。同じSlotへの変更は1つの回答に集約します。新規改善案は依頼に含まれる項目を対象に `{id,path,itemId,fileVersion,reason,changes}` で指定します。
 
 Python 3.10以降で、判断内容から形式を組み立て・検証できます。`decisions.json` は `responses` に `commentId,decision,reason,changes` を持ちます。パス・項目・版は依頼から補完します。
 
 ```powershell
-python python/woditor_review_tool.py build --request review_request.json --decisions decisions.json --out review_response.json
-python python/woditor_review_tool.py validate --request review_request.json --response review_response.json
-python python/woditor_review_tool.py apply --request review_request.json --response review_response.json --english-root en-US/texts --out-root revised-texts
+python python/woditor_review_tool.py build --request review_request_ID.json --decisions decisions.json --out review_response_ID.json
+python python/woditor_review_tool.py validate --request review_request_ID.json --response review_response_ID.json
+python python/woditor_review_tool.py apply --request review_request_ID.json --response review_response_ID.json --english-root en-US/texts --out-root revised-texts
 ```
 
-`apply` は英訳ファイルの版・変更前の文字列・保護トークンを検証し、新しい出力フォルダにのみ書き込みます。既存フォルダへの書き込みは拒否します。出力は回答に関係するファイルです。既存翻訳CLIも `python/woditor_translation_tool.py` で引き続き利用できます。
+上記はリポジトリからの実行例です。`ID` は実際の依頼IDに置き換えます。`apply` は英訳ファイルの版・変更前の文字列・保護トークンを検証し、新しい出力フォルダにのみ書き込みます。既存フォルダへの書き込みは拒否します。出力は回答に関係するファイルです。既存翻訳CLIも `python/woditor_translation_tool.py` で引き続き利用できます。
 
 ## 保存・バックアップ
 
