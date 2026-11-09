@@ -59,6 +59,22 @@ test('Back returns from diagnostic text to the selected warning tab',async({page
   await expect(page.getByRole('dialog',{name:'テキスト表示',exact:true})).toBeVisible();await page.goBack();await expect(page.getByRole('tab',{name:/^警告/})).toHaveAttribute('aria-selected','true');await page.goBack();await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.locator('.source')).toBeVisible();
 });
 
+test('comment drafts survive closing and Back but clear on item changes and submission',async({page})=>{
+  test.skip(!corpus,'Private reference files not available');await loadReal(page);
+  const composer=page.getByLabel('コメント内容');
+  await page.locator('.comment-trigger').click();await composer.fill('Draft\nsecond line');await closeReviewSheet(page);
+  await page.locator('.comment-trigger').click();await expect(composer).toHaveValue('Draft\nsecond line');await page.keyboard.press('Escape');
+  await page.locator('.comment-trigger').click();await expect(composer).toHaveValue('Draft\nsecond line');await page.goBack();await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.locator('.comment-trigger').click();await expect(composer).toHaveValue('Draft\nsecond line');await page.getByRole('button',{name:'すべてのコメント',exact:true}).click();await expect(composer).toHaveValue('Draft\nsecond line');
+  await page.getByRole('button',{name:'送信',exact:true}).click();await expect(composer).toHaveValue('');await expect(page.locator('.post-text')).toHaveText('Draft\nsecond line');
+  await page.getByRole('button',{name:'返信',exact:true}).click();await composer.fill('Unsent reply');await closeReviewSheet(page);await page.locator('.comment-trigger').click();await expect(composer).toHaveValue('Unsent reply');await expect(composer).toHaveAttribute('placeholder','返信を入力');
+  await page.getByRole('button',{name:'キャンセル',exact:true}).click();await page.getByRole('button',{name:'編集',exact:true}).click();await composer.fill('Edited draft');await page.goBack();await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.locator('.comment-trigger').click();await expect(composer).toHaveValue('Edited draft');await expect(page.getByRole('button',{name:'保存',exact:true})).toBeVisible();await page.getByRole('button',{name:'保存',exact:true}).click();await expect(composer).toHaveValue('');await expect(page.locator('.post-text')).toHaveText('Edited draft');
+  await composer.fill('Discard on navigation');await closeReviewSheet(page);await page.locator('.entry-open').click();await closeReviewSheet(page);await page.locator('.comment-trigger').click();await expect(composer).toHaveValue('Discard on navigation');await closeReviewSheet(page);
+  await page.getByRole('button',{name:'次の項目',exact:true}).click();await page.locator('.comment-trigger').click();await expect(composer).toHaveValue('');await closeReviewSheet(page);
+  await page.getByRole('button',{name:'前の項目',exact:true}).click();await page.locator('.comment-trigger').click();await expect(composer).toHaveValue('');await expect(composer).toHaveAttribute('placeholder','コメントを入力');
+});
+
 test('real ZIP -> folders -> compare -> context -> filtered empty state', async ({page}) => {
   test.skip(!corpus, 'Private reference files not available');
   const errors: string[] = [];

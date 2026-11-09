@@ -39,6 +39,7 @@ let lastFocus: HTMLElement | null = null;
 let commentTab: 'open' | 'all' = 'open', replyTarget: string | null = null;
 let diagnosticTab: 'error' | 'warning' | 'skip' = 'error';
 let editTarget: {threadId: string; postId: string} | null = null;
+let commentDraft='',commentDraftItem='';
 let confirmation: {question: string; run: () => void | Promise<void>} | null = null;
 let exportSelection = new Set<string>(), preparedRequest: ReviewRequest | null = null;
 let reviewMode: ReviewMode = 'comments';
@@ -90,8 +91,8 @@ function exportRows() {
   const files = exportFiles(), checked = files.filter(f => exportSelection.has(f.path)).length;
   return `<div class="sheet-body"><label class="export-row export-all"><input id="export-all" type="checkbox" ${files.length && checked === files.length ? 'checked' : ''} ${!files.length ? 'disabled' : ''}>すべて選択</label>${files.map(f => `<label class="export-row"><input type="checkbox" data-export-path="${e(f.path)}" ${exportSelection.has(f.path) ? 'checked' : ''}>${e(f.path)}</label>`).join('') || '<div class="empty">出力対象のファイルはありません</div>'}</div>`;
 }
-function openSheet(name: string) {lastFocus = document.activeElement as HTMLElement; sheet = name; menu = false; replyTarget = null; editTarget = null; if (name === 'diagnostics') diagnosticTab = 'error'; if (name === 'export') reviewMode = workspace.files.some(f => (!path || f.path === path) && f.items.some(i => unresolved(i).length)) ? 'comments' : 'initial'; if (name === 'export' || name === 'english') resetExportSelection(); render(); root.querySelector<HTMLElement>('.sheet .icon, .sheet input, .sheet button:not(.handle)')?.focus();}
-function closeSheet() {sheet = null; replyTarget = null; editTarget = null; render(); lastFocus?.focus();}
+function openSheet(name: string) {lastFocus = document.activeElement as HTMLElement; sheet = name; menu = false; if (name === 'diagnostics') diagnosticTab = 'error'; if (name === 'export') reviewMode = workspace.files.some(f => (!path || f.path === path) && f.items.some(i => unresolved(i).length)) ? 'comments' : 'initial'; if (name === 'export' || name === 'english') resetExportSelection(); render(); root.querySelector<HTMLElement>('.sheet .icon, .sheet input, .sheet button:not(.handle)')?.focus();}
+function closeSheet() {sheet = null; render(); lastFocus?.focus();}
 function persist(changedPath?: string) {void saveWorkspace(workspace, changedPath).catch(error => toast(`保存できませんでした。バックアップしてください：${String(error)}`));}
 function ask(question: string, run: () => void | Promise<void>) {confirmation = {question, run}; render(); root.querySelector<HTMLElement>('[data-action="confirm-cancel"]')?.focus();}
 function reconcileCurrent() {
@@ -149,8 +150,7 @@ function review(file: ReviewFile) {
 function commentsBody() {
   const item = currentItem(); if (!item) return '<div class="empty">対象の項目はありません</div>';
   const threads = item.threads.filter(t => commentTab === 'all' || !t.resolved);
-  const editText = editTarget ? item.threads.find(t => t.id === editTarget!.threadId)?.posts.find(p => p.id === editTarget!.postId)?.text : '';
-  return `<div class="filters"><button class="pill ${commentTab === 'open' ? 'active' : ''}" data-action="comment-tab" data-value="open">未解決</button><button class="pill ${commentTab === 'all' ? 'active' : ''}" data-action="comment-tab" data-value="all">すべてのコメント</button></div><div class="sheet-body">${threads.map(threadView).join('') || '<div class="empty">コメントはありません</div>'}</div><form class="sheet-foot" id="comment-form"><textarea name="text" aria-label="コメント内容" placeholder="${editTarget ? 'コメントを編集' : replyTarget ? '返信を入力' : 'コメントを入力'}" required>${e(editText ?? '')}</textarea><div class="send-row"><span>${editTarget ? '編集中' : replyTarget ? '返信先を選択中' : ''}${editTarget || replyTarget ? '<button class="text-act" type="button" data-action="cancel-compose">キャンセル</button>' : ''}</span><button type="submit" class="primary">${editTarget ? '保存' : '送信'}</button></div></form>`;
+  return `<div class="filters"><button class="pill ${commentTab === 'open' ? 'active' : ''}" data-action="comment-tab" data-value="open">未解決</button><button class="pill ${commentTab === 'all' ? 'active' : ''}" data-action="comment-tab" data-value="all">すべてのコメント</button></div><div class="sheet-body">${threads.map(threadView).join('') || '<div class="empty">コメントはありません</div>'}</div><form class="sheet-foot" id="comment-form"><textarea name="text" aria-label="コメント内容" placeholder="${editTarget ? 'コメントを編集' : replyTarget ? '返信を入力' : 'コメントを入力'}" required>${e(commentDraft)}</textarea><div class="send-row"><span>${editTarget ? '編集中' : replyTarget ? '返信先を選択中' : ''}${editTarget || replyTarget ? '<button class="text-act" type="button" data-action="cancel-compose">キャンセル</button>' : ''}</span><button type="submit" class="primary">${editTarget ? '保存' : '送信'}</button></div></form>`;
 }
 function progressRows(node: TreeNode, depth = 0): string {
   return `<div class="progress-detail" style="--depth:${depth}"><span>${e(node.name)}</span><span>${node.done.toLocaleString()} / ${node.total.toLocaleString()}</span></div>${node.children.filter(c => !c.file).map(c => progressRows(c, depth + 1)).join('')}`;
@@ -175,6 +175,9 @@ function sheetBody() {
   return '<div class="sheet-body"><div class="empty">コメントはありません</div></div>';
 }
 function render() {
+  const draftItem=JSON.stringify([workspaceRevision,path,currentId]);
+  if(commentDraftItem!==draftItem) {commentDraftItem=draftItem;commentDraft='';replyTarget=null;editTarget=null;}
+
   const scroll = root.querySelector('.scroll')?.scrollTop ?? 0;
   const sheetScroll = root.querySelector('.sheet-body')?.scrollTop ?? 0;
   const file = currentFile(), tree = fileTree(workspace.files, homeFilter), p = percent(tree.done, tree.total);
@@ -249,8 +252,8 @@ root.addEventListener('click', event => {
     textView.offsets[textView.language]=root.querySelector('.text-scroll')?.scrollTop??0;
     textView.language=value as TextLanguage;render();refreshTextView(true);return;
   }
-  else if (action === 'reply') {replyTarget = value!; editTarget = null; render(); root.querySelector<HTMLTextAreaElement>('textarea')?.focus(); return;}
-  else if (action === 'edit') {editTarget = {threadId: button.dataset.thread!, postId: button.dataset.post!}; replyTarget = null; render(); root.querySelector<HTMLTextAreaElement>('textarea')?.focus(); return;}
+  else if (action === 'reply') {if(editTarget) commentDraft='';replyTarget = value!; editTarget = null; render(); root.querySelector<HTMLTextAreaElement>('textarea')?.focus(); return;}
+  else if (action === 'edit') {editTarget = {threadId: button.dataset.thread!, postId: button.dataset.post!}; replyTarget = null; commentDraft=currentItem()?.threads.find(t=>t.id===editTarget!.threadId)?.posts.find(p=>p.id===editTarget!.postId)?.text??''; render(); root.querySelector<HTMLTextAreaElement>('textarea')?.focus(); return;}
   else if (action === 'delete') {
     const item = currentItem(), file = currentFile(); if (!item || !file) return;
     ask('このコメントを削除しますか？', () => {deleteComment(item, button.dataset.thread!, button.dataset.post!); persist(file.path);}); return;
@@ -264,7 +267,7 @@ root.addEventListener('click', event => {
     const item = currentItem(), file = currentFile(); if (!item || !file) return;
     ask('再審で不採用になった変更を破棄しますか？', () => {discardRejectedChanges(item); persist(file.path);}); return;
   }
-  else if (action === 'cancel-compose') {replyTarget = null; editTarget = null;}
+  else if (action === 'cancel-compose') {replyTarget = null; editTarget = null; commentDraft='';}
   else if (action === 'source-edit') {openSheet('source'); return;}
   else if (action === 'split-group' || action === 'merge-group') {
     const file = currentFile(), item = currentItem(); if (!file || !item) return;
@@ -277,6 +280,7 @@ root.addEventListener('click', event => {
 });
 root.addEventListener('input',event=>{
   const input=event.target as HTMLInputElement;
+  if(input.matches('#comment-form textarea')) {commentDraft=input.value;return;}
   if(input.id!=='item-search' || sheet!=='items') return;
   itemQuery=input.value;
   const body=root.querySelector('.sheet-body');
@@ -299,7 +303,7 @@ root.addEventListener('submit', async event => {
   if (form.id === 'comment-form') {
     event.preventDefault(); const item = currentItem(), file = currentFile(); if (!item || !file) return;
     const text = new FormData(form).get('text') as string;
-    try {if (editTarget) editComment(item, editTarget.threadId, editTarget.postId, text); else addComment(item, text, replyTarget ?? undefined); replyTarget = null; editTarget = null; persist(file.path); reconcileCurrent(); render();} catch (error) {toast(String(error));}
+    try {if (editTarget) editComment(item, editTarget.threadId, editTarget.postId, text); else addComment(item, text, replyTarget ?? undefined); replyTarget = null; editTarget = null; commentDraft=''; persist(file.path); reconcileCurrent(); render();} catch (error) {toast(String(error));}
     return;
   }
   if (form.id === 'restore-form') {
