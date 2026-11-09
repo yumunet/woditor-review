@@ -40,6 +40,25 @@ test('unified import accepts English alone and preserves comments and other file
   await openTreeFile(page,navigationPaths[1]);await expect(page.locator('.source')).toBeVisible();
 });
 
+test('system Back closes panels and confirmation before returning to the folder view',async({page})=>{
+  test.skip(!corpus,'Private reference files not available');await loadReal(page);
+  await page.locator('.comment-trigger').click();await page.goBack();await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.locator('.source')).toBeVisible();
+  await page.goForward();await expect(page.getByRole('dialog',{name:'コメント',exact:true})).toBeVisible();await closeReviewSheet(page);
+  await page.goBack();await expect(page.locator('h1')).toHaveText('翻訳レビュー');await expect(page.locator('.file-row')).not.toHaveCount(0);
+  await page.goForward();await expect(page.locator('.entry-title')).toHaveText('イベント名');await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.goBack();await expect(page.locator('.menu')).toHaveCount(0);await expect(page.locator('.source')).toBeVisible();
+  await page.getByRole('button',{name:'承認',exact:true}).click();await page.getByRole('button',{name:'前の項目',exact:true}).click();await page.getByRole('button',{name:'未確認に戻す',exact:true}).click();await expect(page.getByRole('alertdialog')).toBeVisible();
+  await page.goBack();await expect(page.getByRole('alertdialog')).toHaveCount(0);await expect(page.getByRole('button',{name:'未確認に戻す',exact:true})).toBeVisible();
+  await page.goBack();await expect(page.locator('h1')).toHaveText('翻訳レビュー');
+  await page.goBack();await expect(page).toHaveURL('about:blank');
+});
+
+test('Back returns from diagnostic text to the selected warning tab',async({page})=>{
+  test.skip(!corpus,'Private reference files not available');await loadReal(page,'BasicData/CDataBase/04.txt');
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:/^読み込み結果/}).click();await page.getByRole('tab',{name:/^警告/}).click();await page.locator('.diagnostic.warning').first().click();
+  await expect(page.getByRole('dialog',{name:'テキスト表示',exact:true})).toBeVisible();await page.goBack();await expect(page.getByRole('tab',{name:/^警告/})).toHaveAttribute('aria-selected','true');await page.goBack();await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.locator('.source')).toBeVisible();
+});
+
 test('real ZIP -> folders -> compare -> context -> filtered empty state', async ({page}) => {
   test.skip(!corpus, 'Private reference files not available');
   const errors: string[] = [];
@@ -500,6 +519,8 @@ test('boundary navigation confirms forward and backward file changes and preserv
   await page.getByRole('button',{name:'キャンセル',exact:true}).click();await expect(page.locator('h1')).toHaveText('000.txt');await expect(page.locator('.counter')).toHaveText(last!);
   await page.getByRole('button',{name:'次の項目',exact:true}).click();await page.getByRole('button',{name:'確定',exact:true}).click();
   await expect(page.locator('h1')).toHaveText('001.txt');await expect(page.locator('.counter')).toHaveText(/^1 \/ /);
+  await page.goBack();await expect(page.locator('h1')).toHaveText('000.txt');await expect(page.locator('.counter')).toHaveText(last!);await expect(page.getByRole('alertdialog')).toHaveCount(0);
+  await page.goForward();await expect(page.locator('h1')).toHaveText('001.txt');await expect(page.getByRole('alertdialog')).toHaveCount(0);
   await page.keyboard.press('ArrowLeft');await expect(page.getByRole('alertdialog')).toContainText('前の「000.txt」を開きますか？');
   await page.getByRole('button',{name:'確定',exact:true}).click();await expect(page.locator('h1')).toHaveText('000.txt');await expect(page.locator('.counter')).toHaveText(last!);
 });
@@ -602,7 +623,7 @@ test('export sheets select all files, align output buttons, and preview copied i
   await captureUi(page,info,'export');
   await page.getByRole('button',{name:'指示文をコピー',exact:true}).click();await expect(page.locator('.toast')).toContainText('指示文をコピーしました');await expect(page.locator('.sheet details')).toHaveCount(0);await expect(page.locator('.sheet .instructions')).toHaveCount(0);
   const copied=await page.evaluate(()=>(window as any).copiedInstructions);expect(copied).toContain('woditor_review_tool.py');
-  await page.getByRole('button',{name:'指示文を確認',exact:true}).click();const modal=page.getByRole('dialog',{name:'指示文',exact:true});await expect(modal.locator('pre')).toHaveText(copied);await expect(page.getByRole('button',{name:'指示文を閉じる',exact:true})).toBeFocused();
+  await page.getByRole('button',{name:'指示文を確認',exact:true}).click();const modal=page.getByRole('dialog',{name:'指示文',exact:true});await expect(modal.locator('pre')).toHaveText(copied);await expect(page.getByRole('button',{name:'指示文を閉じる',exact:true})).toBeFocused();await page.goBack();await expect(modal).toHaveCount(0);await expect(page.getByRole('dialog',{name:'AIレビューを依頼',exact:true})).toBeVisible();await page.goForward();await expect(modal.locator('pre')).toHaveText(copied);
   const box=await modal.boundingBox(),viewport=page.viewportSize()!;expect(Math.abs(box!.y+box!.height/2-viewport.height/2)).toBeLessThan(2);expect(Math.abs(box!.x+box!.width/2-viewport.width/2)).toBeLessThan(2);
   await page.keyboard.press('Shift+Tab');await expect(modal.locator('pre')).toBeFocused();await page.keyboard.press('Tab');await expect(page.getByRole('button',{name:'指示文を閉じる',exact:true})).toBeFocused();await captureUi(page,info,'instructions');await page.keyboard.press('Escape');await expect(modal).toHaveCount(0);await expect(page.getByRole('dialog',{name:'AIレビューを依頼',exact:true})).toBeVisible();
   await page.evaluate(()=>{(window as any).failClipboard=true;});await page.getByRole('button',{name:'指示文をコピー',exact:true}).click();await expect(page.locator('.toast')).toContainText('コピーできませんでした');await page.getByRole('button',{name:'指示文を確認',exact:true}).click();await expect(modal.locator('pre')).toHaveText(copied);await page.getByRole('button',{name:'指示文を閉じる',exact:true}).click();

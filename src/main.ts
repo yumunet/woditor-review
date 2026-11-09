@@ -20,9 +20,11 @@ import {navigationQuestion,navigationTarget} from './navigation';
 import {DriveController} from './drive-controller';
 import {driveView} from './drive-view';
 import {workspaceHash} from './drive-sync';
+import {ScreenHistory} from './screen-history';
 
 const root = document.querySelector<HTMLDivElement>('#app')!;
 let workspace: Workspace = emptyWorkspace();
+let workspaceRevision=0;
 let path: string | null = null, currentId: string | null = null;
 let homeFilter: Filter = 'all', itemFilter: Filter = 'all';
 let itemQuery='';
@@ -40,6 +42,27 @@ let editTarget: {threadId: string; postId: string} | null = null;
 let confirmation: {question: string; run: () => void | Promise<void>} | null = null;
 let exportSelection = new Set<string>(), preparedRequest: ReviewRequest | null = null;
 let reviewMode: ReviewMode = 'comments';
+let screenHistory:ScreenHistory<ReturnType<typeof screenState>>|undefined;
+function screenState() {
+  return {workspaceRevision,path,currentId,sheet,menu,homeFilter,itemFilter,itemQuery,before,after,usageIndex,contextOpen,contextLang,
+    commentTab,diagnosticTab,textView:textView && {...textView,offsets:{...textView.offsets}},
+    confirmation,instructionsPreview,reviewMode,exportSelection:new Set(exportSelection),preparedRequest};
+}
+function historyScreen() {
+  return {base:path ? `file:${path}` : 'home',layers:[...(sheet ? [`sheet:${sheet}`] : menu ? ['menu'] : []),
+    ...(instructionsPreview!==null ? ['instructions'] : []),...(confirmation ? ['confirmation'] : [])],value:screenState()};
+}
+function restoreScreen(state:ReturnType<typeof screenState>) {
+  ({path,currentId,sheet,menu,homeFilter,itemFilter,itemQuery,before,after,usageIndex,contextOpen,contextLang,
+    commentTab,diagnosticTab,textView,confirmation,instructionsPreview,reviewMode,preparedRequest}=state);
+  exportSelection=new Set(state.exportSelection);
+  if(state.workspaceRevision!==workspaceRevision) {sheet=null;menu=false;confirmation=null;instructionsPreview=null;textView=null;preparedRequest=null;}
+  if(path && !currentFile()) {path=currentId=sheet=null;menu=false;confirmation=null;instructionsPreview=null;}
+  if(path && !currentItem()) reconcileCurrent();
+  render();if(sheet==='text') refreshTextView(true);
+  const focus=instructionsPreview!==null ? '.instructions-dialog button' : confirmation ? '.dialog button' : sheet ? '.sheet .icon' : '.top .icon';
+  root.querySelector<HTMLElement>(focus)?.focus();
+}
 const sheetTitles: Record<string,string> = {load: 'ファイルを読み込む', items: '翻訳項目', comments: 'コメント', progress: '全体の進捗', diagnostics: '読み込み結果', restore: 'バックアップを復元', export: 'AIレビューを依頼', response: 'AIレビュー結果を読み込む', english: '英訳TXTを出力'};
 sheetTitles.source = '原文を補う';
 sheetTitles.text = 'テキスト表示';
@@ -50,7 +73,7 @@ const drive = new DriveController({getWorkspace: () => workspace,
     busy = 'Driveの変更を保存中…'; render();
     try {
       if (await workspaceHash(workspace) !== expectedHash) throw new Error('同期中に端末のデータが変わりました。もう一度同期してください');
-      await saveWorkspace(next); workspace = next; path = currentId = null; preparedRequest = null; textView = null;
+      await saveWorkspace(next); workspace = next; workspaceRevision++; path = currentId = null; preparedRequest = null; textView = null;
     } finally {busy = ''; render();}
   }, canAutoSync: () => !busy && !sheet && !confirmation && !instructionsPreview && document.visibilityState === 'visible',
   changed: () => {if (sheet === 'drive') render();},
@@ -59,7 +82,7 @@ const currentFile = () => workspace.files.find(f => f.path === path);
 const currentItem = () => currentFile()?.items.find(i => i.id === currentId);
 const targets = () => currentFile()?.items.filter(i => matches(i, itemFilter)) ?? [];
 function toastMarkup() {return notice ? `<div class="toast" role="status">${e(notice)}${noticeInstructions ? '<button data-action="preview-instructions">指示文を確認</button>' : ''}</div>` : '';}
-function toast(message: string, instructions: string | null = null) {notice = message; noticeInstructions = instructions; clearTimeout(toastTimer); root.querySelector('.toast')?.remove(); if (!menu) root.querySelector('.menu')?.remove(); root.insertAdjacentHTML('beforeend', toastMarkup()); toastTimer = setTimeout(() => {notice = ''; noticeInstructions = null; root.querySelector('.toast')?.remove();}, instructions ? 10000 : 5000);}
+function toast(message: string, instructions: string | null = null) {notice = message; noticeInstructions = instructions; clearTimeout(toastTimer); root.querySelector('.toast')?.remove(); if (!menu) root.querySelector('.menu')?.remove(); root.insertAdjacentHTML('beforeend', toastMarkup()); screenHistory?.sync(historyScreen()); toastTimer = setTimeout(() => {notice = ''; noticeInstructions = null; root.querySelector('.toast')?.remove();}, instructions ? 10000 : 5000);}
 function closeInstructions() {instructionsPreview = null; render(); root.querySelector<HTMLElement>('[data-action="preview-instructions"], [data-action="copy-instructions"]')?.focus();}
 function exportFiles() {return workspace.files.filter(f => sheet === 'english' || reviewMode === 'initial' || f.items.some(i => unresolved(i).length));}
 function resetExportSelection() {exportSelection = new Set(exportFiles().filter(f => !path || f.path === path).map(f => f.path)); preparedRequest = null;}
@@ -171,6 +194,7 @@ function render() {
   if(sheet==='text') refreshTextView();
   root.classList.toggle('has-comments', !!currentItem() && unresolved(currentItem()!).length > 0);
   if (confirmation) root.insertAdjacentHTML('beforeend', `<div class="dialog-overlay"><section class="dialog" role="alertdialog" aria-modal="true" aria-label="確認"><p>${e(confirmation.question)}</p><div class="dialog-actions"><button data-action="confirm-cancel">キャンセル</button><button class="primary" data-action="confirm-ok">確定</button></div></section></div>`);
+  screenHistory?.sync(historyScreen());
 }
 
 root.addEventListener('click', event => {
@@ -280,7 +304,7 @@ root.addEventListener('submit', async event => {
   }
   if (form.id === 'restore-form') {
     event.preventDefault(); const file = new FormData(form).get('backup') as File;
-    try {const restored = restoreJson(await file.text()); ask('現在の作業状態をバックアップで置き換えますか？', async () => {await saveWorkspace(restored); workspace = restored; path = currentId = null; sheet = null; expanded.clear(); render(); toast('バックアップを復元しました');});} catch (error) {toast(String(error));} return;
+    try {const restored = restoreJson(await file.text()); ask('現在の作業状態をバックアップで置き換えますか？', async () => {await saveWorkspace(restored); workspace = restored; workspaceRevision++; path = currentId = null; sheet = null; expanded.clear(); render(); toast('バックアップを復元しました');});} catch (error) {toast(String(error));} return;
   }
   if (form.id === 'response-form') {
     event.preventDefault(); const data = new FormData(form), answer = data.get('answer') as File, revised = data.get('revised') as File;
@@ -302,6 +326,7 @@ root.addEventListener('submit', async event => {
         documents=replaceDiagnosticDocuments(documents,result.diagnosticDocuments,[...result.files.map(f=>f.path),...result.diagnostics.map(d=>d.path)]);
       }
       workspace = importResponse(workspace, answerValue, parsed);
+      workspaceRevision++;
       workspace.diagnostics.push(...diagnostics);
       workspace.diagnosticDocuments=documents;
       await saveWorkspace(workspace); sheet = null; reconcileCurrent(); busy = ''; render(); toast(initialReview ? `AIの指摘を${answerValue.suggestions.length}件読み込みました` : '変更を読み込みました。再確認してください');
@@ -325,6 +350,7 @@ root.addEventListener('submit', async event => {
       workspace.diagnostics.push(...result.diagnostics);
     } else workspace = {...emptyWorkspace(), ...result};
     workspace.diagnosticDocuments=documents;
+    workspaceRevision++;
     if (englishOnly) reconcileCurrent(); else path = currentId = null;
     await saveWorkspace(workspace);
     if (result.diagnostics.length) sheet = 'diagnostics';
@@ -378,6 +404,7 @@ root.addEventListener('touchend', event => {
   else swipe.target.style.transform = '';
   swipe = null;
 });
+screenHistory=new ScreenHistory(historyScreen(),restoreScreen);
 busy = '保存したデータを読み込み中…'; render();
 void Promise.all([loadWorkspace(), drive.initialize()]).then(([saved]) => {if (saved) workspace = saved;}).catch(error => {notice = `保存データを読み込めません：${String(error)}`;}).finally(() => {busy = ''; render();});
 registerPwa(toast);
