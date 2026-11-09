@@ -137,6 +137,8 @@ npm run test:e2e
 
 Python実行ファイルは `PYTHON` 環境変数で指定できます。Windowsでは既定でEdgeを使います。必要に応じて `PLAYWRIGHT_CHANNEL=chrome` に変更できます。Windows以外では `npx playwright install chromium` でテスト用ブラウザを用意してください。
 
+通常のテストはスクリーンショットを更新しません。UIを変更した画面だけを撮り直す場合は、`UPDATE_SCREENSHOTS` に画面名（`review`、`comments`、`items`、`diagnostic`、`export`、`instructions`、`drive-conflict`）をカンマ区切りで指定し、対象のテストを実行してください。日時・IDだけの画像差分は採用しません。
+
 実データの再検査：
 
 ```powershell
