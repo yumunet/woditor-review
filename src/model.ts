@@ -33,7 +33,8 @@ export interface ReviewFile {
   manualGroups?: string[][];
   errors?: string[];
 }
-export interface Diagnostic { path: string; severity: 'error' | 'warning' | 'skip'; message: string }
+export interface Diagnostic { path: string; severity: 'error' | 'warning' | 'skip'; message: string; line?: number; enLine?: number }
+export interface DiagnosticDocument {path:string;jaText?:string;enText?:string}
 export interface ReviewRequest {
   schemaVersion: 1; requestId: string; createdAt: string;
   entries: {path: string; fileVersion: string; itemId: string; slotIds: string[]; commentId: string;
@@ -42,6 +43,7 @@ export interface ReviewRequest {
 export interface Workspace {
   schemaVersion: 1; files: ReviewFile[]; diagnostics: Diagnostic[]; requests: ReviewRequest[];
   importedResponses: string[]; updatedAt: string;
+  diagnosticDocuments?: DiagnosticDocument[];
 }
 export const emptyWorkspace = (): Workspace => ({schemaVersion: 1, files: [], diagnostics: [], requests: [], importedResponses: [], updatedAt: new Date().toISOString()});
 export const sourceText = (slot: Slot) => slot.sourceOverride ?? slot.source;

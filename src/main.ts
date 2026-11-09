@@ -10,17 +10,19 @@ import { characterDiff } from './diff';
 import { strToU8, zipSync } from 'fflate';
 import { registerPwa } from './pwa';
 import { canMerge, canSplit, mergeGroup, splitGroup } from './grouping';
-import { diagnosticsView, withoutReplacedDiagnostics } from './diagnostics';
+import { diagnosticDocument,diagnosticsView,replaceDiagnosticDocuments,withoutReplacedDiagnostics } from './diagnostics';
 import { threadView } from './comments';
 import { updateManualSources } from './source-edit';
 import {newlineWarning,slotWarnings} from './translation-warnings';
 import {itemRows} from './item-picker';
+import {createTextView,paintTextView,targetLine,textLineHeight,textViewMarkup,type TextView,type TextLanguage} from './text-viewer';
 
 const root = document.querySelector<HTMLDivElement>('#app')!;
 let workspace: Workspace = emptyWorkspace();
 let path: string | null = null, currentId: string | null = null;
 let homeFilter: Filter = 'all', itemFilter: Filter = 'all';
 let itemQuery='';
+let textView:TextView|null=null;
 const expanded = new Set<string>();
 let menu = false, sheet: string | null = null, contextOpen = true, contextLang: 'ja' | 'en' = 'en';
 let before = 3, after = 3, usageIndex = 0, busy = '', notice = '';
@@ -34,6 +36,7 @@ let confirmation: {question: string; run: () => void | Promise<void>} | null = n
 let exportSelection = new Set<string>(), preparedRequest: ReviewRequest | null = null;
 const sheetTitles: Record<string,string> = {load: 'ファイルを読み込む', items: '翻訳項目', comments: 'コメント', progress: '全体の進捗', diagnostics: '読み込み結果', restore: 'バックアップを復元', export: 'レビューJSONを出力', response: 'レビューJSONを読み込む', reload: '英訳TXTを再読み込み', english: '英訳TXTを出力'};
 sheetTitles.source = '原文を補う';
+sheetTitles.text = 'テキスト表示';
 const currentFile = () => workspace.files.find(f => f.path === path);
 const currentItem = () => currentFile()?.items.find(i => i.id === currentId);
 const targets = () => currentFile()?.items.filter(i => matches(i, itemFilter)) ?? [];
@@ -45,6 +48,12 @@ function ask(question: string, run: () => void | Promise<void>) {confirmation = 
 function reconcileCurrent() {if (!targets().some(i => i.id === currentId)) {currentId = targets()[0]?.id ?? null; if (!currentId && sheet === 'comments') sheet = null;}}
 function selectItem(id: string) {currentId = id; before = after = 3; usageIndex = 0; contextOpen = true;}
 function move(delta: number) {const list = targets(), index = list.findIndex(i => i.id === currentId); const target = list[index + delta]; if (target) {selectItem(target.id); render(); root.querySelector('.review')?.scrollTo(0, 0);}}
+function refreshTextView(position=false) {
+  const scroller=root.querySelector<HTMLElement>('.text-scroll');
+  if(!textView || !scroller) return;
+  if(position) scroller.scrollTop=textView.offsets[textView.language]??Math.max(0,(targetLine(textView)-1)*textLineHeight-88);
+  paintTextView(textView,scroller);
+}
 function treeRows(node: TreeNode, depth = 0): string {
   return node.children.filter(c => c.visible).map(c => {
     const p = percent(c.done, c.total), isOpen = expanded.has(c.path);
@@ -82,6 +91,7 @@ function progressRows(node: TreeNode, depth = 0): string {
   return `<div class="progress-detail" style="--depth:${depth}"><span>${e(node.name)}</span><span>${node.done.toLocaleString()} / ${node.total.toLocaleString()}</span></div>${node.children.filter(c => !c.file).map(c => progressRows(c, depth + 1)).join('')}`;
 }
 function sheetBody() {
+  if(sheet==='text' && textView) return textViewMarkup(textView);
   if (sheet === 'source') {
     const file=currentFile(), item=currentItem();
     if (!file || !item) return '';
@@ -111,6 +121,7 @@ function render() {
   const heading = root.querySelector('.sheet h2'); if (heading) heading.textContent = sheetTitles[sheet ?? ''] ?? '';
   root.querySelector('.scroll')?.scrollTo(0, scroll);
   root.querySelector('.sheet-body')?.scrollTo(0, sheetScroll);
+  if(sheet==='text') refreshTextView();
   root.classList.toggle('has-comments', !!currentItem() && unresolved(currentItem()!).length > 0);
   if (confirmation) root.insertAdjacentHTML('beforeend', `<div class="dialog-overlay"><section class="dialog" role="alertdialog" aria-modal="true" aria-label="確認"><p>${e(confirmation.question)}</p><div class="dialog-actions"><button data-action="confirm-cancel">キャンセル</button><button class="primary" data-action="confirm-ok">確定</button></div></section></div>`);
 }
@@ -144,6 +155,16 @@ root.addEventListener('click', event => {
   }
   else if (action === 'comment-tab') commentTab = value as 'open' | 'all';
   else if (action === 'diagnostic-tab') diagnosticTab = value as typeof diagnosticTab;
+  else if(action==='open-diagnostic') {
+    const diagnostic=workspace.diagnostics[Number(value)],document=diagnostic && diagnosticDocument(workspace,diagnostic.path);
+    if(!document) {toast('テキストが保存されていません。ZIPを再読み込みしてください');return;}
+    textView=createTextView(document,diagnostic);openSheet('text');refreshTextView(true);return;
+  }
+  else if(action==='diagnostic-back') {sheet='diagnostics';render();return;}
+  else if(action==='text-language' && textView) {
+    textView.offsets[textView.language]=root.querySelector('.text-scroll')?.scrollTop??0;
+    textView.language=value as TextLanguage;render();refreshTextView(true);return;
+  }
   else if (action === 'reply') {replyTarget = value!; editTarget = null; render(); root.querySelector<HTMLTextAreaElement>('textarea')?.focus(); return;}
   else if (action === 'edit') {editTarget = {threadId: button.dataset.thread!, postId: button.dataset.post!}; replyTarget = null; render(); root.querySelector<HTMLTextAreaElement>('textarea')?.focus(); return;}
   else if (action === 'delete') {
@@ -173,6 +194,10 @@ root.addEventListener('input',event=>{
   const body=root.querySelector('.sheet-body');
   if(body) {body.innerHTML=itemRows(currentFile()!,targets(),currentId,itemQuery);body.scrollTop=0;}
 });
+root.addEventListener('scroll',event=>{
+  const element=event.target as HTMLElement;
+  if(sheet==='text' && textView && element.matches('.text-scroll')) paintTextView(textView,element);
+},true);
 root.addEventListener('change', event => {const el = event.target as HTMLInputElement; if (el.id === 'context-lang') {contextLang = el.value as 'en' | 'ja'; render();} if (el.dataset.exportPath) {if (el.checked) exportSelection.add(el.dataset.exportPath); else exportSelection.delete(el.dataset.exportPath); preparedRequest = null; render();}});
 root.addEventListener('submit', async event => {
   const form = event.target as HTMLFormElement;
@@ -196,6 +221,7 @@ root.addEventListener('submit', async event => {
     try {
       let parsed: ReviewFile[] | undefined;
       let diagnostics: Workspace['diagnostics'] = [];
+      let documents=workspace.diagnosticDocuments??[];
       if (revised?.size) {
         const zip = sourceZip(workspace);
         const result = await parseArchives(zip.buffer as ArrayBuffer, await revised.arrayBuffer(), updateBusy, true);
@@ -203,10 +229,12 @@ root.addEventListener('submit', async event => {
         if (!result.files.length) throw new Error('対応する英訳TXTがありません');
         parsed = result.files;
         diagnostics = result.diagnostics;
+        documents=replaceDiagnosticDocuments(documents,result.diagnosticDocuments,[...result.files.map(f=>f.path),...result.diagnostics.map(d=>d.path)]);
       }
       if (form.id === 'response-form') workspace = importResponse(workspace, JSON.parse(await answer.text()), parsed);
       else workspace = mergeFiles({...workspace, diagnostics: withoutReplacedDiagnostics(workspace.diagnostics, parsed!.map(f => f.path))}, parsed!);
       workspace.diagnostics.push(...diagnostics);
+      workspace.diagnosticDocuments=documents;
       await saveWorkspace(workspace); sheet = null; reconcileCurrent(); busy = ''; render(); toast('変更を読み込みました。再確認してください');
     } catch (error) {busy = ''; render(); toast(String(error));} return;
   }
@@ -218,12 +246,14 @@ root.addEventListener('submit', async event => {
   try {
     const result = await parseArchives(await ja.arrayBuffer(), await en.arrayBuffer(), updateBusy);
     diagnosticTab = 'error';
-    if (!result.files.length) {workspace.diagnostics = result.diagnostics; sheet = 'diagnostics'; busy = ''; render(); return;}
+    const documents=replaceDiagnosticDocuments(workspace.diagnosticDocuments,result.diagnosticDocuments,[...result.files.map(f=>f.path),...result.diagnostics.map(d=>d.path)]);
+    if (!result.files.length) {workspace.diagnostics = result.diagnostics;workspace.diagnosticDocuments=documents;await saveWorkspace(workspace);sheet = 'diagnostics'; busy = ''; render(); return;}
     if (workspace.files.length) {
       const attempted = [...result.files.map(f => f.path), ...result.diagnostics.map(d => d.path)];
       workspace = mergeFiles({...workspace, diagnostics: withoutReplacedDiagnostics(workspace.diagnostics, attempted)}, result.files);
       workspace.diagnostics.push(...result.diagnostics);
     } else workspace = {...emptyWorkspace(), ...result};
+    workspace.diagnosticDocuments=documents;
     path = currentId = null;
     await saveWorkspace(workspace);
     if (result.diagnostics.length) sheet = 'diagnostics';

@@ -397,3 +397,42 @@ test('item rows show a compact one-line original preview with ellipsis',async({p
   await page.setViewportSize(info.project.name==='mobile'?{width:390,height:844}:{width:1280,height:900});
   mkdirSync('docs/screenshots',{recursive:true});await page.screenshot({path:`docs/screenshots/${info.project.name}-items.png`});
 });
+
+test('diagnostic text viewer opens errors at the source line and switches languages',async({page},info)=>{
+  test.skip(!corpus,'Private reference files not available');const path='MapData/TitleMap/Event_0000.txt';await loadReal(page,path);
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:/^読み込み結果/}).click();
+  await page.locator('.diagnostic.error').first().click();await expect(page.getByRole('dialog',{name:'テキスト表示',exact:true})).toBeVisible();
+  await expect(page.getByRole('tab',{name:'日本語',exact:true})).toHaveAttribute('aria-selected','true');
+  await expect(page.locator('.focus-line')).toHaveAttribute('data-text-line','58');
+  const ja=readFileSync(`.reference/ja-JP/texts/${path}`,'utf8').split(/\r?\n/);await expect(page.locator('.focus-line code')).toHaveText(ja[57]);
+  expect(await page.locator('.text-scroll').evaluate(el=>el.scrollTop)).toBeGreaterThan(500);
+  await page.getByRole('tab',{name:'英語',exact:true}).click();
+  const line=Number(await page.locator('.focus-line').getAttribute('data-text-line')),en=readFileSync(`.reference/en-US/texts/${path}`,'utf8').split(/\r?\n/);
+  await expect(page.locator('.focus-line code')).toHaveText(en[line-1]);
+  mkdirSync('docs/screenshots',{recursive:true});await page.screenshot({path:`docs/screenshots/${info.project.name}-diagnostic.png`});
+  await page.locator('.text-scroll').evaluate(el=>{el.scrollTop=el.scrollHeight;});
+  await expect(page.locator('.text-row').last()).toHaveAttribute('data-text-line',String(en.length));
+  expect(await page.locator('.text-row').count()).toBeLessThanOrEqual(120);
+  await page.getByRole('button',{name:/読み込み結果$/}).click();await expect(page.getByRole('tab',{name:/^エラー/})).toHaveAttribute('aria-selected','true');
+});
+
+test('warning locations open both the removed setting and its English count field',async({page})=>{
+  test.skip(!corpus,'Private reference files not available');await loadReal(page,'BasicData/CDataBase/04.txt');
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:/^読み込み結果/}).click();
+  await page.getByRole('tab',{name:/^警告/}).click();await page.locator('.diagnostic.warning').filter({hasText:'無効化された設定'}).first().click();
+  await expect(page.locator('.focus-line code')).toContainText('CHOICE_NAME_0_0=');
+  await page.getByRole('tab',{name:'英語',exact:true}).click();await expect(page.locator('.focus-line code')).toHaveText('CHOICE_NAME_0_NUM=0');
+});
+
+test('rejected files remain viewable in both languages after restart',async({page})=>{
+  test.skip(!corpus,'Private reference files not available');await page.goto('/');await page.getByRole('button',{name:'ファイルを読み込む',exact:true}).click();
+  for(const [name,lang] of [['ja','ja-JP'],['en','en-US']]) {
+    let text=readFileSync(`.reference/${lang}/texts/${sourcePath}`,'utf8');if(name==='en') text=text.replace('EVENT_ID=0','EVENT_ID=999');
+    await page.locator(`input[name=${name}]`).setInputFiles({name:`${lang}.zip`,mimeType:'application/zip',buffer:Buffer.from(zipSync({[`${lang}/texts/${sourcePath}`]:Buffer.from(text)}))});
+  }
+  await page.getByRole('button',{name:'読み込む',exact:true}).click();await expect(page.locator('.busy')).toHaveCount(0,{timeout:90_000});
+  await page.locator('.diagnostic.error').click();await expect(page.locator('.focus-line code')).toHaveText('EVENT_ID=0');
+  await page.getByRole('tab',{name:'英語',exact:true}).click();await expect(page.locator('.focus-line code')).toHaveText('EVENT_ID=999');
+  await page.reload();await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'読み込み結果 (エラー1)',exact:true}).click();
+  await page.locator('.diagnostic.error').click();await page.getByRole('tab',{name:'英語',exact:true}).click();await expect(page.locator('.focus-line code')).toHaveText('EVENT_ID=999');
+});

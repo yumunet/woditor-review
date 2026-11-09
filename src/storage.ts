@@ -82,7 +82,18 @@ export function validateWorkspace(data: unknown): asserts data is Workspace {
     for (const c of f.commands) if (!object(c) || !Number.isInteger(c.line) || !str(c.ja) || !str(c.en) || !Number.isInteger(c.code)) return fail();
     for (const [id, lines] of Object.entries(f.usages)) if (!slots.has(id) || !arr(lines) || !lines.every(n => Number.isInteger(n) && f.commands.some((c: any) => c.line === n))) return fail();
   }
-  for (const d of data.diagnostics) if (!object(d) || !str(d.path) || !str(d.message) || !['error','warning','skip'].includes(d.severity)) return fail();
+  for (const d of data.diagnostics) {
+    if (!object(d) || !str(d.path) || !str(d.message) || !['error','warning','skip'].includes(d.severity)) return fail();
+    for(const key of ['line','enLine']) if(d[key]!==undefined && (!Number.isInteger(d[key]) || d[key]<1)) return fail();
+  }
+  if(data.diagnosticDocuments!==undefined) {
+    if(!arr(data.diagnosticDocuments)) return fail();
+    const documents=new Set();
+    for(const d of data.diagnosticDocuments) {
+      if(!object(d) || !str(d.path) || !d.path || d.path!==relativePath(d.path) || documents.has(d.path) || d.jaText===undefined && d.enText===undefined || d.jaText!==undefined && !str(d.jaText) || d.enText!==undefined && !str(d.enText)) return fail();
+      documents.add(d.path);
+    }
+  }
   for (const r of data.requests) {
     if (!object(r) || r.schemaVersion !== 1 || !str(r.requestId) || !arr(r.entries)) return fail();
     for (const row of r.entries) if (!object(row) || !str(row.path) || !str(row.itemId) || !str(row.commentId) || !hash(row.fileVersion) || !arr(row.slotIds) || !arr(row.slots) || !arr(row.posts) || !arr(row.context)) return fail();

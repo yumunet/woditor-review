@@ -1,4 +1,4 @@
-import type { Diagnostic, ReviewFile } from './model';
+import type { Diagnostic, DiagnosticDocument, ReviewFile } from './model';
 let worker: Worker | undefined;
 let nextId = 0;
 export async function renderTranslations(files: ReviewFile[]): Promise<{path: string; text: string; version: string}[]> {
@@ -12,7 +12,7 @@ export async function renderTranslations(files: ReviewFile[]): Promise<{path: st
     target.addEventListener('message', message); target.addEventListener('error', error); target.postMessage({id, files: payload});
   });
 }
-export function parseArchives(ja: ArrayBuffer, en: ArrayBuffer, progress: (message: string) => void, partial = false): Promise<{files: ReviewFile[]; diagnostics: Diagnostic[]}> {
+export function parseArchives(ja: ArrayBuffer, en: ArrayBuffer, progress: (message: string) => void, partial = false): Promise<{files: ReviewFile[]; diagnostics: Diagnostic[];diagnosticDocuments:DiagnosticDocument[]}> {
   worker ??= new Worker(new URL('./parser.worker.ts', import.meta.url), {type: 'module'});
   const target = worker, id = ++nextId;
   return new Promise((resolve, reject) => {
