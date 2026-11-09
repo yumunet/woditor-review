@@ -436,3 +436,15 @@ test('rejected files remain viewable in both languages after restart',async({pag
   await page.reload();await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'読み込み結果 (エラー1)',exact:true}).click();
   await page.locator('.diagnostic.error').click();await page.getByRole('tab',{name:'英語',exact:true}).click();await expect(page.locator('.focus-line code')).toHaveText('EVENT_ID=999');
 });
+
+test('folder disclosure triangles keep the same geometry in both states',async({page})=>{
+  test.skip(!corpus,'Private reference files not available');await loadReal(page);
+  await page.getByRole('button',{name:'戻る',exact:true}).click();
+  const folder=page.locator('.folder[data-value="MapData"]');
+  const geometry=async()=>folder.locator('.folder-triangle').evaluate(svg=>{
+    const r=svg.getBoundingClientRect(),p=svg.querySelector('path')!.getBoundingClientRect();
+    return {width:r.width,height:r.height,pathWidth:p.width,pathHeight:p.height,d:svg.querySelector('path')!.getAttribute('d')};
+  });
+  const open=await geometry();await folder.click();await expect(folder).toHaveAttribute('aria-expanded','false');
+  expect(await geometry()).toEqual(open);await folder.click();await expect(folder).toHaveAttribute('aria-expanded','true');expect(await geometry()).toEqual(open);
+});

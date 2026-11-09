@@ -1,6 +1,6 @@
 import './styles.css';
 import { emptyWorkspace, isDone, matches, sourceText, unresolved, type Workspace, type ReviewFile, type Item, type Filter, type ReviewRequest } from './model';
-import { escape as e, icon, filterButtons, fileTree, compact, percent, initialContext, type TreeNode } from './ui';
+import { escape as e, icon, folderTriangle, filterButtons, fileTree, compact, percent, initialContext, type TreeNode } from './ui';
 import { commandColor } from './command-colors';
 import { parseArchives, renderTranslations } from './parser-client';
 import { addComment, approveItem, deleteComment, editComment, latestPreview, nextAfterApproval, setResolved, undoApproval } from './review-state';
@@ -57,7 +57,7 @@ function refreshTextView(position=false) {
 function treeRows(node: TreeNode, depth = 0): string {
   return node.children.filter(c => c.visible).map(c => {
     const p = percent(c.done, c.total), isOpen = expanded.has(c.path);
-    return `<button class="file-row ${c.file ? '' : 'folder'}" style="--depth:${depth}" data-action="${c.file ? 'file' : 'folder'}" data-value="${e(c.path)}" ${c.file ? '' : `aria-expanded="${isOpen}"`} title="${e(c.path)}"><span class="angle">${c.file ? '' : isOpen ? '▼' : '▶'}</span><span class="glyph">${icon(c.file ? 'file' : 'folder')}</span><span class="row-name">${e(c.name)}</span><span class="bar"><span class="fill" style="display:block;width:${p ?? 0}%"></span></span><span class="pct">${p === null ? '—' : p + '%'}</span><span class="count" aria-label="${c.total}項目">${compact(c.total)}</span></button>${!c.file && isOpen ? treeRows(c, depth + 1) : ''}`;
+    return `<button class="file-row ${c.file ? '' : 'folder'}" style="--depth:${depth}" data-action="${c.file ? 'file' : 'folder'}" data-value="${e(c.path)}" ${c.file ? '' : `aria-expanded="${isOpen}"`} title="${e(c.path)}"><span class="angle">${c.file ? '' : folderTriangle()}</span><span class="glyph">${icon(c.file ? 'file' : 'folder')}</span><span class="row-name">${e(c.name)}</span><span class="bar"><span class="fill" style="display:block;width:${p ?? 0}%"></span></span><span class="pct">${p === null ? '—' : p + '%'}</span><span class="count" aria-label="${c.total}項目">${compact(c.total)}</span></button>${!c.file && isOpen ? treeRows(c, depth + 1) : ''}`;
   }).join('');
 }
 function context(file: ReviewFile, item: Item) {

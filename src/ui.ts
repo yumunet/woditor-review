@@ -17,6 +17,7 @@ const paths: Record<string, string> = {
   upload: '<path d="M12 16V3m-5 5 5-5 5 5M3 15v6h18v-6"/>',
 };
 export const icon = (name: string) => `<svg class="svg" viewBox="0 0 24 24" aria-hidden="true">${paths[name] ?? paths.file}</svg>`;
+export const folderTriangle = () => '<svg class="folder-triangle" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2 8 5 2 8Z"/></svg>';
 export const filters: [Filter, string][] = [['all', 'すべて'], ['pending', '未確認'], ['comment', 'コメントあり'], ['done', '確認済み']];
 export const filterButtons = (filter: Filter, scope: string) => `<div class="filters" aria-label="${scope === 'home' ? 'ファイル' : '項目'}フィルター">${filters.map(([key, label]) => `<button class="pill ${key === filter ? 'active' : ''}" data-action="filter" data-scope="${scope}" data-value="${key}" aria-pressed="${key === filter}">${label}</button>`).join('')}</div>`;
 export const compact = (n: number) => n < 1000 ? String(n) : `${Math.round(n / 100) / 10}K`;
