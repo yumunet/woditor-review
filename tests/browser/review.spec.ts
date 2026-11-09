@@ -319,3 +319,28 @@ test('corrected English positions survive JSON export, revised TXT and approved 
   const zip=unzipSync(readFileSync((await(await event).path())!)),output=Buffer.from(zip[`en-US/texts/${path}`]).toString('utf8');
   expect(output).toBe(revised);
 });
+
+test('comment action buttons stay in one row at mobile and narrow widths',async({page},info)=>{
+  test.skip(!corpus,'Private reference files not available');
+  await loadReal(page);
+  await page.getByRole('button',{name:'コメント',exact:true}).click();
+  await page.getByLabel('コメント内容').fill('コメントの操作を確認');await page.getByRole('button',{name:'送信',exact:true}).click();
+  const actions=page.locator('.thread-root > .thread-actions').first();
+  const checkRow=async()=>{
+    await expect(actions.getByRole('button')).toHaveText(['返信','編集','削除','解決']);
+    const boxes=await actions.getByRole('button').evaluateAll(buttons=>buttons.map(button=>{const r=button.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height};}));
+    for(let i=1;i<boxes.length;i++) {expect(Math.abs(boxes[i].y-boxes[0].y)).toBeLessThan(1);expect(boxes[i].x).toBeGreaterThanOrEqual(boxes[i-1].x+boxes[i-1].width);}
+    expect(await actions.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBeTruthy();
+  };
+  await checkRow();
+  await page.setViewportSize({width:320,height:844});await checkRow();
+  await actions.getByRole('button',{name:'返信',exact:true}).click();await page.getByLabel('コメント内容').fill('返信も確認');await page.getByRole('button',{name:'送信',exact:true}).click();
+  await checkRow();await expect(page.locator('.reply .thread-actions button')).toHaveText(['編集','削除']);
+  await actions.getByRole('button',{name:'編集',exact:true}).click();await page.getByLabel('コメント内容').fill('編集したコメント');await page.getByRole('button',{name:'保存',exact:true}).click();
+  await expect(page.locator('.thread-root .post-text')).toHaveText('編集したコメント');
+  await page.setViewportSize(info.project.name==='mobile'?{width:390,height:844}:{width:1280,height:900});
+  mkdirSync('docs/screenshots',{recursive:true});await page.screenshot({path:`docs/screenshots/${info.project.name}-comments.png`});
+  await actions.getByRole('button',{name:'解決',exact:true}).click();await page.getByRole('button',{name:'すべてのコメント',exact:true}).click();
+  await expect(actions.getByRole('button')).toHaveText(['編集','削除','再開']);
+  await actions.getByRole('button',{name:'再開',exact:true}).click();await checkRow();
+});

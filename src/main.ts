@@ -3,7 +3,7 @@ import { emptyWorkspace, isDone, matches, unresolved, type Workspace, type Revie
 import { escape as e, icon, filterButtons, fileTree, compact, percent, initialContext, type TreeNode } from './ui';
 import { commandColor } from './command-colors';
 import { parseArchives, renderTranslations } from './parser-client';
-import { addComment, approveItem, canEdit, deleteComment, editComment, latestPreview, nextAfterApproval, setResolved, undoApproval } from './review-state';
+import { addComment, approveItem, deleteComment, editComment, latestPreview, nextAfterApproval, setResolved, undoApproval } from './review-state';
 import { backupJson, download, loadWorkspace, restoreJson, saveWorkspace } from './storage';
 import { chatInstructions, createRequest, importResponse, mergeFiles, sourceZip } from './exchange';
 import { characterDiff } from './diff';
@@ -11,6 +11,7 @@ import { strToU8, zipSync } from 'fflate';
 import { registerPwa } from './pwa';
 import { canMerge, canSplit, mergeGroup, splitGroup } from './grouping';
 import { diagnosticsView, withoutReplacedDiagnostics } from './diagnostics';
+import { threadView } from './comments';
 
 const root = document.querySelector<HTMLDivElement>('#app')!;
 let workspace: Workspace = emptyWorkspace();
@@ -70,7 +71,7 @@ function commentsBody() {
   const item = currentItem(); if (!item) return '<div class="empty">対象の項目はありません</div>';
   const threads = item.threads.filter(t => commentTab === 'all' || !t.resolved);
   const editText = editTarget ? item.threads.find(t => t.id === editTarget!.threadId)?.posts.find(p => p.id === editTarget!.postId)?.text : '';
-  return `<div class="filters"><button class="pill ${commentTab === 'open' ? 'active' : ''}" data-action="comment-tab" data-value="open">未解決</button><button class="pill ${commentTab === 'all' ? 'active' : ''}" data-action="comment-tab" data-value="all">すべてのコメント</button></div><div class="sheet-body">${threads.map(t => `<article class="thread"><div class="thread-top"><strong>${t.posts[0].author === 'ai' ? 'AI' : '自分'}</strong><time class="thread-time">${e(new Date(t.posts[0].createdAt).toLocaleString('ja-JP'))}</time><span class="thread-status ${t.resolved ? 'resolved' : ''}">${t.resolved ? '解決済み' : '未解決'}</span></div>${t.posts.map((p, index) => `<div class="${index ? 'reply' : ''}">${index ? `<strong class="hint">${p.author === 'ai' ? 'AI' : '自分'}</strong>` : ''}${p.decision ? `<p class="hint">${({accepted:'採用', rejected:'不採用', partial:'一部採用', needs_review:'要確認'})[p.decision]}</p>` : ''}<div class="post-text">${e(p.text)}</div>${canEdit(t, p.id) ? `<div class="thread-actions"><button class="text-act" data-action="edit" data-thread="${e(t.id)}" data-post="${e(p.id)}">${icon('edit')}編集</button><button class="text-act" data-action="delete" data-thread="${e(t.id)}" data-post="${e(p.id)}">${icon('trash')}削除</button></div>` : ''}</div>`).join('')}<div class="thread-actions">${!t.resolved ? `<button class="text-act" data-action="reply" data-value="${e(t.id)}">${icon('reply')}返信</button>` : ''}<button class="text-act" data-action="resolve" data-value="${e(t.id)}">${icon(t.resolved ? 'undo' : 'check')}${t.resolved ? '再開' : '解決'}</button></div></article>`).join('') || '<div class="empty">コメントはありません</div>'}</div><form class="sheet-foot" id="comment-form"><textarea name="text" aria-label="コメント内容" placeholder="${editTarget ? 'コメントを編集' : replyTarget ? '返信を入力' : 'コメントを入力'}" required>${e(editText ?? '')}</textarea><div class="send-row"><span>${editTarget ? '編集中' : replyTarget ? '返信先を選択中' : ''}${editTarget || replyTarget ? '<button class="text-act" type="button" data-action="cancel-compose">キャンセル</button>' : ''}</span><button type="submit" class="primary">${editTarget ? '保存' : '送信'}</button></div></form>`;
+  return `<div class="filters"><button class="pill ${commentTab === 'open' ? 'active' : ''}" data-action="comment-tab" data-value="open">未解決</button><button class="pill ${commentTab === 'all' ? 'active' : ''}" data-action="comment-tab" data-value="all">すべてのコメント</button></div><div class="sheet-body">${threads.map(threadView).join('') || '<div class="empty">コメントはありません</div>'}</div><form class="sheet-foot" id="comment-form"><textarea name="text" aria-label="コメント内容" placeholder="${editTarget ? 'コメントを編集' : replyTarget ? '返信を入力' : 'コメントを入力'}" required>${e(editText ?? '')}</textarea><div class="send-row"><span>${editTarget ? '編集中' : replyTarget ? '返信先を選択中' : ''}${editTarget || replyTarget ? '<button class="text-act" type="button" data-action="cancel-compose">キャンセル</button>' : ''}</span><button type="submit" class="primary">${editTarget ? '保存' : '送信'}</button></div></form>`;
 }
 function progressRows(node: TreeNode, depth = 0): string {
   return `<div class="progress-detail" style="--depth:${depth}"><span>${e(node.name)}</span><span>${node.done.toLocaleString()} / ${node.total.toLocaleString()}</span></div>${node.children.filter(c => !c.file).map(c => progressRows(c, depth + 1)).join('')}`;
