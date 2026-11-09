@@ -81,6 +81,8 @@ test('real ZIP -> folders -> compare -> context -> filtered empty state', async 
   page.on('pageerror', err => errors.push(String(err)));
   await loadReal(page);
   await expect(page.locator('.entry-title')).toHaveText('イベント名');
+  await expect(page.locator('html')).toHaveCSS('font-synthesis','weight');
+  for(const selector of ['.entry-title','.label','.comment-trigger','.approve']) await expect(page.locator(selector).first()).toHaveCSS('font-weight','700');
   await expect(page.locator('.source')).toHaveCSS('background-color','rgb(255, 255, 255)');
   await expect(page.locator('.translation')).toHaveCSS('background-color','rgb(255, 255, 255)');
   await expect(page.locator('.approve svg circle')).toHaveAttribute('r','9');
@@ -91,6 +93,7 @@ test('real ZIP -> folders -> compare -> context -> filtered empty state', async 
   await page.getByLabel('コマンド表示言語').selectOption('ja');
   await expect(page.locator('.command.current')).toContainText('■文章');
   await page.locator('.entry-open').click();
+  await expect(page.locator('.pick-title').first()).toHaveCSS('font-weight','700');
   await page.getByRole('button', {name: '確認済み', exact: true}).click();
   await expect(page.getByRole('dialog')).toContainText('対象の項目はありません');
   await page.getByRole('button', {name: '閉じる', exact: true}).click();

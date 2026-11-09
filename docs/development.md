@@ -151,6 +151,8 @@ python scripts/corpus-report.py
 
 コメントの下書きと返信・編集先は、同じ翻訳項目のパネルを閉じてもメモリ内で保持する。翻訳項目の切り替え、データ置換、送信成功、明示的な作成キャンセルで破棄する。再起動をまたぐ保存は行わない。
 
+日本語の太字フェイスを持たない端末でも見出しを太く表示できるよう、`font-synthesis: weight` を許可する。主要なラベル・ボタン・項目名は700を指定し、本文は通常の太さを保つ。外部Webフォントは取得しない。
+
 ```text
 src/                    TypeScript UI・状態・保存・JSON受け渡し
 src/parser.worker.ts    ZIP処理とPyodideのWorker
