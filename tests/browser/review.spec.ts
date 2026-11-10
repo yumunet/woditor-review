@@ -650,6 +650,20 @@ test('export sheets select all files, align output buttons, and preview copied i
   await page.getByRole('button',{name:'閉じる',exact:true}).click();await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'英訳TXTを出力',exact:true}).click();await expect(files).toHaveCount(4);await expect(all).toBeChecked();await all.uncheck();await expect(page.getByRole('button',{name:'英訳TXTを出力',exact:true})).toBeDisabled();await files.last().check();expect(await all.evaluate((el:HTMLInputElement)=>el.indeterminate)).toBeTruthy();await all.check();await expect(page.locator('[data-export-path]:checked')).toHaveCount(4);
 });
 
+test('export trees preserve hierarchy and support collapsed folder selection in both panels',async({page})=>{
+  test.skip(!corpus,'Private reference files not available');await loadNavigationFiles(page);
+  for(const panel of ['AIレビューを依頼','英訳TXTを出力']) {
+    await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:panel,exact:true}).click();
+    const folder=page.getByRole('checkbox',{name:'BasicData/CommonEventを選択',exact:true});
+    await expect(page.locator('.export-folder span').first()).toHaveText('BasicData');await expect(page.locator('.export-leaf span').first()).toHaveText('000.txt');
+    await folder.uncheck();await expect(page.locator('[data-export-path]:checked')).toHaveCount(1);
+    await page.locator('[data-export-path]').first().check();expect(await folder.evaluate((el:HTMLInputElement)=>el.indeterminate)).toBe(true);
+    await page.getByRole('button',{name:'BasicData/CommonEventを閉じる',exact:true}).click();await expect(page.locator('[data-export-path]').first()).not.toBeVisible();
+    await folder.check();await expect(page.locator('[data-export-path]:checked')).toHaveCount(4);await expect(page.getByRole('checkbox',{name:'すべて選択',exact:true})).toBeChecked();
+    await page.getByRole('button',{name:'BasicData/CommonEventを開く',exact:true}).click();await closeReviewSheet(page);
+  }
+});
+
 test.describe('backup timestamps',()=>{
   test.use({timezoneId:'Pacific/Honolulu'});
   test('backup download uses the device local date and time and can restore',async({page})=>{

@@ -22,6 +22,7 @@ import {driveView} from './drive-view';
 import {workspaceHash} from './drive-sync';
 import {ScreenHistory} from './screen-history';
 import {loadPreferences,preferencesFrom,savePreferences,type Preferences} from './preferences';
+import {exportTree,folderFiles} from './export-tree';
 
 const root = document.querySelector<HTMLDivElement>('#app')!;
 let workspace: Workspace = emptyWorkspace();
@@ -43,6 +44,7 @@ let editTarget: {threadId: string; postId: string} | null = null;
 let commentDraft='',commentDraftItem='';
 let confirmation: {question: string; run: () => void | Promise<void>} | null = null;
 let exportSelection = new Set<string>(), preparedRequest: ReviewRequest | null = null;
+const exportCollapsed=new Set<string>();
 let reviewMode: ReviewMode = 'comments';
 let preferences=preferencesFrom(undefined);
 function setPreferences(next:Partial<Preferences>) {
@@ -95,7 +97,7 @@ function exportFiles() {return workspace.files.filter(f => sheet === 'english' |
 function resetExportSelection() {exportSelection = new Set(exportFiles().filter(f => !path || f.path === path).map(f => f.path)); preparedRequest = null;}
 function exportRows() {
   const files = exportFiles(), checked = files.filter(f => exportSelection.has(f.path)).length;
-  return `<div class="sheet-body"><label class="export-row export-all"><input id="export-all" type="checkbox" ${files.length && checked === files.length ? 'checked' : ''} ${!files.length ? 'disabled' : ''}>すべて選択</label>${files.map(f => `<label class="export-row"><input type="checkbox" data-export-path="${e(f.path)}" ${exportSelection.has(f.path) ? 'checked' : ''}>${e(f.path)}</label>`).join('') || '<div class="empty">出力対象のファイルはありません</div>'}</div>`;
+  return `<div class="sheet-body"><label class="export-row export-all"><input id="export-all" type="checkbox" ${files.length && checked === files.length ? 'checked' : ''} ${!files.length ? 'disabled' : ''}>すべて選択</label>${files.length ? exportTree(files,exportSelection,exportCollapsed) : '<div class="empty">出力対象のファイルはありません</div>'}</div>`;
 }
 function openSheet(name: string) {lastFocus = document.activeElement as HTMLElement; sheet = name; menu = false; if (name === 'diagnostics') diagnosticTab = 'error'; if (name === 'export') {reviewMode = preferences.reviewMode ?? (workspace.files.some(f => (!path || f.path === path) && f.items.some(i => unresolved(i).length)) ? 'comments' : 'initial');setPreferences({reviewMode});} if (name === 'export' || name === 'english') resetExportSelection(); render(); root.querySelector<HTMLElement>('.sheet .icon, .sheet input, .sheet button:not(.handle)')?.focus();}
 function closeSheet() {sheet = null; render(); lastFocus?.focus();}
@@ -199,6 +201,10 @@ function render() {
   root.querySelector('.sheet-body')?.scrollTo(0, sheetScroll);
   const all = root.querySelector<HTMLInputElement>('#export-all');
   if (all) {const count = exportFiles().filter(f => exportSelection.has(f.path)).length; all.indeterminate = count > 0 && count < exportFiles().length;}
+  root.querySelectorAll<HTMLInputElement>('[data-export-folder]').forEach(input=>{
+    const files=folderFiles(exportFiles(),input.dataset.exportFolder!),count=files.filter(f=>exportSelection.has(f.path)).length;
+    input.indeterminate=count>0 && count<files.length;
+  });
   if (instructionsPreview !== null) root.insertAdjacentHTML('beforeend', `<div class="dialog-overlay instructions-overlay"><section class="dialog instructions-dialog" role="dialog" aria-modal="true" aria-label="指示文"><div class="instructions-head"><h2>指示文</h2><button class="icon" aria-label="指示文を閉じる" data-action="close-instructions">${icon('close')}</button></div><pre class="instructions-text" tabindex="0">${e(instructionsPreview)}</pre></section></div>`);
   if(sheet==='text') refreshTextView();
   root.classList.toggle('has-comments', !!currentItem() && unresolved(currentItem()!).length > 0);
@@ -230,6 +236,7 @@ root.addEventListener('click', event => {
   }
   if (action === 'home') {path = null; currentId = null; sheet = null;}
   else if (action === 'folder') {if (expanded.has(value!)) expanded.delete(value!); else expanded.add(value!);}
+  else if (action === 'export-folder') {if(exportCollapsed.has(value!)) exportCollapsed.delete(value!);else exportCollapsed.add(value!);}
   else if (action === 'file') {path = value!; itemFilter = homeFilter; itemQuery=''; selectItem(targets()[0]?.id ?? '');}
   else if (action === 'filter') {if (scope === 'home') homeFilter = value as Filter; else {const retaining=itemFilter==='comment' && value==='comment' && !!currentItem();itemFilter = value as Filter; if (!retaining && !targets().some(i => i.id === currentId)) currentId = targets()[0]?.id ?? null;}}
   else if (action === 'pick') {selectItem(value!); closeSheet(); return;}
@@ -296,7 +303,7 @@ root.addEventListener('scroll',event=>{
   const element=event.target as HTMLElement;
   if(sheet==='text' && textView && element.matches('.text-scroll')) paintTextView(textView,element);
 },true);
-root.addEventListener('change', event => {const el = event.target as HTMLInputElement; if (el.name === 'review-mode') {reviewMode = el.value as ReviewMode; setPreferences({reviewMode}); resetExportSelection(); render(); return;} if (el.id === 'drive-auto') {void drive.setAutomatic(el.checked).catch(error => toast(String(error))); return;} if (el.id === 'export-all') {exportSelection = new Set(el.checked ? exportFiles().map(f => f.path) : []); preparedRequest = null; render(); return;} if (el.id === 'context-lang') {contextLang = el.value as 'en' | 'ja'; render();} if (el.dataset.exportPath) {if (el.checked) exportSelection.add(el.dataset.exportPath); else exportSelection.delete(el.dataset.exportPath); preparedRequest = null; render();}});
+root.addEventListener('change', event => {const el = event.target as HTMLInputElement; if (el.name === 'review-mode') {reviewMode = el.value as ReviewMode; setPreferences({reviewMode}); resetExportSelection(); render(); return;} if(el.dataset.exportFolder) {for(const file of folderFiles(exportFiles(),el.dataset.exportFolder)) {if(el.checked) exportSelection.add(file.path);else exportSelection.delete(file.path);}preparedRequest=null;render();return;} if (el.id === 'drive-auto') {void drive.setAutomatic(el.checked).catch(error => toast(String(error))); return;} if (el.id === 'export-all') {exportSelection = new Set(el.checked ? exportFiles().map(f => f.path) : []); preparedRequest = null; render(); return;} if (el.id === 'context-lang') {contextLang = el.value as 'en' | 'ja'; render();} if (el.dataset.exportPath) {if (el.checked) exportSelection.add(el.dataset.exportPath); else exportSelection.delete(el.dataset.exportPath); preparedRequest = null; render();}});
 root.addEventListener('submit', async event => {
   const form = event.target as HTMLFormElement;
   if (form.id === 'drive-config-form') {
