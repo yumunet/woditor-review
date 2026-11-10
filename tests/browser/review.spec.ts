@@ -86,6 +86,9 @@ test('real ZIP -> folders -> compare -> context -> filtered empty state', async 
   await expect(page.locator('.source')).toHaveCSS('background-color','rgb(255, 255, 255)');
   await expect(page.locator('.translation')).toHaveCSS('background-color','rgb(255, 255, 255)');
   await expect(page.locator('.approve svg circle')).toHaveAttribute('r','9');
+  const arrow=await page.locator('.prevnext').first().boundingBox(),comment=await page.locator('.comment-trigger').boundingBox(),approve=await page.locator('.approve').boundingBox();
+  expect(arrow!.width).toBeGreaterThanOrEqual(44);expect(arrow!.height).toBe(arrow!.width);expect(comment!.height).toBeGreaterThanOrEqual(48);expect(approve!.height).toBeGreaterThanOrEqual(56);
+  await expect(page.locator('.approve')).toHaveCSS('background-color','rgb(22, 131, 73)');
   await page.getByRole('button', {name: '次の項目', exact: true}).click();
   await expect(page.locator('.translation')).toContainText('Yuichi');
   await expect(page.locator('.command.current')).toContainText('Show Message');
