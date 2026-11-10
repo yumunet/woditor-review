@@ -759,6 +759,7 @@ test('comments focus the composer, show scroll directions and fit the keyboard v
   await expect(up).toBeHidden();await expect(down).toBeHidden();
   for(let i=0;i<3;i++) {await page.getByLabel('コメント内容').fill(`Comment ${i}\n`+'Long review line\n'.repeat(8));await page.getByRole('button',{name:'送信',exact:true}).click();}
   await expect(down).toBeVisible();await expect(up).toBeHidden();await captureUi(page,info,'comment-scroll');await down.click();await expect(up).toBeVisible();
+  const guide=await up.boundingBox(),listBox=await page.locator('.comments-list').boundingBox();expect(Math.abs(guide!.x+guide!.width/2-listBox!.x-listBox!.width/2)).toBeLessThan(1);
   const list=page.locator('.comments-list');await list.evaluate(el=>{el.scrollTop=el.scrollHeight;});await expect(down).toBeHidden();await expect(up).toBeVisible();await up.click();await expect(down).toBeVisible();
   const resize=async(height:number,top=0)=>{
     await page.evaluate(({height,top})=>{Object.defineProperty(visualViewport!,'height',{configurable:true,value:height});Object.defineProperty(visualViewport!,'offsetTop',{configurable:true,value:top});visualViewport!.dispatchEvent(new Event('resize'));},{height,top});
