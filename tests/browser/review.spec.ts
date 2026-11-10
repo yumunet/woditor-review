@@ -779,3 +779,11 @@ test('review badge text aligns with its label',async({page})=>{
   const centers=await page.locator('.comment-trigger').evaluate(button=>['.comment-label','.bubble'].map(selector=>{const range=document.createRange();range.selectNodeContents(button.querySelector(selector)!);const rect=range.getBoundingClientRect();return rect.y+rect.height/2;}));
   expect(Math.abs(centers[0]-centers[1])).toBeLessThanOrEqual(1.5);
 });
+
+test('completed item markers use a balanced green at the same size as other markers',async({page},info)=>{
+  test.skip(!corpus,'Private reference files not available');await loadReal(page);
+  await page.getByRole('button',{name:'承認',exact:true}).click();await page.getByRole('button',{name:'前の項目',exact:true}).click();await page.locator('.entry-open').click();
+  await expect(page.locator('.dot.done')).toHaveCSS('background-color','rgb(65, 159, 117)');
+  const sizes=await page.locator('.dot').evaluateAll(dots=>dots.map(dot=>{const rect=dot.getBoundingClientRect();return [rect.width,rect.height];}));expect(sizes.every(([width,height])=>width===8 && height===8)).toBe(true);
+  await expect(page.locator('.dot.done')).toHaveCSS('box-shadow','none');await captureUi(page,info,'items');
+});
