@@ -53,6 +53,7 @@ body{position:fixed;inset:0}
 .rejected-proposal{margin-top:4px;display:grid;justify-items:start;gap:8px}
 .export-all{font-weight:700;background:#f8faff}
 .export-tree .export-row{padding-left:calc(14px + var(--depth)*16px);gap:8px}
+.export-tree .export-leaf{padding-left:calc(46px + var(--depth)*16px)}
 .export-tree .svg{width:18px;height:18px;color:#70828a}
 .export-tree span{min-width:0;overflow-wrap:anywhere}
 .export-folder{background:#f9fbfe}

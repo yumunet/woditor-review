@@ -668,6 +668,7 @@ test('export trees preserve hierarchy and support collapsed folder selection in 
     await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:panel,exact:true}).click();
     const folder=page.getByRole('checkbox',{name:'BasicData/CommonEventを選択',exact:true});
     await expect(page.locator('.export-folder span').first()).toHaveText('BasicData');await expect(page.locator('.export-leaf span').first()).toHaveText('000.txt');
+    const parent=await folder.boundingBox(),child=await page.locator('[data-export-path]').first().boundingBox();expect(child!.x).toBeGreaterThan(parent!.x);
     await folder.uncheck();await expect(page.locator('[data-export-path]:checked')).toHaveCount(1);
     await page.locator('[data-export-path]').first().check();expect(await folder.evaluate((el:HTMLInputElement)=>el.indeterminate)).toBe(true);
     await page.getByRole('button',{name:'BasicData/CommonEventを閉じる',exact:true}).click();await expect(page.locator('[data-export-path]').first()).not.toBeVisible();
@@ -740,7 +741,7 @@ test('context controls retain all options and full view marks every variable usa
   await page.locator('.context-title').click();await expect(page.locator('.command-frame')).toHaveCount(0);await page.getByRole('button',{name:'次の項目',exact:true}).click();await expect(page.locator('.command-frame')).toHaveCount(0);
   await page.reload();await openTreeFile(page,navigationPaths[0]);await page.locator('.entry-open').click();await page.locator(`.pick-row[data-value="${target.id}"]`).click();await expect(page.locator('.context-title')).toHaveAttribute('aria-expanded','false');await page.locator('.context-title').click();
   await expect(button('ファイル全体を表示')).toHaveAttribute('aria-pressed','true');await expect(button('行番号')).toHaveAttribute('aria-pressed','true');await expect(button('行の折り返し')).toHaveAttribute('aria-pressed','false');await expect(page.locator('.command-code').first()).toHaveText(target.ja);
-  await button('前後の行数').click();await expect(page.getByRole('option',{name:'7行',exact:true})).toHaveAttribute('aria-selected','true');await page.goBack();await expect(page.getByRole('listbox')).toHaveCount(0);await button('ファイル全体を表示').click();await expect(page.locator('.command')).toHaveCount(target.partial);
+  await button('前後の行数').click();await expect(page.getByRole('option',{name:'7行',exact:true})).toHaveAttribute('aria-selected','true');const title=await page.locator('.entry-title').textContent();await page.keyboard.press('ArrowRight');await expect(page.locator('.entry-title')).toHaveText(title!);await expect(page.getByRole('listbox')).toBeVisible();await page.goBack();await expect(page.getByRole('listbox')).toHaveCount(0);await button('ファイル全体を表示').click();await expect(page.locator('.command')).toHaveCount(target.partial);
 });
 
 test('diagnostic errors and warnings open translation items and Back restores the results tab',async({page})=>{
@@ -751,13 +752,13 @@ test('diagnostic errors and warnings open translation items and Back restores th
   await page.locator('.diagnostic.error').first().locator('..').getByRole('button',{name:'翻訳項目を開く',exact:true}).click();await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.locator('.source')).toHaveText('');await expect(page.getByRole('button',{name:'原文を補う',exact:true})).toBeVisible();await page.goBack();await expect(page.getByRole('tab',{name:/^エラー/})).toHaveAttribute('aria-selected','true');
 });
 
-test('comments focus the composer, show scroll directions and fit the keyboard viewport with short search results',async({page})=>{
+test('comments focus the composer, show scroll directions and fit the keyboard viewport with short search results',async({page},info)=>{
   test.skip(!corpus,'Private reference files not available');await loadReal(page);
   const source=await page.locator('.source').textContent();await page.locator('.comment-trigger').click();await expect(page.getByLabel('コメント内容')).toBeFocused();
   const up=page.getByRole('button',{name:'コメントを上にスクロール',exact:true}),down=page.getByRole('button',{name:'コメントを下にスクロール',exact:true});
   await expect(up).toBeHidden();await expect(down).toBeHidden();
-  for(let i=0;i<3;i++) {await page.getByLabel('コメント内容').fill(`Comment ${i}\n`+'Long review line\n'.repeat(18));await page.getByRole('button',{name:'送信',exact:true}).click();}
-  await expect(down).toBeVisible();await expect(up).toBeHidden();await down.click();await expect(up).toBeVisible();
+  for(let i=0;i<3;i++) {await page.getByLabel('コメント内容').fill(`Comment ${i}\n`+'Long review line\n'.repeat(8));await page.getByRole('button',{name:'送信',exact:true}).click();}
+  await expect(down).toBeVisible();await expect(up).toBeHidden();await captureUi(page,info,'comment-scroll');await down.click();await expect(up).toBeVisible();
   const list=page.locator('.comments-list');await list.evaluate(el=>{el.scrollTop=el.scrollHeight;});await expect(down).toBeHidden();await expect(up).toBeVisible();await up.click();await expect(down).toBeVisible();
   const resize=async(height:number,top=0)=>{
     await page.evaluate(({height,top})=>{Object.defineProperty(visualViewport!,'height',{configurable:true,value:height});Object.defineProperty(visualViewport!,'offsetTop',{configurable:true,value:top});visualViewport!.dispatchEvent(new Event('resize'));},{height,top});

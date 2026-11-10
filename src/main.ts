@@ -426,7 +426,7 @@ document.addEventListener('keydown', event => {
     if (event.shiftKey && document.activeElement === first) {event.preventDefault(); last?.focus();}
     else if (!event.shiftKey && document.activeElement === last) {event.preventDefault(); first?.focus();}
   }
-  if (!input && !sheet && !confirmation && path && !busy && ['ArrowLeft', 'ArrowRight'].includes(event.key)) {event.preventDefault(); move(event.key === 'ArrowLeft' ? -1 : 1);}
+  if (!input && !sheet && !confirmation && !contextMenu && !menu && path && !busy && ['ArrowLeft', 'ArrowRight'].includes(event.key)) {event.preventDefault(); move(event.key === 'ArrowLeft' ? -1 : 1);}
 });
 let swipe: {x: number; y: number; target: HTMLElement; allowed: boolean} | null = null;
 root.addEventListener('touchstart', event => {
