@@ -8,7 +8,7 @@ test('project Pages assets, install scope, and offline Python work under the sub
   const failures:string[]=[],paths:string[]=[];
   page.on('requestfailed',req=>failures.push(req.url()));page.on('pageerror',error=>failures.push(String(error)));
   page.on('request',req=>{const url=new URL(req.url());if(url.origin==='http://127.0.0.1:4173')paths.push(url.pathname);});
-  await page.goto('./');await expect(page.getByRole('heading',{name:'翻訳レビュー',exact:true})).toBeVisible();
+  await page.goto('./');await expect(page.getByRole('heading',{name:'Woditor Review',exact:true})).toBeVisible();
   await expect(page.locator('link[rel=manifest]')).toHaveAttribute('href',base+'manifest.webmanifest');
   await expect(page.locator('link[rel=apple-touch-icon]')).toHaveAttribute('href',base+'icon-192.png');
   const manifest=await (await page.request.get(base+'manifest.webmanifest')).json();
@@ -23,7 +23,7 @@ test('project Pages assets, install scope, and offline Python work under the sub
   });
   expect(state.scope).toBe('http://127.0.0.1:4173'+base);expect(state.script).toBe('http://127.0.0.1:4173'+base+'sw.js');expect(state.root).toBe(false);expect(state.sentinel).toBe(true);
   expect(state.resources.length).toBeGreaterThan(10);expect(state.resources.every(p=>p.startsWith(base))).toBeTruthy();expect(state.resources).toContain(base+'pyodide/pyodide.asm.wasm');
-  await context.setOffline(true);await page.reload();await expect(page.getByRole('heading',{name:'翻訳レビュー',exact:true})).toBeVisible();
+  await context.setOffline(true);await page.reload();await expect(page.getByRole('heading',{name:'Woditor Review',exact:true})).toBeVisible();
   if(existsSync(`.reference/ja-JP/texts/${path}`)){
     await page.getByRole('button',{name:'ファイルを読み込む',exact:true}).click();
     for(const [name,lang]of [['ja','ja-JP'],['en','en-US']])await page.locator(`input[name=${name}]`).setInputFiles({name:`${lang}.zip`,mimeType:'application/zip',buffer:Buffer.from(zipSync({[`${lang}/texts/${path}`]:readFileSync(`.reference/${lang}/texts/${path}`)}))});

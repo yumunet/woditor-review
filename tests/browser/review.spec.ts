@@ -44,12 +44,12 @@ test('system Back closes panels and confirmation before returning to the folder 
   test.skip(!corpus,'Private reference files not available');await loadReal(page);
   await page.locator('.comment-trigger').click();await page.goBack();await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.locator('.source')).toBeVisible();
   await page.goForward();await expect(page.getByRole('dialog',{name:'コメント',exact:true})).toBeVisible();await closeReviewSheet(page);
-  await page.goBack();await expect(page.locator('h1')).toHaveText('翻訳レビュー');await expect(page.locator('.file-row')).not.toHaveCount(0);
+  await page.goBack();await expect(page.locator('h1')).toHaveText('Woditor Review');await expect(page.locator('.file-row')).not.toHaveCount(0);
   await page.goForward();await expect(page.locator('.entry-title')).toHaveText('イベント名');await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.goBack();await expect(page.locator('.menu')).toHaveCount(0);await expect(page.locator('.source')).toBeVisible();
   await page.getByRole('button',{name:'承認',exact:true}).click();await page.getByRole('button',{name:'前の項目',exact:true}).click();await page.getByRole('button',{name:'未確認に戻す',exact:true}).click();await expect(page.getByRole('alertdialog')).toBeVisible();
   await page.goBack();await expect(page.getByRole('alertdialog')).toHaveCount(0);await expect(page.getByRole('button',{name:'未確認に戻す',exact:true})).toBeVisible();
-  await page.goBack();await expect(page.locator('h1')).toHaveText('翻訳レビュー');
+  await page.goBack();await expect(page.locator('h1')).toHaveText('Woditor Review');
   await page.goBack();await expect(page).toHaveURL('about:blank');
 });
 
