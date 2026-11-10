@@ -1,5 +1,5 @@
 import {captureUi} from './screenshots';
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page, type Locator } from '@playwright/test';
 import { readFileSync, existsSync, readdirSync, mkdirSync, writeFileSync } from 'node:fs';
 import { zipSync, unzipSync } from 'fflate';
 const real = '.reference/ja-JP/texts/MapData/SampleMapA/Event_0000.txt';
@@ -767,7 +767,11 @@ test('comments focus the composer, show scroll directions and fit the keyboard v
   const up=page.getByRole('button',{name:'コメントを上にスクロール',exact:true}),down=page.getByRole('button',{name:'コメントを下にスクロール',exact:true});
   await expect(up).toBeHidden();await expect(down).toBeHidden();
   for(let i=0;i<3;i++) {await page.getByLabel('コメント内容').fill(`Comment ${i}\n`+'Long review line\n'.repeat(8));await page.getByRole('button',{name:'送信',exact:true}).click();}
-  await expect(down).toBeVisible();await expect(up).toBeHidden();await captureUi(page,info,'comment-scroll');await down.click();await expect(up).toBeVisible();
+  const expectCenteredMark=async(control:Locator)=>{
+    const offsets=await control.evaluate(button=>{const outer=button.getBoundingClientRect();return ['svg','path'].map(selector=>{const mark=button.querySelector(selector)!.getBoundingClientRect();return {x:mark.x+mark.width/2-outer.x-outer.width/2,y:mark.y+mark.height/2-outer.y-outer.height/2};});});
+    for(const offset of offsets) {expect(Math.abs(offset.x)).toBeLessThan(.25);expect(Math.abs(offset.y)).toBeLessThan(.25);}
+  };
+  await expect(down).toBeVisible();await expect(up).toBeHidden();await expectCenteredMark(down);await captureUi(page,info,'comment-scroll');await down.click();await expect(up).toBeVisible();await expectCenteredMark(up);
   const guide=await up.boundingBox(),listBox=await page.locator('.comments-list').boundingBox();expect(Math.abs(guide!.x+guide!.width/2-listBox!.x-listBox!.width/2)).toBeLessThan(1);
   const list=page.locator('.comments-list');await list.evaluate(el=>{el.scrollTop=el.scrollHeight;});await expect(down).toBeHidden();await expect(up).toBeVisible();await up.click();await expect(down).toBeVisible();
   const resize=async(height:number,top=0)=>{
