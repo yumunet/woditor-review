@@ -73,6 +73,7 @@ function restoreScreen(state:ReturnType<typeof screenState>) {
     commentTab,diagnosticTab,textView,confirmation,instructionsPreview,reviewMode,preparedRequest}=state);
   exportSelection=new Set(state.exportSelection);
   reviewMode=preferences.reviewMode??reviewMode;
+  if(preferences.contextFull && contextMenu==='radius') contextMenu=null;
   before=after=preferences.contextRadius;
   if(state.workspaceRevision!==workspaceRevision) {contextMenu=null;sheet=null;menu=false;confirmation=null;instructionsPreview=null;textView=null;preparedRequest=null;}
   if(path && !currentFile()) {path=currentId=sheet=null;menu=false;confirmation=null;instructionsPreview=null;}
