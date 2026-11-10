@@ -7,6 +7,8 @@ const corpus = existsSync(real);
 const sourcePath = 'MapData/SampleMapA/Event_0000.txt';
 export async function loadReal(page: Page, importPath = sourcePath) {
   await page.goto('/');
+  await expect(page.locator('.busy')).toHaveCount(0);
+  if(!await page.getByRole('button',{name:'ファイルを読み込む',exact:true}).count()) await page.getByRole('button',{name:'メニュー',exact:true}).click();
   await page.getByRole('button', {name: 'ファイルを読み込む', exact: true}).click();
   for (const [name, lang] of [['ja', 'ja-JP'], ['en', 'en-US']]) {
     const buffer = Buffer.from(zipSync({[`extra/${lang}/texts/${importPath}`]: readFileSync(`.reference/${lang}/texts/${importPath}`)}));
@@ -473,12 +475,13 @@ test('diagnostic text viewer opens errors at the source line and switches langua
   test.skip(!corpus,'Private reference files not available');const path='MapData/TitleMap/Event_0000.txt';await loadReal(page,path);
   await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:/^読み込み結果/}).click();
   await page.locator('.diagnostic.error').first().click();await expect(page.getByRole('dialog',{name:'テキスト表示',exact:true})).toBeVisible();
-  await expect(page.getByRole('tab',{name:'日本語',exact:true})).toHaveAttribute('aria-selected','true');
+  await expect(page.getByRole('tab',{name:'英語',exact:true})).toHaveAttribute('aria-selected','true');
   await expect(page.locator('.focus-line')).toHaveAttribute('data-text-line','58');
-  const ja=readFileSync(`.reference/ja-JP/texts/${path}`,'utf8').split(/\r?\n/);await expect(page.locator('.focus-line code')).toHaveText(ja[57]);
+  const en=readFileSync(`.reference/en-US/texts/${path}`,'utf8').split(/\r?\n/);await expect(page.locator('.focus-line code')).toHaveText(en[57]);
   expect(await page.locator('.text-scroll').evaluate(el=>el.scrollTop)).toBeGreaterThan(500);
+  await page.getByRole('tab',{name:'日本語',exact:true}).click();await expect(page.getByRole('tab',{name:'日本語',exact:true})).toHaveAttribute('aria-selected','true');
   await page.getByRole('tab',{name:'英語',exact:true}).click();
-  const line=Number(await page.locator('.focus-line').getAttribute('data-text-line')),en=readFileSync(`.reference/en-US/texts/${path}`,'utf8').split(/\r?\n/);
+  const line=Number(await page.locator('.focus-line').getAttribute('data-text-line'));
   await expect(page.locator('.focus-line code')).toHaveText(en[line-1]);
   mkdirSync('docs/screenshots',{recursive:true});await captureUi(page,info,'diagnostic');
   await page.locator('.text-scroll').evaluate(el=>{el.scrollTop=el.scrollHeight;});
@@ -738,4 +741,12 @@ test('context controls retain all options and full view marks every variable usa
   await page.reload();await openTreeFile(page,navigationPaths[0]);await page.locator('.entry-open').click();await page.locator(`.pick-row[data-value="${target.id}"]`).click();await expect(page.locator('.context-title')).toHaveAttribute('aria-expanded','false');await page.locator('.context-title').click();
   await expect(button('ファイル全体を表示')).toHaveAttribute('aria-pressed','true');await expect(button('行番号')).toHaveAttribute('aria-pressed','true');await expect(button('行の折り返し')).toHaveAttribute('aria-pressed','false');await expect(page.locator('.command-code').first()).toHaveText(target.ja);
   await button('前後の行数').click();await expect(page.getByRole('option',{name:'7行',exact:true})).toHaveAttribute('aria-selected','true');await page.goBack();await expect(page.getByRole('listbox')).toHaveCount(0);await button('ファイル全体を表示').click();await expect(page.locator('.command')).toHaveCount(target.partial);
+});
+
+test('diagnostic errors and warnings open translation items and Back restores the results tab',async({page})=>{
+  test.skip(!corpus,'Private reference files not available');await loadReal(page,'BasicData/CDataBase/04.txt');
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:/^読み込み結果/}).click();await page.getByRole('tab',{name:/^警告/}).click();
+  await page.locator('[data-action=diagnostic-item]').first().click();await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.locator('.source')).toBeVisible();await page.goBack();await expect(page.getByRole('tab',{name:/^警告/})).toHaveAttribute('aria-selected','true');
+  await loadReal(page,'MapData/SampleMapA/Event_0019.txt');await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:/^読み込み結果/}).click();
+  await page.locator('.diagnostic.error').first().locator('..').getByRole('button',{name:'翻訳項目を開く',exact:true}).click();await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.locator('.source')).toHaveText('');await expect(page.getByRole('button',{name:'原文を補う',exact:true})).toBeVisible();await page.goBack();await expect(page.getByRole('tab',{name:/^エラー/})).toHaveAttribute('aria-selected','true');
 });

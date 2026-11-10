@@ -1,4 +1,4 @@
-export interface Screen<T> {base:string; layers:string[]; value:T}
+export interface Screen<T> {base:string; layers:string[]; value:T;preservePrevious?:boolean}
 interface Entry<T> extends Screen<T> {id:string}
 const same = <T>(a:Screen<T>,b:Screen<T>) => a.base===b.base && a.layers.join('\0')===b.layers.join('\0');
 
@@ -29,7 +29,7 @@ export class ScreenHistory<T> {
     let target=-1;
     // Closing a panel (or returning home) consumes its history entries. A new
     // file first closes any overlay, so Back never reopens a stale confirmation.
-    for(let i=this.index-1;i>=0;i--) {
+    for(let i=screen.preservePrevious?-1:this.index-1;i>=0;i--) {
       const entry=this.entries[i];
       if(same(entry,screen) || current.layers.length && entry.base===current.base && !entry.layers.length && screen.base!==current.base) {target=i;break;}
     }

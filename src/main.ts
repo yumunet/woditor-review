@@ -11,7 +11,7 @@ import { characterDiff } from './diff';
 import { strToU8, zipSync } from 'fflate';
 import { registerPwa } from './pwa';
 import { canMerge, canSplit, mergeGroup, splitGroup } from './grouping';
-import { diagnosticDocument,diagnosticsView,replaceDiagnosticDocuments,withoutReplacedDiagnostics } from './diagnostics';
+import { diagnosticDocument,diagnosticItem,diagnosticsView,replaceDiagnosticDocuments,withoutReplacedDiagnostics } from './diagnostics';
 import { threadView } from './comments';
 import { updateManualSources } from './source-edit';
 import {newlineWarning,slotWarnings} from './translation-warnings';
@@ -35,6 +35,7 @@ let itemQuery='';
 let textView:TextView|null=null;
 const expanded = new Set<string>();
 let folderScroll=0,renderedPath:string|null=null;
+let preservePreviousScreen=false;
 let menu = false, sheet: string | null = null;
 let contextMenu:ContextMenu=null;
 let before = 3, after = 3, usageIndex = 0, busy = '', notice = '';
@@ -61,7 +62,7 @@ function screenState() {
     confirmation,instructionsPreview,reviewMode,exportSelection:new Set(exportSelection),preparedRequest};
 }
 function historyScreen() {
-  return {base:path ? `file:${path}` : 'home',layers:[...(sheet ? [`sheet:${sheet}`] : menu ? ['menu'] : []),
+  return {preservePrevious:preservePreviousScreen,base:path ? `file:${path}` : 'home',layers:[...(sheet ? [`sheet:${sheet}`] : menu ? ['menu'] : []),
     ...(contextMenu ? ['context-menu:'+contextMenu] : []),...(instructionsPreview!==null ? ['instructions'] : []),...(confirmation ? ['confirmation'] : [])],value:screenState()};
 }
 function restoreScreen(state:ReturnType<typeof screenState>) {
@@ -175,7 +176,7 @@ function sheetBody() {
   if (sheet === 'load') return `<form class="form" id="load-form"><label>日本語原文 ZIP${workspace.files.length ? '（省略すると現在の原文を使用）' : ''}<input type="file" name="ja" accept=".zip,application/zip" ${workspace.files.length ? '' : 'required'}></label><label>英訳済み ZIP<input type="file" name="en" accept=".zip,application/zip" required></label><button class="primary" type="submit">読み込む</button></form>`;
   if (sheet === 'items') return `${filterButtons(itemFilter, 'item')}<div class="item-search"><input type="search" id="item-search" aria-label="翻訳項目を検索" placeholder="原文・英訳を検索" value="${e(itemQuery)}"></div><div class="sheet-body">${itemRows(currentFile()!,targets(),currentId,itemQuery)}</div>`;
   if (sheet === 'progress') return `<div class="sheet-body">${progressRows(fileTree(workspace.files, 'all'))}</div>`;
-  if (sheet === 'diagnostics') return diagnosticsView(workspace.diagnostics, diagnosticTab);
+  if (sheet === 'diagnostics') return diagnosticsView(workspace.diagnostics, diagnosticTab,workspace);
   if (sheet === 'comments') return commentsBody();
   if (sheet === 'restore') return '<form class="form" id="restore-form"><label>バックアップ JSON<input type="file" name="backup" accept=".json,application/json" required></label><button class="primary" type="submit">復元する</button></form>';
   if (sheet === 'export') return `<fieldset class="review-mode"><legend>依頼内容</legend><label><input type="radio" name="review-mode" value="initial" ${reviewMode === 'initial' ? 'checked' : ''}>英訳をチェックして指摘を作る</label><label><input type="radio" name="review-mode" value="comments" ${reviewMode === 'comments' ? 'checked' : ''}>既存コメントに回答・修正する</label></fieldset>${exportRows()}<div class="sheet-foot"><div class="export-actions"><button class="primary" data-action="export-request" ${!exportSelection.size ? 'disabled' : ''}>JSONを出力</button><button class="text-act" data-action="english-zip" ${!exportSelection.size ? 'disabled' : ''}>英訳TXTを出力</button></div><div class="send-row"><button class="text-act" data-action="copy-instructions" ${!exportSelection.size ? 'disabled' : ''}>${icon('copy')}指示文をコピー</button></div></div>`;
@@ -215,6 +216,7 @@ function render() {
   root.classList.toggle('has-comments', !!currentItem() && unresolved(currentItem()!).length > 0);
   if (confirmation) root.insertAdjacentHTML('beforeend', `<div class="dialog-overlay"><section class="dialog" role="alertdialog" aria-modal="true" aria-label="確認"><p>${e(confirmation.question)}</p><div class="dialog-actions"><button data-action="confirm-cancel">キャンセル</button><button class="primary" data-action="confirm-ok">確定</button></div></section></div>`);
   screenHistory?.sync(historyScreen());
+  preservePreviousScreen=false;
 }
 
 document.addEventListener('pointerdown',event=>{if((menu||contextMenu) && !root.contains(event.target as Node)) {menu=false;contextMenu=null;render();}});
@@ -266,6 +268,11 @@ root.addEventListener('click', event => {
   }
   else if (action === 'comment-tab') commentTab = value as 'open' | 'all';
   else if (action === 'diagnostic-tab') diagnosticTab = value as typeof diagnosticTab;
+  else if(action==='diagnostic-item') {
+    const diagnostic=workspace.diagnostics[Number(value)],target=diagnostic && diagnosticItem(workspace,diagnostic);
+    if(!target) {toast('対応する翻訳項目がありません');return;}
+    preservePreviousScreen=true;path=target.file.path;itemFilter='all';itemQuery='';sheet=null;selectItem(target.item.id);render();root.querySelector('.review')?.scrollTo(0,0);return;
+  }
   else if(action==='open-diagnostic') {
     const diagnostic=workspace.diagnostics[Number(value)],document=diagnostic && diagnosticDocument(workspace,diagnostic.path);
     if(!document) {toast('テキストが保存されていません。ZIPを再読み込みしてください');return;}

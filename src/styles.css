@@ -63,6 +63,9 @@
 .folder[aria-expanded=true] .folder-triangle{transform:rotate(90deg)}
 .diagnostic{display:block;width:100%;text-align:left;background:#fff;border:0;border-bottom:1px solid var(--line)}
 .diagnostic-open{display:block;color:var(--accent);font-size:11px;margin-top:5px}
+.diagnostic-row{border-bottom:1px solid var(--line)}
+.diagnostic-row .diagnostic{border-bottom:0}
+.diagnostic-item{margin:0 16px 12px}
 .text-toolbar{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;gap:6px;border-bottom:1px solid var(--line);flex:none}
 .text-toolbar [role=tablist]{display:flex;gap:4px}
 .text-file-path{padding:7px 14px;color:var(--muted);font-size:11px;overflow-wrap:anywhere;flex:none}
