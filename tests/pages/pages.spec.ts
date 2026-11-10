@@ -12,7 +12,7 @@ test('project Pages assets, install scope, and offline Python work under the sub
   await expect(page.locator('link[rel=manifest]')).toHaveAttribute('href',base+'manifest.webmanifest');
   await expect(page.locator('link[rel=apple-touch-icon]')).toHaveAttribute('href',base+'icon-192.png');
   const manifest=await (await page.request.get(base+'manifest.webmanifest')).json();
-  expect([manifest.name,manifest.short_name]).toEqual(['Woditor Review','Woditor Review']);
+  expect([manifest.name,manifest.short_name]).toEqual(['Woditor Review','Review']);
   expect([manifest.id,manifest.start_url,manifest.scope]).toEqual([base,base,base]);
   for(const icon of manifest.icons){expect(icon.src).toMatch(/^\/woditor-review\/icon-/);expect((await page.request.get(icon.src)).status()).toBe(200);}
   const state=await page.evaluate(async()=>{
