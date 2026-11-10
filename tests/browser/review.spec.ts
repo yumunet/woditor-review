@@ -90,7 +90,7 @@ test('real ZIP -> folders -> compare -> context -> filtered empty state', async 
   await expect(page.locator('.translation')).toContainText('Yuichi');
   await expect(page.locator('.command.current')).toContainText('Show Message');
   await expect(page.locator('.command.current')).toHaveCSS('background-color', 'rgb(255, 255, 250)');
-  await page.getByLabel('コマンド表示言語').selectOption('ja');
+  await page.getByRole('button',{name:'表示言語',exact:true}).click();await page.getByRole('option',{name:'日本語',exact:true}).click();
   await expect(page.locator('.command.current')).toContainText('■文章');
   await page.locator('.entry-open').click();
   await expect(page.locator('.pick-title').first()).toHaveCSS('font-weight','700');
@@ -710,4 +710,29 @@ test('menu dismisses outside without activating content and the item picker reve
   await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.locator('.menu-dismiss').click({position:{x:20,y:300}});await expect(page.locator('.menu')).toHaveCount(0);await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'メニュー',exact:true}).click();await expect(page.locator('.menu')).toHaveCount(0);
   await page.locator('.entry-open').click();await page.locator('.pick-row').last().click();const title=await page.locator('.entry-title').textContent();await page.locator('.entry-open').click();await expect(page.locator('.pick-row.active')).toContainText(title!);await expect(page.locator('.pick-row.active')).toBeInViewport();expect(await page.locator('.sheet-body').evaluate(el=>el.scrollTop)).toBeGreaterThan(0);
+});
+
+test('context controls retain all options and full view marks every variable usage',async({page},info)=>{
+  test.skip(!corpus,'Private reference files not available');await loadReal(page,navigationPaths[0]);
+  const target=await page.evaluate(async(path)=>{
+    const db=await new Promise<IDBDatabase>(resolve=>{const r=indexedDB.open('woditor-review');r.onsuccess=()=>resolve(r.result);});
+    const file:any=await new Promise(resolve=>{const r=db.transaction('files').objectStore('files').get(path);r.onsuccess=()=>resolve(r.result);});db.close();
+    const item=file.items.find((i:any)=>file.usages[i.slotIds[0]]?.length>1),hits=file.usages[item.slotIds[0]],index=file.commands.findIndex((c:any)=>c.line===hits[0]);
+    return {id:item.id,hits:hits.length,commands:file.commands.length,partial:Math.min(file.commands.length,index+8)-Math.max(0,index-7),ja:file.commands[0].ja};
+  },navigationPaths[0]);
+  await page.locator('.entry-open').click();await page.locator(`.pick-row[data-value="${target.id}"]`).click();
+  const button=(name:string)=>page.getByRole('button',{name,exact:true});
+  await button('前後の行数').click();await page.getByRole('option',{name:'7行',exact:true}).click();await expect(page.locator('.command')).toHaveCount(target.partial);
+  await button('ファイル全体を表示').click();await expect(page.locator('.command')).toHaveCount(target.commands);await expect(page.locator('.command.current')).toHaveCount(target.hits);await expect(page.locator('.usage-tools')).toHaveText(`使用箇所 ${target.hits}件`);await expect(button('次の使用箇所')).toHaveCount(0);
+  await button('行番号').click();await expect(page.locator('.command-number').first()).toHaveText('0');
+  await button('行の折り返し').click();await expect(page.locator('.command-code').first()).toHaveCSS('white-space','pre');
+  await button('表示言語').click();await page.getByRole('option',{name:'日本語',exact:true}).click();await expect(page.locator('.command-code').first()).toHaveText(target.ja);
+  if(info.project.name==='desktop') await button('行番号').hover();
+  else {await button('行番号').dispatchEvent('pointerdown',{pointerType:'touch'});}
+  await expect(page.getByRole('tooltip')).toHaveText('行番号');
+  if(info.project.name==='mobile') {await button('行番号').dispatchEvent('pointerup',{pointerType:'touch'});await button('行番号').dispatchEvent('click');await expect(button('行番号')).toHaveAttribute('aria-pressed','true');}
+  await page.locator('.context-title').click();await expect(page.locator('.command-frame')).toHaveCount(0);await page.getByRole('button',{name:'次の項目',exact:true}).click();await expect(page.locator('.command-frame')).toHaveCount(0);
+  await page.reload();await openTreeFile(page,navigationPaths[0]);await page.locator('.entry-open').click();await page.locator(`.pick-row[data-value="${target.id}"]`).click();await expect(page.locator('.context-title')).toHaveAttribute('aria-expanded','false');await page.locator('.context-title').click();
+  await expect(button('ファイル全体を表示')).toHaveAttribute('aria-pressed','true');await expect(button('行番号')).toHaveAttribute('aria-pressed','true');await expect(button('行の折り返し')).toHaveAttribute('aria-pressed','false');await expect(page.locator('.command-code').first()).toHaveText(target.ja);
+  await button('前後の行数').click();await expect(page.getByRole('option',{name:'7行',exact:true})).toHaveAttribute('aria-selected','true');await page.goBack();await expect(page.getByRole('listbox')).toHaveCount(0);await button('ファイル全体を表示').click();await expect(page.locator('.command')).toHaveCount(target.partial);
 });

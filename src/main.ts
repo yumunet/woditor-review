@@ -1,7 +1,8 @@
 import './styles.css';
 import { emptyWorkspace, isDone, matches, sourceText, itemTitle, unresolved, type Workspace, type ReviewFile, type Item, type Filter, type ReviewRequest, type ReviewMode } from './model';
-import { escape as e, icon, menuIcon, folderTriangle, filterButtons, fileTree, compact, percent, initialContext, type TreeNode } from './ui';
-import { commandColor } from './command-colors';
+import { escape as e, icon, menuIcon, folderTriangle, filterButtons, fileTree, compact, percent, type TreeNode } from './ui';
+import {contextView,positionContextMenu,type ContextMenu} from './context-view';
+import {installTooltips} from './tooltips';
 import { parseArchives, renderTranslations } from './parser-client';
 import { addComment, approveItem, deleteComment, discardRejectedChanges, editComment, latestPreview, nextAfterApproval, setResolved, undoApproval } from './review-state';
 import { backupFileName, backupJson, download, loadWorkspace, restoreJson, saveWorkspace } from './storage';
@@ -25,6 +26,7 @@ import {loadPreferences,preferencesFrom,savePreferences,type Preferences} from '
 import {exportTree,folderFiles} from './export-tree';
 
 const root = document.querySelector<HTMLDivElement>('#app')!;
+const hideTooltips=installTooltips();
 let workspace: Workspace = emptyWorkspace();
 let workspaceRevision=0;
 let path: string | null = null, currentId: string | null = null;
@@ -33,7 +35,8 @@ let itemQuery='';
 let textView:TextView|null=null;
 const expanded = new Set<string>();
 let folderScroll=0,renderedPath:string|null=null;
-let menu = false, sheet: string | null = null, contextOpen = true, contextLang: 'ja' | 'en' = 'en';
+let menu = false, sheet: string | null = null;
+let contextMenu:ContextMenu=null;
 let before = 3, after = 3, usageIndex = 0, busy = '', notice = '';
 let toastTimer: ReturnType<typeof setTimeout>;
 let noticeInstructions: string | null = null, instructionsPreview: string | null = null;
@@ -53,20 +56,21 @@ function setPreferences(next:Partial<Preferences>) {
 }
 let screenHistory:ScreenHistory<ReturnType<typeof screenState>>|undefined;
 function screenState() {
-  return {workspaceRevision,path,currentId,sheet,menu,homeFilter,itemFilter,itemQuery,before,after,usageIndex,contextOpen,contextLang,
+  return {workspaceRevision,path,currentId,sheet,menu,homeFilter,itemFilter,itemQuery,before,after,usageIndex,contextMenu,
     commentTab,diagnosticTab,textView:textView && {...textView,offsets:{...textView.offsets}},
     confirmation,instructionsPreview,reviewMode,exportSelection:new Set(exportSelection),preparedRequest};
 }
 function historyScreen() {
   return {base:path ? `file:${path}` : 'home',layers:[...(sheet ? [`sheet:${sheet}`] : menu ? ['menu'] : []),
-    ...(instructionsPreview!==null ? ['instructions'] : []),...(confirmation ? ['confirmation'] : [])],value:screenState()};
+    ...(contextMenu ? ['context-menu:'+contextMenu] : []),...(instructionsPreview!==null ? ['instructions'] : []),...(confirmation ? ['confirmation'] : [])],value:screenState()};
 }
 function restoreScreen(state:ReturnType<typeof screenState>) {
-  ({path,currentId,sheet,menu,homeFilter,itemFilter,itemQuery,before,after,usageIndex,contextOpen,contextLang,
+  ({path,currentId,sheet,menu,homeFilter,itemFilter,itemQuery,before,after,usageIndex,contextMenu,
     commentTab,diagnosticTab,textView,confirmation,instructionsPreview,reviewMode,preparedRequest}=state);
   exportSelection=new Set(state.exportSelection);
   reviewMode=preferences.reviewMode??reviewMode;
-  if(state.workspaceRevision!==workspaceRevision) {sheet=null;menu=false;confirmation=null;instructionsPreview=null;textView=null;preparedRequest=null;}
+  before=after=preferences.contextRadius;
+  if(state.workspaceRevision!==workspaceRevision) {contextMenu=null;sheet=null;menu=false;confirmation=null;instructionsPreview=null;textView=null;preparedRequest=null;}
   if(path && !currentFile()) {path=currentId=sheet=null;menu=false;confirmation=null;instructionsPreview=null;}
   if(path && !currentItem()) reconcileCurrent();
   render();if(sheet==='text') refreshTextView(true);
@@ -114,7 +118,7 @@ function reconcileCurrent() {
   if(itemFilter==='comment' && currentItem()) return;
   if (!targets().some(i => i.id === currentId)) {currentId = targets()[0]?.id ?? null; if (!currentId && sheet === 'comments') sheet = null;}
 }
-function selectItem(id: string) {currentId = id; before = after = 3; usageIndex = 0; contextOpen = true;}
+function selectItem(id: string) {currentId = id; before = after = preferences.contextRadius; usageIndex = 0; contextMenu=null;}
 function move(delta: number) {
   if(!path) return;
   const target=navigationTarget(workspace.files,path,currentId,itemFilter,homeFilter,delta<0?-1:1);
@@ -137,15 +141,7 @@ function treeRows(node: TreeNode, depth = 0): string {
     return `<button class="file-row ${c.file ? '' : 'folder'}" style="--depth:${depth}" data-action="${c.file ? 'file' : 'folder'}" data-value="${e(c.path)}" ${c.file ? '' : `aria-expanded="${isOpen}"`} title="${e(c.path)}"><span class="angle">${c.file ? '' : folderTriangle()}</span><span class="glyph">${icon(c.file ? 'file' : 'folder')}</span><span class="row-name">${e(c.name)}</span><span class="bar"><span class="fill" style="display:block;width:${p ?? 0}%"></span></span><span class="pct">${p === null ? '—' : p + '%'}</span><span class="count" aria-label="${c.total}項目">${compact(c.total)}</span></button>${!c.file && isOpen ? treeRows(c, depth + 1) : ''}`;
   }).join('');
 }
-function context(file: ReviewFile, item: Item) {
-  const slot = file.slots.find(s => s.id === item.slotIds[0])!;
-  const usages = file.usages[slot.id];
-  const line = usages ? usages[usageIndex] : slot.command ? slot.line : undefined;
-  const commands = line === undefined ? [] : initialContext(file, line, before, after);
-  const index = file.commands.findIndex(c => c.line === line);
-  if (!slot.command && !usages) return '';
-  return `<button class="context-title" data-action="context" aria-expanded="${contextOpen}">周辺コマンド<span class="chevron ${contextOpen ? 'open' : ''}">${contextOpen ? '閉じる' : '開く'}${icon('down')}</span></button>${contextOpen ? `<div class="command-frame"><div class="context-tools">${usages ? `<span>使用箇所 ${usages.length ? usageIndex + 1 : 0} / ${usages.length}</span><button class="icon" aria-label="前の使用箇所" data-action="usage" data-value="-1" ${usageIndex <= 0 ? 'disabled' : ''}>${icon('back')}</button><button class="icon" aria-label="次の使用箇所" data-action="usage" data-value="1" ${usageIndex >= usages.length - 1 ? 'disabled' : ''}>${icon('next')}</button>` : '<span></span>'}<select id="context-lang" aria-label="コマンド表示言語"><option value="en" ${contextLang === 'en' ? 'selected' : ''}>英語</option><option value="ja" ${contextLang === 'ja' ? 'selected' : ''}>日本語</option></select></div>${commands.length ? `<button class="expand" data-action="expand" data-value="before" ${index - before <= 0 ? 'disabled' : ''}>前をさらに表示</button>${commands.map(c => `<div class="command ${c.line === line ? 'current' : ''}" style="color:${commandColor(c[contextLang])}" ${c.line === line ? 'aria-current="true"' : ''}>${e(c[contextLang])}</div>`).join('')}<button class="expand" data-action="expand" data-value="after" ${index + after >= file.commands.length - 1 ? 'disabled' : ''}>後をさらに表示</button>` : '<div class="empty">直接参照はありません</div>'}</div>` : ''}`;
-}
+function context(file:ReviewFile,item:Item) {return contextView(file,item,preferences,{usageIndex,before,after,menu:contextMenu});}
 function review(file: ReviewFile) {
   const item = currentItem(), list = targets(), index = list.findIndex(i => i.id === currentId);
   const previous=navigationTarget(workspace.files,file.path,currentId,itemFilter,homeFilter,-1);
@@ -188,6 +184,7 @@ function sheetBody() {
   return '<div class="sheet-body"><div class="empty">コメントはありません</div></div>';
 }
 function render() {
+  hideTooltips();
   const draftItem=JSON.stringify([workspaceRevision,path,currentId]);
   if(commentDraftItem!==draftItem) {commentDraftItem=draftItem;commentDraft='';replyTarget=null;editTarget=null;}
 
@@ -214,14 +211,16 @@ function render() {
   });
   if (instructionsPreview !== null) root.insertAdjacentHTML('beforeend', `<div class="dialog-overlay instructions-overlay"><section class="dialog instructions-dialog" role="dialog" aria-modal="true" aria-label="指示文"><div class="instructions-head"><h2>指示文</h2><button class="icon" aria-label="指示文を閉じる" data-action="close-instructions">${icon('close')}</button></div><pre class="instructions-text" tabindex="0">${e(instructionsPreview)}</pre></section></div>`);
   if(sheet==='text') refreshTextView();
+  positionContextMenu(root);
   root.classList.toggle('has-comments', !!currentItem() && unresolved(currentItem()!).length > 0);
   if (confirmation) root.insertAdjacentHTML('beforeend', `<div class="dialog-overlay"><section class="dialog" role="alertdialog" aria-modal="true" aria-label="確認"><p>${e(confirmation.question)}</p><div class="dialog-actions"><button data-action="confirm-cancel">キャンセル</button><button class="primary" data-action="confirm-ok">確定</button></div></section></div>`);
   screenHistory?.sync(historyScreen());
 }
 
-document.addEventListener('pointerdown',event=>{if(menu && !root.contains(event.target as Node)) {menu=false;render();}});
+document.addEventListener('pointerdown',event=>{if((menu||contextMenu) && !root.contains(event.target as Node)) {menu=false;contextMenu=null;render();}});
 root.addEventListener('click', event => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-action]');
+  if(contextMenu && !(event.target as HTMLElement).closest('.context-popover,[data-action=context-menu]')) {contextMenu=null;render();return;}
   if (!button || button.disabled || busy) return;
   const {action, value, scope} = button.dataset;
   if (action === 'close-instructions') {closeInstructions(); return;}
@@ -251,9 +250,13 @@ root.addEventListener('click', event => {
   else if (action === 'close') {closeSheet(); return;}
   else if (action === 'prev') {move(-1); return;}
   else if (action === 'next') {move(1); return;}
-  else if (action === 'context') contextOpen = !contextOpen;
+  else if(action==='context') {contextMenu=null;setPreferences({contextOpen:!preferences.contextOpen});}
+  else if(action==='context-menu') contextMenu=contextMenu===value?null:value as ContextMenu;
+  else if(action==='context-radius') {const radius=Number(value);if(radius>=3 && radius<=10) {setPreferences({contextRadius:radius});before=after=radius;}contextMenu=null;}
+  else if(action==='context-language') {if(value==='ja'||value==='en') setPreferences({contextLanguage:value});contextMenu=null;}
+  else if(action==='context-toggle' && ['contextFull','contextLineNumbers','contextWrap'].includes(value!)) {const key=value as 'contextFull'|'contextLineNumbers'|'contextWrap';setPreferences({[key]:!preferences[key]});}
   else if (action === 'expand') {if (value === 'before') before += 8; else after += 8;}
-  else if (action === 'usage') {usageIndex += Number(value); before = after = 3;}
+  else if (action === 'usage') {usageIndex += Number(value); before = after = preferences.contextRadius;}
   else if (action === 'approve') {
     const item = currentItem(), file = currentFile(); if (!item || !file) return;
     const approve = () => {approveItem(item, file.slots, true); if(itemFilter!=='comment') selectItem(nextAfterApproval(file.items, item.id, i => matches(i, itemFilter))); persist(file.path); render();};
@@ -311,7 +314,7 @@ root.addEventListener('scroll',event=>{
   const element=event.target as HTMLElement;
   if(sheet==='text' && textView && element.matches('.text-scroll')) paintTextView(textView,element);
 },true);
-root.addEventListener('change', event => {const el = event.target as HTMLInputElement; if (el.name === 'review-mode') {reviewMode = el.value as ReviewMode; setPreferences({reviewMode}); resetExportSelection(); render(); return;} if(el.dataset.exportFolder) {for(const file of folderFiles(exportFiles(),el.dataset.exportFolder)) {if(el.checked) exportSelection.add(file.path);else exportSelection.delete(file.path);}preparedRequest=null;render();return;} if (el.id === 'drive-auto') {void drive.setAutomatic(el.checked).catch(error => toast(String(error))); return;} if (el.id === 'export-all') {exportSelection = new Set(el.checked ? exportFiles().map(f => f.path) : []); preparedRequest = null; render(); return;} if (el.id === 'context-lang') {contextLang = el.value as 'en' | 'ja'; render();} if (el.dataset.exportPath) {if (el.checked) exportSelection.add(el.dataset.exportPath); else exportSelection.delete(el.dataset.exportPath); preparedRequest = null; render();}});
+root.addEventListener('change', event => {const el = event.target as HTMLInputElement; if (el.name === 'review-mode') {reviewMode = el.value as ReviewMode; setPreferences({reviewMode}); resetExportSelection(); render(); return;} if(el.dataset.exportFolder) {for(const file of folderFiles(exportFiles(),el.dataset.exportFolder)) {if(el.checked) exportSelection.add(file.path);else exportSelection.delete(file.path);}preparedRequest=null;render();return;} if (el.id === 'drive-auto') {void drive.setAutomatic(el.checked).catch(error => toast(String(error))); return;} if (el.id === 'export-all') {exportSelection = new Set(el.checked ? exportFiles().map(f => f.path) : []); preparedRequest = null; render(); return;} if (el.dataset.exportPath) {if (el.checked) exportSelection.add(el.dataset.exportPath); else exportSelection.delete(el.dataset.exportPath); preparedRequest = null; render();}});
 root.addEventListener('submit', async event => {
   const form = event.target as HTMLFormElement;
   if (form.id === 'drive-config-form') {
@@ -400,7 +403,7 @@ async function exportReview(action: string) {
 }
 document.addEventListener('keydown', event => {
   const input = (event.target as HTMLElement).closest('input,textarea,select,[contenteditable=true]');
-  if (event.key === 'Escape') {if (instructionsPreview !== null) {closeInstructions(); return;} if (confirmation) {confirmation = null; render();} else if (sheet) closeSheet(); else {menu = false; render();} return;}
+  if (event.key === 'Escape') {if(contextMenu) {contextMenu=null;render();return;}if (instructionsPreview !== null) {closeInstructions(); return;} if (confirmation) {confirmation = null; render();} else if (sheet) closeSheet(); else {menu = false; render();} return;}
   if (event.key === 'Tab' && (sheet || confirmation || instructionsPreview !== null)) {
     const container = instructionsPreview !== null ? root.querySelector('.instructions-dialog')! : confirmation ? root.querySelector('.dialog')! : root.querySelector('.sheet')!;
     const focusable = [...container.querySelectorAll<HTMLElement>('button:not(:disabled):not([tabindex="-1"]), input, textarea, select, [tabindex="0"]')];
@@ -431,5 +434,5 @@ root.addEventListener('touchend', event => {
 });
 screenHistory=new ScreenHistory(historyScreen(),restoreScreen);
 busy = '保存したデータを読み込み中…'; render();
-void Promise.all([loadWorkspace(), drive.initialize(),loadPreferences()]).then(([saved,,settings]) => {if (saved) workspace = saved;preferences=settings;reviewMode=settings.reviewMode??reviewMode;}).catch(error => {notice = `保存データを読み込めません：${String(error)}`;}).finally(() => {busy = ''; render();});
+void Promise.all([loadWorkspace(), drive.initialize(),loadPreferences()]).then(([saved,,settings]) => {if (saved) workspace = saved;preferences=settings;before=after=settings.contextRadius;reviewMode=settings.reviewMode??reviewMode;}).catch(error => {notice = `保存データを読み込めません：${String(error)}`;}).finally(() => {busy = ''; render();});
 registerPwa(toast);

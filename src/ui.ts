@@ -3,6 +3,10 @@ import { isDone, matches } from './model';
 
 export const escape = (s: string | number) => String(s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]!));
 const paths: Record<string, string> = {
+  radius:'<path d="M4 8h16M4 16h16M12 3v18m-3-3 3 3 3-3m-6-12 3-3 3 3"/>',
+  language:'<path d="M3 5h12M9 3v2M5 5c1 5 4 8 9 10M13 5c-1 5-4 8-9 10m10 6 4-11 4 11m-6-4h4"/>',
+  numbers:'<path d="M4 4h1v6M3 10h4M3 15c4-3 5 1 1 3l-1 3h4M11 6h10M11 12h10M11 18h10"/>',
+  wrap:'<path d="M3 5h18M3 10h13a4 4 0 0 1 0 8h-5m3-3-3 3 3 3M3 15h3"/>',
   back: '<path d="m15 18-6-6 6-6"/>', next: '<path d="m9 6 6 6-6 6"/>',
   down: '<path d="m6 9 6 6 6-6"/>', check: '<path d="m5 12 4 4L19 6"/>',
   'check-circle': '<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>',
