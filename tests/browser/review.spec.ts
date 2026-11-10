@@ -744,9 +744,18 @@ test('context controls retain all options and full view marks every variable usa
   await expect(button('前後の行数')).toBeDisabled();await button('ファイル全体を表示').click();await expect(button('前後の行数')).toBeEnabled();await expect(page.locator('.command')).toHaveCount(target.partial);await button('前後の行数').click();await expect(page.getByRole('option',{name:'7行',exact:true})).toHaveAttribute('aria-selected','true');const title=await page.locator('.entry-title').textContent();await page.keyboard.press('ArrowRight');await expect(page.locator('.entry-title')).toHaveText(title!);await expect(page.getByRole('listbox')).toBeVisible();await page.goBack();await expect(page.getByRole('listbox')).toHaveCount(0);await expect(page.locator('.command')).toHaveCount(target.partial);
 });
 
-test('diagnostic errors and warnings open translation items and Back restores the results tab',async({page})=>{
+test('diagnostic errors and warnings open translation items and Back restores the results tab',async({page},info)=>{
   test.skip(!corpus,'Private reference files not available');await loadReal(page,'BasicData/CDataBase/04.txt');
   await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:/^読み込み結果/}).click();await page.getByRole('tab',{name:/^警告/}).click();
+  const row=page.locator('.diagnostic-row').filter({has:page.locator('[data-action=diagnostic-item]')}).first(),text=row.locator('.diagnostic-open'),item=row.locator('.diagnostic-item');
+  const alignment=async()=>{const a=await text.boundingBox(),b=await item.boundingBox(),r=await row.boundingBox();expect(b!.x).toBeGreaterThanOrEqual(a!.x+a!.width);expect(Math.abs(b!.x+b!.width-r!.x-r!.width+8)).toBeLessThan(1);expect(Math.abs(b!.y+b!.height/2-r!.y-r!.height/2)).toBeLessThan(1);};
+  await expect(text).toHaveJSProperty('tagName','SPAN');await expect(row.locator('strong')).toHaveCSS('font-weight','700');
+  await alignment();await page.setViewportSize({width:320,height:844});await alignment();expect(await item.evaluate(el=>el.getBoundingClientRect().right<=innerWidth)).toBe(true);await page.setViewportSize(info.project.name==='mobile'?{width:390,height:844}:{width:1280,height:900});
+  await captureUi(page,info,'results');
+  if(info.project.name==='desktop') await item.hover();else await item.dispatchEvent('pointerdown',{pointerType:'touch'});
+  await expect(page.getByRole('tooltip')).toHaveText((await item.getAttribute('aria-label'))!);
+  if(info.project.name==='mobile') {await item.dispatchEvent('pointerup',{pointerType:'touch'});await item.dispatchEvent('click');await expect(page.getByRole('dialog',{name:'読み込み結果',exact:true})).toBeVisible();}
+  await text.click();await expect(page.getByRole('dialog',{name:'テキスト表示',exact:true})).toBeVisible();await page.goBack();await expect(page.getByRole('tab',{name:/^警告/})).toHaveAttribute('aria-selected','true');
   await page.locator('[data-action=diagnostic-item]').first().click();await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.locator('.source')).toBeVisible();await page.goBack();await expect(page.getByRole('tab',{name:/^警告/})).toHaveAttribute('aria-selected','true');
   await loadReal(page,'MapData/SampleMapA/Event_0019.txt');await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:/^読み込み結果/}).click();
   await page.locator('.diagnostic.error').first().locator('..').getByRole('button',{name:'翻訳項目を開く',exact:true}).click();await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.locator('.source')).toHaveText('');await expect(page.getByRole('button',{name:'原文を補う',exact:true})).toBeVisible();await page.goBack();await expect(page.getByRole('tab',{name:/^エラー/})).toHaveAttribute('aria-selected','true');

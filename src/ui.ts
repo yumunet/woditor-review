@@ -13,6 +13,7 @@ const paths: Record<string, string> = {
   undo: '<path d="M3 10h10a7 7 0 0 1 0 14M3 10l5-5M3 10l5 5" transform="translate(0 -3)"/>',
   close: '<path d="m6 6 12 12M6 18 18 6"/>', menu: '<circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>',
   list: '<path d="M8 6h12M8 12h12M8 18h12M3 6h1M3 12h1M3 18h1"/>',
+  'item-jump': '<path d="M8 6h12M8 12h5M8 18h5M3 6h1M3 12h1M3 18h1m13-8 4 4-4 4m-3-4h7"/>',
   comment: '<path d="M20 15a3 3 0 0 1-3 3H8l-5 4V6a3 3 0 0 1 3-3h11a3 3 0 0 1 3 3Z"/>',
   folder: '<path d="M3 6h7l2 2h9v12H3Z"/>', file: '<path d="M5 3h9l5 5v13H5Z M14 3v6h5"/>',
   reply: '<path d="m9 5-6 6 6 6M3 11h10a7 7 0 0 1 7 7"/>',
