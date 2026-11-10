@@ -3,6 +3,8 @@
 .command.current{background:rgb(255,255,250);font-weight:600}
 .menu button{display:flex;align-items:center;gap:10px}
 .menu .svg{width:18px;height:18px;color:#64788f}
+.menu-dismiss{position:absolute;inset:0;z-index:9}
+.top [data-action=menu][aria-expanded=true]{position:relative;z-index:11}
 .empty .primary{display:inline-flex;align-items:center;justify-content:center;gap:6px;vertical-align:middle}
 .review-mode{border:0;border-bottom:1px solid var(--line);padding:10px 16px;margin:0;display:grid;gap:9px;flex:none;font-size:13px}
 .review-mode legend{color:var(--muted);font-size:12px;padding-top:10px}

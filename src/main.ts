@@ -32,6 +32,7 @@ let homeFilter: Filter = 'all', itemFilter: Filter = 'all';
 let itemQuery='';
 let textView:TextView|null=null;
 const expanded = new Set<string>();
+let folderScroll=0,renderedPath:string|null=null;
 let menu = false, sheet: string | null = null, contextOpen = true, contextLang: 'ja' | 'en' = 'en';
 let before = 3, after = 3, usageIndex = 0, busy = '', notice = '';
 let toastTimer: ReturnType<typeof setTimeout>;
@@ -99,8 +100,12 @@ function exportRows() {
   const files = exportFiles(), checked = files.filter(f => exportSelection.has(f.path)).length;
   return `<div class="sheet-body"><label class="export-row export-all"><input id="export-all" type="checkbox" ${files.length && checked === files.length ? 'checked' : ''} ${!files.length ? 'disabled' : ''}>すべて選択</label>${files.length ? exportTree(files,exportSelection,exportCollapsed) : '<div class="empty">出力対象のファイルはありません</div>'}</div>`;
 }
-function openSheet(name: string) {lastFocus = document.activeElement as HTMLElement; sheet = name; menu = false; if (name === 'diagnostics') diagnosticTab = 'error'; if (name === 'export') {reviewMode = preferences.reviewMode ?? (workspace.files.some(f => (!path || f.path === path) && f.items.some(i => unresolved(i).length)) ? 'comments' : 'initial');setPreferences({reviewMode});} if (name === 'export' || name === 'english') resetExportSelection(); render(); root.querySelector<HTMLElement>('.sheet .icon, .sheet input, .sheet button:not(.handle)')?.focus();}
+function openSheet(name: string) {lastFocus = document.activeElement as HTMLElement; sheet = name; menu = false; if (name === 'diagnostics') diagnosticTab = 'error'; if (name === 'export') {reviewMode = preferences.reviewMode ?? (workspace.files.some(f => (!path || f.path === path) && f.items.some(i => unresolved(i).length)) ? 'comments' : 'initial');setPreferences({reviewMode});} if (name === 'export' || name === 'english') resetExportSelection(); render(); root.querySelector<HTMLElement>('.sheet .icon, .sheet input, .sheet button:not(.handle)')?.focus();if(name==='items') revealCurrentItem();}
 function closeSheet() {sheet = null; render(); lastFocus?.focus();}
+function revealCurrentItem() {
+  const body=root.querySelector<HTMLElement>('.sheet-body'),active=root.querySelector<HTMLElement>('.pick-row.active');
+  if(body) body.scrollTop=active ? body.scrollTop+active.getBoundingClientRect().top-body.getBoundingClientRect().top-(body.clientHeight-active.clientHeight)/2 : 0;
+}
 function persist(changedPath?: string) {void saveWorkspace(workspace, changedPath).catch(error => toast(`保存できませんでした。バックアップしてください：${String(error)}`));}
 function ask(question: string, run: () => void | Promise<void>) {confirmation = {question, run}; render(); root.querySelector<HTMLElement>('[data-action="confirm-cancel"]')?.focus();}
 function reconcileCurrent() {
@@ -186,10 +191,11 @@ function render() {
   const draftItem=JSON.stringify([workspaceRevision,path,currentId]);
   if(commentDraftItem!==draftItem) {commentDraftItem=draftItem;commentDraft='';replyTarget=null;editTarget=null;}
 
-  const scroll = root.querySelector('.scroll')?.scrollTop ?? 0;
+  const folder=root.querySelector('.file-scroll');if(folder) folderScroll=folder.scrollTop;
+  const scroll = renderedPath===path ? root.querySelector('.review')?.scrollTop ?? 0 : 0;
   const sheetScroll = root.querySelector('.sheet-body')?.scrollTop ?? 0;
   const file = currentFile(), tree = fileTree(workspace.files, homeFilter), p = percent(tree.done, tree.total);
-  root.innerHTML = `<header class="top">${file ? `<button class="icon" aria-label="戻る" data-action="home">${icon('back')}</button>` : ''}<h1 title="${e(file?.path ?? 'Woditor Review')}">${e(file?.path.split('/').at(-1) ?? 'Woditor Review')}</h1>${!file ? `<button class="overall" data-action="progress" aria-label="全体の進捗"><span class="ring" style="--progress:${p ?? 0}%"></span>${p === null ? '—' : p + '%'}</button>` : ''}<button class="icon" aria-label="メニュー" data-action="menu" aria-expanded="${menu}">${icon('menu')}</button></header>${menu ? `<nav class="menu" aria-label="メニュー"><button data-action="load">ファイルを読み込む</button><button data-action="diagnostics">読み込み結果 (エラー${workspace.diagnostics.filter(d => d.severity === 'error').length})</button><button data-action="export">AIレビューを依頼</button><button data-action="response">AIレビュー結果を読み込む</button><button data-action="backup">状態をバックアップ</button><button data-action="restore">バックアップを復元</button></nav>` : ''}${file ? review(file) : `${filterButtons(homeFilter, 'home')}<main class="scroll file-scroll">${workspace.files.length ? treeRows(tree) || '<div class="empty">対象のファイルはありません</div>' : `<div class="empty">日本語と英語のTXTを読み込んでください<br><button class="primary" data-action="load">${icon('upload')} ファイルを読み込む</button></div>`}</main>`}${sheet ? `<div class="scrim" data-action="close"></div><section class="sheet" role="dialog" aria-modal="true" aria-label="${e(({load: 'ファイルを読み込む', items: '翻訳項目', comments: 'コメント', progress: '全体の進捗', diagnostics: '読み込み結果'} as Record<string,string>)[sheet] ?? '')}"><button class="handle" aria-label="下にスワイプして閉じる" tabindex="-1"></button><div class="sheet-head"><h2>${({load: 'ファイルを読み込む', items: '翻訳項目', comments: 'コメント', progress: '全体の進捗', diagnostics: '読み込み結果'} as Record<string,string>)[sheet] ?? ''}</h2><button class="icon" aria-label="閉じる" data-action="close">${icon('close')}</button></div>${sheetBody()}</section>` : ''}${toastMarkup()}${busy ? `<div class="busy" role="status"><div class="spinner"></div><div>${e(busy)}</div></div>` : ''}`;
+  root.innerHTML = `<header class="top">${file ? `<button class="icon" aria-label="戻る" data-action="home">${icon('back')}</button>` : ''}<h1 title="${e(file?.path ?? 'Woditor Review')}">${e(file?.path.split('/').at(-1) ?? 'Woditor Review')}</h1>${!file ? `<button class="overall" data-action="progress" aria-label="全体の進捗"><span class="ring" style="--progress:${p ?? 0}%"></span>${p === null ? '—' : p + '%'}</button>` : ''}<button class="icon" aria-label="メニュー" data-action="menu" aria-expanded="${menu}">${icon('menu')}</button></header>${menu ? `<div class="menu-dismiss" data-action="dismiss-menu" aria-hidden="true"></div><nav class="menu" aria-label="メニュー"><button data-action="load">ファイルを読み込む</button><button data-action="diagnostics">読み込み結果 (エラー${workspace.diagnostics.filter(d => d.severity === 'error').length})</button><button data-action="export">AIレビューを依頼</button><button data-action="response">AIレビュー結果を読み込む</button><button data-action="backup">状態をバックアップ</button><button data-action="restore">バックアップを復元</button></nav>` : ''}${file ? review(file) : `${filterButtons(homeFilter, 'home')}<main class="scroll file-scroll">${workspace.files.length ? treeRows(tree) || '<div class="empty">対象のファイルはありません</div>' : `<div class="empty">日本語と英語のTXTを読み込んでください<br><button class="primary" data-action="load">${icon('upload')} ファイルを読み込む</button></div>`}</main>`}${sheet ? `<div class="scrim" data-action="close"></div><section class="sheet" role="dialog" aria-modal="true" aria-label="${e(({load: 'ファイルを読み込む', items: '翻訳項目', comments: 'コメント', progress: '全体の進捗', diagnostics: '読み込み結果'} as Record<string,string>)[sheet] ?? '')}"><button class="handle" aria-label="下にスワイプして閉じる" tabindex="-1"></button><div class="sheet-head"><h2>${({load: 'ファイルを読み込む', items: '翻訳項目', comments: 'コメント', progress: '全体の進捗', diagnostics: '読み込み結果'} as Record<string,string>)[sheet] ?? ''}</h2><button class="icon" aria-label="閉じる" data-action="close">${icon('close')}</button></div>${sheetBody()}</section>` : ''}${toastMarkup()}${busy ? `<div class="busy" role="status"><div class="spinner"></div><div>${e(busy)}</div></div>` : ''}`;
   root.querySelector('.sheet')?.setAttribute('aria-label', sheetTitles[sheet ?? ''] ?? '');
   root.querySelector('.menu [data-action="backup"]')?.insertAdjacentHTML('beforebegin', '<button data-action="english">英訳TXTを出力</button>');
   root.querySelector('.menu [data-action="backup"]')?.insertAdjacentHTML('beforebegin', '<button data-action="drive">Google Drive同期</button>');
@@ -197,7 +203,8 @@ function render() {
   if (file && group?.code === 103) root.querySelector('.menu')?.insertAdjacentHTML('beforeend', `<button data-action="split-group" ${canSplit(group) ? '' : 'disabled'}>コメントを行ごとに分割</button><button data-action="merge-group" ${canMerge(file, group) ? '' : 'disabled'}>次のコメントと結合</button>`);
   const heading = root.querySelector('.sheet h2'); if (heading) heading.textContent = sheetTitles[sheet ?? ''] ?? '';
   root.querySelectorAll<HTMLButtonElement>('.menu [data-action]').forEach(button => button.insertAdjacentHTML('afterbegin', menuIcon(button.dataset.action!)));
-  root.querySelector('.scroll')?.scrollTo(0, scroll);
+  root.querySelector('.review')?.scrollTo(0, scroll);
+  root.querySelector('.file-scroll')?.scrollTo(0,folderScroll);renderedPath=path;
   root.querySelector('.sheet-body')?.scrollTo(0, sheetScroll);
   const all = root.querySelector<HTMLInputElement>('#export-all');
   if (all) {const count = exportFiles().filter(f => exportSelection.has(f.path)).length; all.indeterminate = count > 0 && count < exportFiles().length;}
@@ -212,6 +219,7 @@ function render() {
   screenHistory?.sync(historyScreen());
 }
 
+document.addEventListener('pointerdown',event=>{if(menu && !root.contains(event.target as Node)) {menu=false;render();}});
 root.addEventListener('click', event => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-action]');
   if (!button || button.disabled || busy) return;

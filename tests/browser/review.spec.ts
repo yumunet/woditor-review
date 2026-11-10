@@ -253,6 +253,12 @@ test('full real corpus in worker, diagnostics, all folder progress and restart',
   await page.getByRole('button', {name:'全体の進捗',exact:true}).click();
   await expect(page.locator('.progress-detail')).toContainText(['全体','BasicData','CDataBase','CommonEvent','DataBase','SysDataBase','MapData','Dungeon','SampleMapA','SampleMapB','TitleMap']);
   await page.getByRole('button', {name:'閉じる',exact:true}).click();
+  await page.locator('.file-row[data-value="BasicData"]').click();await page.locator('.file-row[data-value="BasicData/CommonEvent"]').click();
+  const scroller=page.locator('.file-scroll');await scroller.evaluate(el=>{el.scrollTop=el.scrollHeight;});
+  const position=await scroller.evaluate(el=>el.scrollTop);expect(position).toBeGreaterThan(100);
+  await page.locator('.file-row[data-value^="BasicData/CommonEvent/"]').last().click();await page.getByRole('button',{name:'戻る',exact:true}).click();
+  await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBe(position);
+  await page.locator('.file-row[data-value^="BasicData/CommonEvent/"]').last().click();await page.goBack();await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBe(position);
   await page.reload(); await expect(page.locator('.file-row')).toHaveCount(2);
   expect(external).toEqual([]);
 });
@@ -697,4 +703,11 @@ test('review mode stays selected after panel close, history and app restart',asy
   await page.getByRole('radio',{name:'英訳をチェックして指摘を作る',exact:true}).check();await page.goBack();await expect(page.getByRole('dialog')).toHaveCount(0);await open(page);await expect(page.getByRole('radio',{name:'英訳をチェックして指摘を作る',exact:true})).toBeChecked();
   await page.reload();await expect(page.locator('.busy')).toHaveCount(0);await open(page);await expect(page.getByRole('radio',{name:'英訳をチェックして指摘を作る',exact:true})).toBeChecked();await page.getByRole('radio',{name:'既存コメントに回答・修正する',exact:true}).check();await closeReviewSheet(page);
   const next=await context.newPage();await next.goto('/');await expect(next.locator('.busy')).toHaveCount(0);await page.close();await open(next);await expect(next.getByRole('radio',{name:'既存コメントに回答・修正する',exact:true})).toBeChecked();
+});
+
+test('menu dismisses outside without activating content and the item picker reveals the current item',async({page})=>{
+  test.skip(!corpus,'Private reference files not available');await loadNavigationFiles(page);await openTreeFile(page,navigationPaths[0]);
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.locator('.menu-dismiss').click({position:{x:20,y:300}});await expect(page.locator('.menu')).toHaveCount(0);await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'メニュー',exact:true}).click();await expect(page.locator('.menu')).toHaveCount(0);
+  await page.locator('.entry-open').click();await page.locator('.pick-row').last().click();const title=await page.locator('.entry-title').textContent();await page.locator('.entry-open').click();await expect(page.locator('.pick-row.active')).toContainText(title!);await expect(page.locator('.pick-row.active')).toBeInViewport();expect(await page.locator('.sheet-body').evaluate(el=>el.scrollTop)).toBeGreaterThan(0);
 });
