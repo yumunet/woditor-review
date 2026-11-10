@@ -3,6 +3,8 @@ import { emptyWorkspace, isDone, matches, sourceText, itemTitle, unresolved, typ
 import { escape as e, icon, menuIcon, folderTriangle, filterButtons, fileTree, compact, percent, type TreeNode } from './ui';
 import {contextView,positionContextMenu,type ContextMenu} from './context-view';
 import {installTooltips} from './tooltips';
+import {installViewport} from './viewport';
+import {updateCommentScroll} from './comment-scroll';
 import { parseArchives, renderTranslations } from './parser-client';
 import { addComment, approveItem, deleteComment, discardRejectedChanges, editComment, latestPreview, nextAfterApproval, setResolved, undoApproval } from './review-state';
 import { backupFileName, backupJson, download, loadWorkspace, restoreJson, saveWorkspace } from './storage';
@@ -27,6 +29,7 @@ import {exportTree,folderFiles} from './export-tree';
 
 const root = document.querySelector<HTMLDivElement>('#app')!;
 const hideTooltips=installTooltips();
+const commentResize=new ResizeObserver(()=>updateCommentScroll(root));
 let workspace: Workspace = emptyWorkspace();
 let workspaceRevision=0;
 let path: string | null = null, currentId: string | null = null;
@@ -75,8 +78,8 @@ function restoreScreen(state:ReturnType<typeof screenState>) {
   if(path && !currentFile()) {path=currentId=sheet=null;menu=false;confirmation=null;instructionsPreview=null;}
   if(path && !currentItem()) reconcileCurrent();
   render();if(sheet==='text') refreshTextView(true);
-  const focus=instructionsPreview!==null ? '.instructions-dialog button' : confirmation ? '.dialog button' : sheet ? '.sheet .icon' : '.top .icon';
-  root.querySelector<HTMLElement>(focus)?.focus();
+  const focus=instructionsPreview!==null ? '.instructions-dialog button' : confirmation ? '.dialog button' : sheet==='comments' ? '#comment-form textarea' : sheet ? '.sheet .icon' : '.top .icon';
+  root.querySelector<HTMLElement>(focus)?.focus({preventScroll:true});
 }
 const sheetTitles: Record<string,string> = {load: 'ファイルを読み込む', items: '翻訳項目', comments: 'コメント', progress: '全体の進捗', diagnostics: '読み込み結果', restore: 'バックアップを復元', export: 'AIレビューを依頼', response: 'AIレビュー結果を読み込む', english: '英訳TXTを出力'};
 sheetTitles.source = '原文を補う';
@@ -105,7 +108,7 @@ function exportRows() {
   const files = exportFiles(), checked = files.filter(f => exportSelection.has(f.path)).length;
   return `<div class="sheet-body"><label class="export-row export-all"><input id="export-all" type="checkbox" ${files.length && checked === files.length ? 'checked' : ''} ${!files.length ? 'disabled' : ''}>すべて選択</label>${files.length ? exportTree(files,exportSelection,exportCollapsed) : '<div class="empty">出力対象のファイルはありません</div>'}</div>`;
 }
-function openSheet(name: string) {lastFocus = document.activeElement as HTMLElement; sheet = name; menu = false; if (name === 'diagnostics') diagnosticTab = 'error'; if (name === 'export') {reviewMode = preferences.reviewMode ?? (workspace.files.some(f => (!path || f.path === path) && f.items.some(i => unresolved(i).length)) ? 'comments' : 'initial');setPreferences({reviewMode});} if (name === 'export' || name === 'english') resetExportSelection(); render(); root.querySelector<HTMLElement>('.sheet .icon, .sheet input, .sheet button:not(.handle)')?.focus();if(name==='items') revealCurrentItem();}
+function openSheet(name: string) {lastFocus = document.activeElement as HTMLElement; sheet = name; menu = false; if (name === 'diagnostics') diagnosticTab = 'error'; if (name === 'export') {reviewMode = preferences.reviewMode ?? (workspace.files.some(f => (!path || f.path === path) && f.items.some(i => unresolved(i).length)) ? 'comments' : 'initial');setPreferences({reviewMode});} if (name === 'export' || name === 'english') resetExportSelection(); render(); root.querySelector<HTMLElement>(name==='comments'?'#comment-form textarea':'.sheet .icon, .sheet input, .sheet button:not(.handle)')?.focus({preventScroll:true});if(name==='items') revealCurrentItem();}
 function closeSheet() {sheet = null; render(); lastFocus?.focus();}
 function revealCurrentItem() {
   const body=root.querySelector<HTMLElement>('.sheet-body'),active=root.querySelector<HTMLElement>('.pick-row.active');
@@ -160,7 +163,7 @@ function review(file: ReviewFile) {
 function commentsBody() {
   const item = currentItem(); if (!item) return '<div class="empty">対象の項目はありません</div>';
   const threads = item.threads.filter(t => commentTab === 'all' || !t.resolved);
-  return `<div class="filters"><button class="pill ${commentTab === 'open' ? 'active' : ''}" data-action="comment-tab" data-value="open">未解決</button><button class="pill ${commentTab === 'all' ? 'active' : ''}" data-action="comment-tab" data-value="all">すべてのコメント</button></div><div class="sheet-body">${threads.map(threadView).join('') || '<div class="empty">コメントはありません</div>'}</div><form class="sheet-foot" id="comment-form"><textarea name="text" aria-label="コメント内容" placeholder="${editTarget ? 'コメントを編集' : replyTarget ? '返信を入力' : 'コメントを入力'}" required>${e(commentDraft)}</textarea><div class="send-row"><span>${editTarget ? '編集中' : replyTarget ? '返信先を選択中' : ''}${editTarget || replyTarget ? '<button class="text-act" type="button" data-action="cancel-compose">キャンセル</button>' : ''}</span><button type="submit" class="primary">${editTarget ? '保存' : '送信'}</button></div></form>`;
+  return `<div class="filters"><button class="pill ${commentTab === 'open' ? 'active' : ''}" data-action="comment-tab" data-value="open">未解決</button><button class="pill ${commentTab === 'all' ? 'active' : ''}" data-action="comment-tab" data-value="all">すべてのコメント</button></div><div class="comment-scroll"><div class="sheet-body comments-list">${threads.map(threadView).join('') || '<div class="empty">コメントはありません</div>'}</div><button class="scroll-hint scroll-up" aria-label="コメントを上にスクロール" data-action="comment-scroll" data-value="-1" hidden>${icon('down')}</button><button class="scroll-hint scroll-down" aria-label="コメントを下にスクロール" data-action="comment-scroll" data-value="1" hidden>${icon('down')}</button></div><form class="sheet-foot" id="comment-form"><textarea name="text" aria-label="コメント内容" placeholder="${editTarget ? 'コメントを編集' : replyTarget ? '返信を入力' : 'コメントを入力'}" required>${e(commentDraft)}</textarea><div class="send-row"><span>${editTarget ? '編集中' : replyTarget ? '返信先を選択中' : ''}${editTarget || replyTarget ? '<button class="text-act" type="button" data-action="cancel-compose">キャンセル</button>' : ''}</span><button type="submit" class="primary">${editTarget ? '保存' : '送信'}</button></div></form>`;
 }
 function progressRows(node: TreeNode, depth = 0): string {
   return `<div class="progress-detail" style="--depth:${depth}"><span>${e(node.name)}</span><span>${node.done.toLocaleString()} / ${node.total.toLocaleString()}</span></div>${node.children.filter(c => !c.file).map(c => progressRows(c, depth + 1)).join('')}`;
@@ -186,6 +189,7 @@ function sheetBody() {
 }
 function render() {
   hideTooltips();
+  commentResize.disconnect();
   const draftItem=JSON.stringify([workspaceRevision,path,currentId]);
   if(commentDraftItem!==draftItem) {commentDraftItem=draftItem;commentDraft='';replyTarget=null;editTarget=null;}
 
@@ -213,6 +217,8 @@ function render() {
   if (instructionsPreview !== null) root.insertAdjacentHTML('beforeend', `<div class="dialog-overlay instructions-overlay"><section class="dialog instructions-dialog" role="dialog" aria-modal="true" aria-label="指示文"><div class="instructions-head"><h2>指示文</h2><button class="icon" aria-label="指示文を閉じる" data-action="close-instructions">${icon('close')}</button></div><pre class="instructions-text" tabindex="0">${e(instructionsPreview)}</pre></section></div>`);
   if(sheet==='text') refreshTextView();
   positionContextMenu(root);
+  const comments=root.querySelector('.comments-list');if(comments) commentResize.observe(comments);
+  updateCommentScroll(root);
   root.classList.toggle('has-comments', !!currentItem() && unresolved(currentItem()!).length > 0);
   if (confirmation) root.insertAdjacentHTML('beforeend', `<div class="dialog-overlay"><section class="dialog" role="alertdialog" aria-modal="true" aria-label="確認"><p>${e(confirmation.question)}</p><div class="dialog-actions"><button data-action="confirm-cancel">キャンセル</button><button class="primary" data-action="confirm-ok">確定</button></div></section></div>`);
   screenHistory?.sync(historyScreen());
@@ -267,6 +273,7 @@ root.addEventListener('click', event => {
     try {approve();} catch(error) {toast(String(error));} return;
   }
   else if (action === 'comment-tab') commentTab = value as 'open' | 'all';
+  else if(action==='comment-scroll') {const list=root.querySelector('.comments-list');list?.scrollBy({top:Number(value)*Math.max(120,list.clientHeight*.7),behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});return;}
   else if (action === 'diagnostic-tab') diagnosticTab = value as typeof diagnosticTab;
   else if(action==='diagnostic-item') {
     const diagnostic=workspace.diagnostics[Number(value)],target=diagnostic && diagnosticItem(workspace,diagnostic);
@@ -320,6 +327,7 @@ root.addEventListener('input',event=>{
 root.addEventListener('scroll',event=>{
   const element=event.target as HTMLElement;
   if(sheet==='text' && textView && element.matches('.text-scroll')) paintTextView(textView,element);
+  if(element.matches('.comments-list')) updateCommentScroll(root);
 },true);
 root.addEventListener('change', event => {const el = event.target as HTMLInputElement; if (el.name === 'review-mode') {reviewMode = el.value as ReviewMode; setPreferences({reviewMode}); resetExportSelection(); render(); return;} if(el.dataset.exportFolder) {for(const file of folderFiles(exportFiles(),el.dataset.exportFolder)) {if(el.checked) exportSelection.add(file.path);else exportSelection.delete(file.path);}preparedRequest=null;render();return;} if (el.id === 'drive-auto') {void drive.setAutomatic(el.checked).catch(error => toast(String(error))); return;} if (el.id === 'export-all') {exportSelection = new Set(el.checked ? exportFiles().map(f => f.path) : []); preparedRequest = null; render(); return;} if (el.dataset.exportPath) {if (el.checked) exportSelection.add(el.dataset.exportPath); else exportSelection.delete(el.dataset.exportPath); preparedRequest = null; render();}});
 root.addEventListener('submit', async event => {
@@ -440,6 +448,7 @@ root.addEventListener('touchend', event => {
   swipe = null;
 });
 screenHistory=new ScreenHistory(historyScreen(),restoreScreen);
+installViewport(root,()=>{positionContextMenu(root);updateCommentScroll(root);});
 busy = '保存したデータを読み込み中…'; render();
 void Promise.all([loadWorkspace(), drive.initialize(),loadPreferences()]).then(([saved,,settings]) => {if (saved) workspace = saved;preferences=settings;before=after=settings.contextRadius;reviewMode=settings.reviewMode??reviewMode;}).catch(error => {notice = `保存データを読み込めません：${String(error)}`;}).finally(() => {busy = ''; render();});
 registerPwa(toast);

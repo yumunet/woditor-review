@@ -750,3 +750,24 @@ test('diagnostic errors and warnings open translation items and Back restores th
   await loadReal(page,'MapData/SampleMapA/Event_0019.txt');await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:/^読み込み結果/}).click();
   await page.locator('.diagnostic.error').first().locator('..').getByRole('button',{name:'翻訳項目を開く',exact:true}).click();await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.locator('.source')).toHaveText('');await expect(page.getByRole('button',{name:'原文を補う',exact:true})).toBeVisible();await page.goBack();await expect(page.getByRole('tab',{name:/^エラー/})).toHaveAttribute('aria-selected','true');
 });
+
+test('comments focus the composer, show scroll directions and fit the keyboard viewport with short search results',async({page})=>{
+  test.skip(!corpus,'Private reference files not available');await loadReal(page);
+  const source=await page.locator('.source').textContent();await page.locator('.comment-trigger').click();await expect(page.getByLabel('コメント内容')).toBeFocused();
+  const up=page.getByRole('button',{name:'コメントを上にスクロール',exact:true}),down=page.getByRole('button',{name:'コメントを下にスクロール',exact:true});
+  await expect(up).toBeHidden();await expect(down).toBeHidden();
+  for(let i=0;i<3;i++) {await page.getByLabel('コメント内容').fill(`Comment ${i}\n`+'Long review line\n'.repeat(18));await page.getByRole('button',{name:'送信',exact:true}).click();}
+  await expect(down).toBeVisible();await expect(up).toBeHidden();await down.click();await expect(up).toBeVisible();
+  const list=page.locator('.comments-list');await list.evaluate(el=>{el.scrollTop=el.scrollHeight;});await expect(down).toBeHidden();await expect(up).toBeVisible();await up.click();await expect(down).toBeVisible();
+  const resize=async(height:number,top=0)=>{
+    await page.evaluate(({height,top})=>{Object.defineProperty(visualViewport!,'height',{configurable:true,value:height});Object.defineProperty(visualViewport!,'offsetTop',{configurable:true,value:top});visualViewport!.dispatchEvent(new Event('resize'));},{height,top});
+    await expect(page.locator('#app')).toHaveCSS('height',`${height}px`);
+  };
+  await page.getByLabel('コメント内容').focus();await resize(430,30);
+  const panel=await page.getByRole('dialog',{name:'コメント',exact:true}).boundingBox(),composer=await page.getByLabel('コメント内容').boundingBox();
+  expect(panel!.y).toBeGreaterThanOrEqual(30);expect(panel!.y+panel!.height).toBeLessThanOrEqual(460);expect(composer!.y+composer!.height).toBeLessThan(460);
+  await page.evaluate(()=>scrollTo(0,200));expect(await page.evaluate(()=>scrollY)).toBe(0);await closeReviewSheet(page);
+  await resize(page.viewportSize()!.height);await page.locator('.entry-open').click();await page.getByLabel('翻訳項目を検索').focus();await page.getByLabel('翻訳項目を検索').fill(source!);await expect(page.locator('.pick-row')).toHaveCount(1);await resize(400);
+  const picker=await page.getByRole('dialog',{name:'翻訳項目',exact:true}).boundingBox();expect(picker!.y).toBeGreaterThanOrEqual(0);expect(picker!.y+picker!.height).toBeLessThanOrEqual(400);
+  await page.evaluate(()=>scrollTo(0,200));expect(await page.evaluate(()=>scrollY)).toBe(0);expect(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight)).toBe(true);
+});
