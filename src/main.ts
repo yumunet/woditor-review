@@ -21,6 +21,7 @@ import {DriveController} from './drive-controller';
 import {driveView} from './drive-view';
 import {workspaceHash} from './drive-sync';
 import {ScreenHistory} from './screen-history';
+import {loadPreferences,preferencesFrom,savePreferences,type Preferences} from './preferences';
 
 const root = document.querySelector<HTMLDivElement>('#app')!;
 let workspace: Workspace = emptyWorkspace();
@@ -43,6 +44,10 @@ let commentDraft='',commentDraftItem='';
 let confirmation: {question: string; run: () => void | Promise<void>} | null = null;
 let exportSelection = new Set<string>(), preparedRequest: ReviewRequest | null = null;
 let reviewMode: ReviewMode = 'comments';
+let preferences=preferencesFrom(undefined);
+function setPreferences(next:Partial<Preferences>) {
+  preferences={...preferences,...next};void savePreferences(preferences).catch(error=>toast(`設定を保存できません：${String(error)}`));
+}
 let screenHistory:ScreenHistory<ReturnType<typeof screenState>>|undefined;
 function screenState() {
   return {workspaceRevision,path,currentId,sheet,menu,homeFilter,itemFilter,itemQuery,before,after,usageIndex,contextOpen,contextLang,
@@ -57,6 +62,7 @@ function restoreScreen(state:ReturnType<typeof screenState>) {
   ({path,currentId,sheet,menu,homeFilter,itemFilter,itemQuery,before,after,usageIndex,contextOpen,contextLang,
     commentTab,diagnosticTab,textView,confirmation,instructionsPreview,reviewMode,preparedRequest}=state);
   exportSelection=new Set(state.exportSelection);
+  reviewMode=preferences.reviewMode??reviewMode;
   if(state.workspaceRevision!==workspaceRevision) {sheet=null;menu=false;confirmation=null;instructionsPreview=null;textView=null;preparedRequest=null;}
   if(path && !currentFile()) {path=currentId=sheet=null;menu=false;confirmation=null;instructionsPreview=null;}
   if(path && !currentItem()) reconcileCurrent();
@@ -91,7 +97,7 @@ function exportRows() {
   const files = exportFiles(), checked = files.filter(f => exportSelection.has(f.path)).length;
   return `<div class="sheet-body"><label class="export-row export-all"><input id="export-all" type="checkbox" ${files.length && checked === files.length ? 'checked' : ''} ${!files.length ? 'disabled' : ''}>すべて選択</label>${files.map(f => `<label class="export-row"><input type="checkbox" data-export-path="${e(f.path)}" ${exportSelection.has(f.path) ? 'checked' : ''}>${e(f.path)}</label>`).join('') || '<div class="empty">出力対象のファイルはありません</div>'}</div>`;
 }
-function openSheet(name: string) {lastFocus = document.activeElement as HTMLElement; sheet = name; menu = false; if (name === 'diagnostics') diagnosticTab = 'error'; if (name === 'export') reviewMode = workspace.files.some(f => (!path || f.path === path) && f.items.some(i => unresolved(i).length)) ? 'comments' : 'initial'; if (name === 'export' || name === 'english') resetExportSelection(); render(); root.querySelector<HTMLElement>('.sheet .icon, .sheet input, .sheet button:not(.handle)')?.focus();}
+function openSheet(name: string) {lastFocus = document.activeElement as HTMLElement; sheet = name; menu = false; if (name === 'diagnostics') diagnosticTab = 'error'; if (name === 'export') {reviewMode = preferences.reviewMode ?? (workspace.files.some(f => (!path || f.path === path) && f.items.some(i => unresolved(i).length)) ? 'comments' : 'initial');setPreferences({reviewMode});} if (name === 'export' || name === 'english') resetExportSelection(); render(); root.querySelector<HTMLElement>('.sheet .icon, .sheet input, .sheet button:not(.handle)')?.focus();}
 function closeSheet() {sheet = null; render(); lastFocus?.focus();}
 function persist(changedPath?: string) {void saveWorkspace(workspace, changedPath).catch(error => toast(`保存できませんでした。バックアップしてください：${String(error)}`));}
 function ask(question: string, run: () => void | Promise<void>) {confirmation = {question, run}; render(); root.querySelector<HTMLElement>('[data-action="confirm-cancel"]')?.focus();}
@@ -290,7 +296,7 @@ root.addEventListener('scroll',event=>{
   const element=event.target as HTMLElement;
   if(sheet==='text' && textView && element.matches('.text-scroll')) paintTextView(textView,element);
 },true);
-root.addEventListener('change', event => {const el = event.target as HTMLInputElement; if (el.name === 'review-mode') {reviewMode = el.value as ReviewMode; resetExportSelection(); render(); return;} if (el.id === 'drive-auto') {void drive.setAutomatic(el.checked).catch(error => toast(String(error))); return;} if (el.id === 'export-all') {exportSelection = new Set(el.checked ? exportFiles().map(f => f.path) : []); preparedRequest = null; render(); return;} if (el.id === 'context-lang') {contextLang = el.value as 'en' | 'ja'; render();} if (el.dataset.exportPath) {if (el.checked) exportSelection.add(el.dataset.exportPath); else exportSelection.delete(el.dataset.exportPath); preparedRequest = null; render();}});
+root.addEventListener('change', event => {const el = event.target as HTMLInputElement; if (el.name === 'review-mode') {reviewMode = el.value as ReviewMode; setPreferences({reviewMode}); resetExportSelection(); render(); return;} if (el.id === 'drive-auto') {void drive.setAutomatic(el.checked).catch(error => toast(String(error))); return;} if (el.id === 'export-all') {exportSelection = new Set(el.checked ? exportFiles().map(f => f.path) : []); preparedRequest = null; render(); return;} if (el.id === 'context-lang') {contextLang = el.value as 'en' | 'ja'; render();} if (el.dataset.exportPath) {if (el.checked) exportSelection.add(el.dataset.exportPath); else exportSelection.delete(el.dataset.exportPath); preparedRequest = null; render();}});
 root.addEventListener('submit', async event => {
   const form = event.target as HTMLFormElement;
   if (form.id === 'drive-config-form') {
@@ -410,5 +416,5 @@ root.addEventListener('touchend', event => {
 });
 screenHistory=new ScreenHistory(historyScreen(),restoreScreen);
 busy = '保存したデータを読み込み中…'; render();
-void Promise.all([loadWorkspace(), drive.initialize()]).then(([saved]) => {if (saved) workspace = saved;}).catch(error => {notice = `保存データを読み込めません：${String(error)}`;}).finally(() => {busy = ''; render();});
+void Promise.all([loadWorkspace(), drive.initialize(),loadPreferences()]).then(([saved,,settings]) => {if (saved) workspace = saved;preferences=settings;reviewMode=settings.reviewMode??reviewMode;}).catch(error => {notice = `保存データを読み込めません：${String(error)}`;}).finally(() => {busy = ''; render();});
 registerPwa(toast);

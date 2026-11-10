@@ -570,6 +570,7 @@ async function resolveCurrentComment(page:Page) {
 
 async function exportCurrentRequest(page:Page) {
   await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'AIレビューを依頼',exact:true}).click();
+  await page.getByRole('radio',{name:'既存コメントに回答・修正する',exact:true}).check();
   const download=page.waitForEvent('download');await page.getByRole('button',{name:'JSONを出力',exact:true}).click();
   const file=await download,request=JSON.parse(readFileSync((await file.path())!,'utf8'));
   expect(file.suggestedFilename()).toBe(`review_request_${request.requestId.replace(/-/g,'').slice(0,12)}.json`);
@@ -674,3 +675,12 @@ test('initial AI review adds comments without changing translations and continue
   await importRevisedAnswer(page,followup,'accepted','Revised Name',[{slotId:target.slots[0].id,before:original,after:'Revised Name'}]);await expect(page.locator('.translation-after')).toHaveText('Revised Name');await resolveCurrentComment(page);await expect(page.locator('.translation')).toHaveText('Revised Name');
 });
 async function closeReviewSheet(page:Page){await page.getByRole('button',{name:'閉じる',exact:true}).click();}
+
+test('review mode stays selected after panel close, history and app restart',async({page,context})=>{
+  test.skip(!corpus,'Private reference files not available');await loadReal(page);
+  const open=async(p:Page)=>{await p.getByRole('button',{name:'メニュー',exact:true}).click();await p.getByRole('button',{name:'AIレビューを依頼',exact:true}).click();};
+  await open(page);await page.getByRole('radio',{name:'既存コメントに回答・修正する',exact:true}).check();await closeReviewSheet(page);await open(page);await expect(page.getByRole('radio',{name:'既存コメントに回答・修正する',exact:true})).toBeChecked();
+  await page.getByRole('radio',{name:'英訳をチェックして指摘を作る',exact:true}).check();await page.goBack();await expect(page.getByRole('dialog')).toHaveCount(0);await open(page);await expect(page.getByRole('radio',{name:'英訳をチェックして指摘を作る',exact:true})).toBeChecked();
+  await page.reload();await expect(page.locator('.busy')).toHaveCount(0);await open(page);await expect(page.getByRole('radio',{name:'英訳をチェックして指摘を作る',exact:true})).toBeChecked();await page.getByRole('radio',{name:'既存コメントに回答・修正する',exact:true}).check();await closeReviewSheet(page);
+  const next=await context.newPage();await next.goto('/');await expect(next.locator('.busy')).toHaveCount(0);await page.close();await open(next);await expect(next.getByRole('radio',{name:'既存コメントに回答・修正する',exact:true})).toBeChecked();
+});
