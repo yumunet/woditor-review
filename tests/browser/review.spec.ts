@@ -773,3 +773,9 @@ test('comments focus the composer, show scroll directions and fit the keyboard v
   const picker=await page.getByRole('dialog',{name:'翻訳項目',exact:true}).boundingBox();expect(picker!.y).toBeGreaterThanOrEqual(0);expect(picker!.y+picker!.height).toBeLessThanOrEqual(400);
   await page.evaluate(()=>scrollTo(0,200));expect(await page.evaluate(()=>scrollY)).toBe(0);expect(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight)).toBe(true);
 });
+
+test('review badge text aligns with its label',async({page})=>{
+  test.skip(!corpus,'Private reference files not available');await loadReal(page);await postReviewComment(page,'Alignment check');
+  const centers=await page.locator('.comment-trigger').evaluate(button=>['.comment-label','.bubble'].map(selector=>{const range=document.createRange();range.selectNodeContents(button.querySelector(selector)!);const rect=range.getBoundingClientRect();return rect.y+rect.height/2;}));
+  expect(Math.abs(centers[0]-centers[1])).toBeLessThanOrEqual(1.5);
+});
