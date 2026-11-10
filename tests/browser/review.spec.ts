@@ -793,6 +793,22 @@ test('review badge text aligns with its label',async({page})=>{
   expect(Math.abs(centers[0]-centers[1])).toBeLessThanOrEqual(1.5);
 });
 
+test('floating comments reveal the displayed post without focusing the composer, including history and replies',async({page})=>{
+  test.skip(!corpus,'Private reference files not available');await loadReal(page);
+  await page.locator('.comment-trigger').click();const composer=page.getByLabel('コメント内容');await expect(composer).toBeFocused();
+  for(let i=0;i<3;i++) {await composer.fill(`Thread ${i}\n`+'Review details\n'.repeat(8));await page.getByRole('button',{name:'送信',exact:true}).click();}
+  await page.getByRole('button',{name:'すべてのコメント',exact:true}).click();
+  await page.locator('.thread').first().getByRole('button',{name:'解決',exact:true}).click();
+  await page.locator('.thread').nth(1).getByRole('button',{name:'返信',exact:true}).click();await composer.fill('この返信を表示');await page.getByRole('button',{name:'送信',exact:true}).click();await composer.fill('未送信の下書き');await closeReviewSheet(page);
+  await expect(page.locator('.float-preview')).toHaveText('この返信を表示');const postId=await page.locator('.float-comment').getAttribute('data-value');
+  await page.locator('.float-comment').click();const post=page.locator(`[data-post-id="${postId}"]`);
+  await expect(post).toHaveClass('reply');await expect(post).toBeInViewport();await expect(post).toBeFocused();await expect(composer).not.toBeFocused();await expect(composer).toHaveValue('未送信の下書き');expect(await page.locator('.comments-list').evaluate(el=>el.scrollTop)).toBeGreaterThan(0);
+  await page.goBack();await expect(page.getByRole('dialog')).toHaveCount(0);await page.goForward();await expect(post).toBeInViewport();await expect(post).toBeFocused();await expect(composer).not.toBeFocused();
+  await closeReviewSheet(page);await page.locator('.comment-trigger').click();await expect(composer).toBeFocused();await expect(composer).toHaveValue('未送信の下書き');
+  await composer.fill('最新の新規コメント');await page.getByRole('button',{name:'送信',exact:true}).click();await closeReviewSheet(page);await expect(page.locator('.float-preview')).toHaveText('最新の新規コメント');await page.locator('.float-comment').click();
+  const root=page.locator('.thread-root').filter({has:page.locator('.post-text',{hasText:'最新の新規コメント'})});await expect(root).toBeInViewport();await expect(root).toBeFocused();await expect(composer).not.toBeFocused();
+});
+
 test('completed item markers use a balanced green at the same size as other markers',async({page},info)=>{
   test.skip(!corpus,'Private reference files not available');await loadReal(page);
   await page.getByRole('button',{name:'承認',exact:true}).click();await page.getByRole('button',{name:'前の項目',exact:true}).click();await page.locator('.entry-open').click();

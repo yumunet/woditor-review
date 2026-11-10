@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addComment, approveItem, canEdit, deleteComment, editComment, latestPreview, nextAfterApproval, setResolved, undoApproval } from '../src/review-state';
+import { addComment, approveItem, canEdit, deleteComment, editComment, latestComment,latestPreview, nextAfterApproval, setResolved, undoApproval } from '../src/review-state';
 import { isDone, type Item, type Slot } from '../src/model';
 const item = (): Item => ({id: 'a', title: 'コメント 1', slotIds: ['s'], code: 103, depth: 0, lastLine: 1, approved: false, threads: [], changes: []});
 const slots = () => [{id: 's', translation: 'old'} as Slot];
@@ -29,4 +29,13 @@ test('approval moves forward through targets; undo does not move', () => {
 test('latest preview favors a later reply even with equal timestamps', () => {
   const i = item(), t = addComment(i, 'First'); addComment(i, 'Second', t.id);
   t.posts[1].createdAt = t.posts[0].createdAt; assert.equal(latestPreview(i), 'Second');
+});
+
+test('preview navigation identifies the displayed reply and ignores resolved threads',()=>{
+  const i=item(),first=addComment(i,'First'),second=addComment(i,'Second');
+  first.posts[0].createdAt='2026-01-01T00:00:00Z';second.posts[0].createdAt='2026-01-02T00:00:00Z';
+  addComment(i,'Reply to first',first.id);first.posts[1].createdAt='2026-01-03T00:00:00Z';
+  assert.equal(latestComment(i)?.thread,first);assert.equal(latestComment(i)?.post,first.posts[1]);assert.equal(latestPreview(i),'Reply to first');
+  second.posts[0].createdAt='2026-01-04T00:00:00Z';second.resolved=true;
+  assert.equal(latestComment(i)?.post,first.posts[1]);first.resolved=true;assert.equal(latestComment(i),undefined);assert.equal(latestPreview(i),'');
 });

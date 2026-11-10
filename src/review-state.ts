@@ -65,9 +65,11 @@ export function approveItem(item: Item, slots: Slot[], resolveComments = false) 
   }
   item.approved = true;
 }
-export function latestPreview(item: Item) {
-  return unresolved(item).flatMap(t => t.posts).map((post, index) => ({post, index})).sort((a, b) => b.post.createdAt.localeCompare(a.post.createdAt) || b.index - a.index).at(0)?.post.text ?? '';
+export function latestComment(item:Item) {
+  return unresolved(item).flatMap(thread=>thread.posts.map(post=>({thread,post}))).map((entry,index)=>({...entry,index}))
+    .sort((a,b)=>b.post.createdAt.localeCompare(a.post.createdAt)||b.index-a.index).at(0);
 }
+export function latestPreview(item: Item) {return latestComment(item)?.post.text??'';}
 export function nextAfterApproval(items: Item[], currentId: string, filter: (item: Item) => boolean): string {
   const index = items.findIndex(i => i.id === currentId);
   return items.slice(index + 1).find(filter)?.id ?? currentId;

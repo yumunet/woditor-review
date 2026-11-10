@@ -6,7 +6,7 @@ import {installTooltips} from './tooltips';
 import {installViewport} from './viewport';
 import {updateCommentScroll} from './comment-scroll';
 import { parseArchives, renderTranslations } from './parser-client';
-import { addComment, approveItem, deleteComment, discardRejectedChanges, editComment, latestPreview, nextAfterApproval, setResolved, undoApproval } from './review-state';
+import { addComment, approveItem, deleteComment, discardRejectedChanges, editComment, latestComment, nextAfterApproval, setResolved, undoApproval } from './review-state';
 import { backupFileName, backupJson, download, loadWorkspace, restoreJson, saveWorkspace } from './storage';
 import { chatInstructions, createRequest, importResponse, mergeFiles, reviewFileNames, sourceZip } from './exchange';
 import { characterDiff } from './diff';
@@ -50,6 +50,7 @@ let commentTab: 'open' | 'all' = 'open', replyTarget: string | null = null;
 let diagnosticTab: 'error' | 'warning' | 'skip' = 'error';
 let editTarget: {threadId: string; postId: string} | null = null;
 let commentDraft='',commentDraftItem='';
+let commentAnchor:string|null=null;
 let confirmation: {question: string; run: () => void | Promise<void>} | null = null;
 let exportSelection = new Set<string>(), preparedRequest: ReviewRequest | null = null;
 const exportCollapsed=new Set<string>();
@@ -61,7 +62,7 @@ function setPreferences(next:Partial<Preferences>) {
 let screenHistory:ScreenHistory<ReturnType<typeof screenState>>|undefined;
 function screenState() {
   return {workspaceRevision,path,currentId,sheet,menu,homeFilter,itemFilter,itemQuery,before,after,usageIndex,contextMenu,
-    commentTab,diagnosticTab,textView:textView && {...textView,offsets:{...textView.offsets}},
+    commentTab,commentAnchor,diagnosticTab,textView:textView && {...textView,offsets:{...textView.offsets}},
     confirmation,instructionsPreview,reviewMode,exportSelection:new Set(exportSelection),preparedRequest};
 }
 function historyScreen() {
@@ -70,7 +71,7 @@ function historyScreen() {
 }
 function restoreScreen(state:ReturnType<typeof screenState>) {
   ({path,currentId,sheet,menu,homeFilter,itemFilter,itemQuery,before,after,usageIndex,contextMenu,
-    commentTab,diagnosticTab,textView,confirmation,instructionsPreview,reviewMode,preparedRequest}=state);
+    commentTab,commentAnchor,diagnosticTab,textView,confirmation,instructionsPreview,reviewMode,preparedRequest}=state);
   exportSelection=new Set(state.exportSelection);
   reviewMode=preferences.reviewMode??reviewMode;
   if(preferences.contextFull && contextMenu==='radius') contextMenu=null;
@@ -79,8 +80,9 @@ function restoreScreen(state:ReturnType<typeof screenState>) {
   if(path && !currentFile()) {path=currentId=sheet=null;menu=false;confirmation=null;instructionsPreview=null;}
   if(path && !currentItem()) reconcileCurrent();
   render();if(sheet==='text') refreshTextView(true);
-  const focus=instructionsPreview!==null ? '.instructions-dialog button' : confirmation ? '.dialog button' : sheet==='comments' ? '#comment-form textarea' : sheet ? '.sheet .icon' : '.top .icon';
+  const focus=instructionsPreview!==null ? '.instructions-dialog button' : confirmation ? '.dialog button' : sheet==='comments' && !commentAnchor ? '#comment-form textarea' : sheet ? '.sheet .icon' : '.top .icon';
   root.querySelector<HTMLElement>(focus)?.focus({preventScroll:true});
+  if(sheet==='comments' && !confirmation && instructionsPreview===null) revealComment();
 }
 const sheetTitles: Record<string,string> = {load: 'ファイルを読み込む', items: '翻訳項目', comments: 'コメント', progress: '全体の進捗', diagnostics: '読み込み結果', restore: 'バックアップを復元', export: 'AIレビューを依頼', response: 'AIレビュー結果を読み込む', english: '英訳TXTを出力'};
 sheetTitles.source = '原文を補う';
@@ -109,8 +111,26 @@ function exportRows() {
   const files = exportFiles(), checked = files.filter(f => exportSelection.has(f.path)).length;
   return `<div class="sheet-body"><label class="export-row export-all"><input id="export-all" type="checkbox" ${files.length && checked === files.length ? 'checked' : ''} ${!files.length ? 'disabled' : ''}>すべて選択</label>${files.length ? exportTree(files,exportSelection,exportCollapsed) : '<div class="empty">出力対象のファイルはありません</div>'}</div>`;
 }
-function openSheet(name: string) {lastFocus = document.activeElement as HTMLElement; sheet = name; menu = false; if (name === 'diagnostics') diagnosticTab = 'error'; if (name === 'export') {reviewMode = preferences.reviewMode ?? (workspace.files.some(f => (!path || f.path === path) && f.items.some(i => unresolved(i).length)) ? 'comments' : 'initial');setPreferences({reviewMode});} if (name === 'export' || name === 'english') resetExportSelection(); render(); root.querySelector<HTMLElement>(name==='comments'?'#comment-form textarea':'.sheet .icon, .sheet input, .sheet button:not(.handle)')?.focus({preventScroll:true});if(name==='items') revealCurrentItem();}
-function closeSheet() {sheet = null; render(); lastFocus?.focus();}
+function openSheet(name:string,postId:string|null=null) {
+  lastFocus=document.activeElement as HTMLElement;sheet=name;menu=false;commentAnchor=name==='comments'?postId:null;
+  if(name==='diagnostics') diagnosticTab='error';
+  if(name==='export') {reviewMode=preferences.reviewMode??(workspace.files.some(f=>(!path||f.path===path)&&f.items.some(i=>unresolved(i).length))?'comments':'initial');setPreferences({reviewMode});}
+  if(name==='export'||name==='english') resetExportSelection();
+  render();
+  root.querySelector<HTMLElement>(name==='comments'&&!commentAnchor?'#comment-form textarea':'.sheet .icon, .sheet input, .sheet button:not(.handle)')?.focus({preventScroll:true});
+  if(name==='items') revealCurrentItem();
+  if(name==='comments') revealComment();
+}
+function closeSheet() {sheet = null;commentAnchor=null; render(); lastFocus?.focus();}
+function revealComment() {
+  if(!commentAnchor) return;
+  const list=root.querySelector<HTMLElement>('.comments-list');
+  const post=[...root.querySelectorAll<HTMLElement>('[data-post-id]')].find(element=>element.dataset.postId===commentAnchor);
+  if(!list||!post) return;
+  post.focus({preventScroll:true});
+  list.scrollTop+=post.getBoundingClientRect().top-list.getBoundingClientRect().top-12;
+  updateCommentScroll(root);
+}
 function revealCurrentItem() {
   const body=root.querySelector<HTMLElement>('.sheet-body'),active=root.querySelector<HTMLElement>('.pick-row.active');
   if(body) body.scrollTop=active ? body.scrollTop+active.getBoundingClientRect().top-body.getBoundingClientRect().top-(body.clientHeight-active.clientHeight)/2 : 0;
@@ -123,7 +143,7 @@ function reconcileCurrent() {
   if(itemFilter==='comment' && currentItem()) return;
   if (!targets().some(i => i.id === currentId)) {currentId = targets()[0]?.id ?? null; if (!currentId && sheet === 'comments') sheet = null;}
 }
-function selectItem(id: string) {currentId = id; before = after = preferences.contextRadius; usageIndex = 0; contextMenu=null;}
+function selectItem(id: string) {currentId = id; before = after = preferences.contextRadius; usageIndex = 0; contextMenu=null;commentAnchor=null;}
 function move(delta: number) {
   if(!path) return;
   const target=navigationTarget(workspace.files,path,currentId,itemFilter,homeFilter,delta<0?-1:1);
@@ -148,7 +168,7 @@ function treeRows(node: TreeNode, depth = 0): string {
 }
 function context(file:ReviewFile,item:Item) {return contextView(file,item,preferences,{usageIndex,before,after,menu:contextMenu});}
 function review(file: ReviewFile) {
-  const item = currentItem(), list = targets(), index = list.findIndex(i => i.id === currentId);
+  const item = currentItem(), preview=item && latestComment(item), list = targets(), index = list.findIndex(i => i.id === currentId);
   const previous=navigationTarget(workspace.files,file.path,currentId,itemFilter,homeFilter,-1);
   const next=navigationTarget(workspace.files,file.path,currentId,itemFilter,homeFilter,1);
   let body = '<div class="empty">対象の項目はありません</div>';
@@ -159,7 +179,7 @@ function review(file: ReviewFile) {
     const diff = pending.length ? characterDiff(oldText, slots.map(s => pending.find(c => c.slotId === s.id)?.after ?? s.translation).join('\n')) : null;
     body = `<button class="entry-open" data-action="items"><span class="entry-title">${e(itemTitle(file,item))}</span><span class="status ${isDone(item) ? 'done' : ''}">${isDone(item) ? '確認済み' : '未確認'}</span>${icon('list')}</button><div class="pair"><div><div class="label">原文</div><div class="text-box source">${e(slots.map(sourceText).join('\n'))}</div>${slots.some(s=>s.sourceMissing) ? '<button class="text-act" data-action="source-edit">原文を補う</button>' : ''}</div><div><div class="label">${diff ? '変更前の英訳' : '英訳'}</div><div class="text-box translation">${diff?.before ?? e(oldText)}</div>${slots.flatMap(slotWarnings).map(w => `<p class="slot-warning ${w === newlineWarning ? 'subtle' : ''}">${e(w)}</p>`).join('')}</div>${diff ? `<div><div class="label">変更後の英訳</div><div class="text-box translation-after">${diff.after}</div></div>` : ''}${pending.some(c=>c.rejectedBy) ? '<div class="rejected-proposal"><p class="hint">AIの再審で不採用になった変更があります。</p><button class="text-act" data-action="discard-rejected">不採用の変更を破棄</button></div>' : ''}</div>${context(file, item)}`;
   }
-  return `<main class="scroll review">${!item ? `<button class="entry-open" data-action="items">項目を選択${icon('list')}</button>` : ''}${body}</main><footer class="bottom"><button class="comment-trigger" data-action="comments" ${!item ? 'disabled' : ''}>${icon('comment')}<span class="comment-label">コメント</span>${item?.threads.length ? `<span class="bubble">${item.threads.length}</span>` : ''}</button><span class="counter" aria-live="polite">${index + 1} / ${list.length}</span><button class="prevnext" data-action="prev" aria-label="前の項目" ${!previous ? 'disabled' : ''}>${icon('back')}</button><button class="prevnext next" data-action="next" aria-label="次の項目" ${!next ? 'disabled' : ''}>${icon('next')}</button></footer>${item && unresolved(item).length ? `<button class="float-comment" data-action="comments"><div class="float-head">未解決 ${unresolved(item).length}件</div><div class="float-preview">${e(latestPreview(item))}</div></button>` : ''}${item ? `<button class="approve ${isDone(item) ? 'undo' : ''}" data-action="approve">${icon(isDone(item) ? 'undo' : 'check-circle')}${isDone(item) ? '未確認に戻す' : '承認'}</button>` : ''}`;
+  return `<main class="scroll review">${!item ? `<button class="entry-open" data-action="items">項目を選択${icon('list')}</button>` : ''}${body}</main><footer class="bottom"><button class="comment-trigger" data-action="comments" ${!item ? 'disabled' : ''}>${icon('comment')}<span class="comment-label">コメント</span>${item?.threads.length ? `<span class="bubble">${item.threads.length}</span>` : ''}</button><span class="counter" aria-live="polite">${index + 1} / ${list.length}</span><button class="prevnext" data-action="prev" aria-label="前の項目" ${!previous ? 'disabled' : ''}>${icon('back')}</button><button class="prevnext next" data-action="next" aria-label="次の項目" ${!next ? 'disabled' : ''}>${icon('next')}</button></footer>${item && preview ? `<button class="float-comment" data-action="comment-preview" data-value="${e(preview.post.id)}"><div class="float-head">未解決 ${unresolved(item).length}件</div><div class="float-preview">${e(preview.post.text)}</div></button>` : ''}${item ? `<button class="approve ${isDone(item) ? 'undo' : ''}" data-action="approve">${icon(isDone(item) ? 'undo' : 'check-circle')}${isDone(item) ? '未確認に戻す' : '承認'}</button>` : ''}`;
 }
 function commentsBody() {
   const item = currentItem(); if (!item) return '<div class="empty">対象の項目はありません</div>';
@@ -274,6 +294,7 @@ root.addEventListener('click', event => {
     try {approve();} catch(error) {toast(String(error));} return;
   }
   else if (action === 'comment-tab') commentTab = value as 'open' | 'all';
+  else if(action==='comment-preview') {openSheet('comments',value??null);return;}
   else if(action==='comment-scroll') {const list=root.querySelector('.comments-list');list?.scrollBy({top:Number(value)*Math.max(120,list.clientHeight*.7),behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});return;}
   else if (action === 'diagnostic-tab') diagnosticTab = value as typeof diagnosticTab;
   else if(action==='diagnostic-item') {
