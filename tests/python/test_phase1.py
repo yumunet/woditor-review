@@ -1,10 +1,17 @@
 import unittest
 from pathlib import Path
 
-from review_parser import decode, extract_source, command_info, slot_policy
+from review_parser import decode, extract_source, command_info, slot_policy, metadata_title
 from woditor_translation_tool import analyze, file_type
 
 ROOT = Path('.reference/ja-JP/texts')
+
+
+class MetadataTitleTests(unittest.TestCase):
+    def test_self_variable_names_use_the_actual_zero_based_index(self):
+        self.assertEqual(metadata_title('CSELF_NAME_0'), 'セルフ変数名 0')
+        self.assertEqual(metadata_title('CSELF_NAME_99'), 'セルフ変数名 99')
+        self.assertEqual(metadata_title('VALINPUT_NAME_0'), '数値引数名 1')
 
 
 @unittest.skipUnless(ROOT.exists(), 'Private reference corpus is not installed')

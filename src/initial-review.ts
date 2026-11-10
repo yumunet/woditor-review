@@ -1,4 +1,4 @@
-import {sourceText, type ReviewRequest, type Workspace} from './model';
+import {sourceText, itemTitle, type ReviewRequest, type Workspace} from './model';
 import {now, uid} from './review-state';
 import {initialContext} from './ui';
 import type {ReviewResponse} from './exchange';
@@ -7,7 +7,7 @@ export function createInitialRequest(workspace: Workspace, selected: string[]): 
   const targets = workspace.files.filter(f => selected.includes(f.path)).flatMap(file => file.items.map(item => {
     const slots = item.slotIds.map(id => file.slots.find(s => s.id === id)!);
     const line = slots[0].command ? slots[0].line : file.usages[slots[0].id]?.[0];
-    return {path: file.path, fileVersion: file.version, sourceVersion: file.sourceVersion, itemId: item.id, title: item.title, slotIds: [...item.slotIds],
+    return {path: file.path, fileVersion: file.version, sourceVersion: file.sourceVersion, itemId: item.id, title: itemTitle(file,item), slotIds: [...item.slotIds],
       slots: slots.map(s => ({id: s.id, source: sourceText(s), translation: s.translation, line: s.enLine ?? s.line, key: s.key, kind: s.kind, position: s.position})),
       context: line === undefined ? [] : initialContext(file, line, 3, 3), threads: structuredClone(item.threads),
       pendingChanges: item.changes.filter(c => c.status === 'pending').map(({id,slotId,before,after}) => ({id,slotId,before,after}))};

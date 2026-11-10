@@ -88,7 +88,7 @@ def metadata_title(key: str) -> str:
              (r'VMEMO_NAME_(\d+)', '変数名')]
     for pattern, title in rules:
         if m := re.fullmatch(pattern, key):
-            return title + ' ' + '-'.join(str(int(n) + 1) for n in m.groups())
+            return title + ' ' + '-'.join(str(int(n) + (0 if title == 'セルフ変数名' else 1)) for n in m.groups())
     return {'EVENT_NAME': 'イベント名', 'COMMON_NAME': 'コモンイベント名',
             'COMMON_EVENT_NAME': 'コモンイベント名', 'COMMONEVENT_NAME': 'コモンイベント名',
             'TYPENAME': 'タイプ名', 'MEMO': 'メモ', 'RETURN_VAL_NAME': '返り値名',

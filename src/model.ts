@@ -57,6 +57,11 @@ export interface Workspace {
 }
 export const emptyWorkspace = (): Workspace => ({schemaVersion: 1, files: [], diagnostics: [], requests: [], importedResponses: [], updatedAt: new Date().toISOString()});
 export const sourceText = (slot: Slot) => slot.sourceOverride ?? slot.source;
+export function itemTitle(file:ReviewFile,item:Item):string {
+  const slot=item.slotIds.length===1 ? file.slots.find(s=>s.id===item.slotIds[0]) : undefined;
+  const index=slot && /^CSELF_NAME_(\d+)$/.exec(slot.key)?.[1];
+  return index!==undefined ? `セルフ変数名 ${Number(index)}` : item.title;
+}
 export const unresolved = (item: Item) => item.threads.filter(t => !t.resolved);
 export const isDone = (item: Item) => item.approved && !unresolved(item).length && !item.changes.some(c => c.status === 'pending');
 export const matches = (item: Item, filter: Filter) => filter === 'all' || (filter === 'done' ? isDone(item) : filter === 'pending' ? !isDone(item) : unresolved(item).length > 0);
