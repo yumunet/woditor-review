@@ -26,6 +26,15 @@ test('automatic alignment notices have their own tab without hiding actual warni
   const html=diagnosticsView([automatic,warning],'automatic');assert.ok(html.includes(automatic.message));assert.ok(!html.includes(warning.message));assert.ok(html.includes('自動補正 (1)'));assert.ok(html.includes('警告 (1)'));
   assert.ok(!diagnosticsView([automatic,warning],'warning').includes(automatic.message));
 });
+
+test('only positional alignment and known format differences are automatic',()=>{
+  const automatic=['原文部分の行数差を自動補正しました（日本語 10 / 英語 9）','設定キーによる行ずれ補正: 2件','コマンド列による行ずれ補正: 1件',
+    '旧形式の文字列操作の引数形式の違いを吸収: 1件'];
+  const differences=['英語版で使用対象外になった翻訳項目: 3件','英語版に対応する翻訳項目がありません: 3件','翻訳対象外の設定値が日英で異なります: 2件','コマンド引数が日英で異なります: 2件'];
+  for(const message of automatic) assert.equal(diagnosticTabFor({path:'a',severity:'warning',message}),'automatic');
+  for(const message of differences) assert.equal(diagnosticTabFor({path:'a',severity:'warning',message}),'warning');
+  for(const message of [...automatic,...differences]) assert.equal(diagnosticTabFor({path:'a',severity:'error',message}),'error');
+});
 test('diagnostic links use exact or nearby slots, including English-only originals',()=>{
   const file={path:'a.txt',slots:[{id:'s',line:10,enLine:8},{id:'missing',line:-20,enLine:20}],items:[{id:'a',slotIds:['s']},{id:'b',slotIds:['missing']}],commands:[],excluded:[]} as unknown as ReviewFile;
   const workspace={...emptyWorkspace(),files:[file]};

@@ -142,7 +142,7 @@ def pair_file(path: str, ja_raw: bytes, en_raw: bytes) -> dict:
         raise ValueError('日本語・英語のファイル形式が一致しません')
     analyze(en, data['type'])  # Validate CSV markers on the English side too.
     a, b = source_lines(ja), source_lines(en)
-    alignment = align(ja, en, data['type'], command_info)
+    alignment = align(ja, en, data['type'], command_info, Counter(s['line'] for s in data['slots']))
     warnings = alignment['warnings']
     errors = []
     # Newlines belong to each input version and are never normalized in storage.

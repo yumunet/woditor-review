@@ -155,7 +155,7 @@ def inactive(key, meta):
     return False
 
 
-def align(ja, en, kind, parse):
+def align(ja, en, kind, parse, translation_lines):
     am, ac = records(ja, parse)
     bm, bc = records(en, parse)
     identity = {'common': 'COMMON_ID', 'map': 'EVENT_ID', 'database': 'TYPE_ID'}[kind]
@@ -179,17 +179,23 @@ def align(ja, en, kind, parse):
             if a['line'] != b['line']:
                 summary['設定キーによる行ずれ補正'] += 1
             if a['value'] != b['value'] and not metadata_allowed(kind, a['key']):
-                summary['設定値の差を保持'] += 1
+                summary['翻訳対象外の設定値が日英で異なります'] += 1
         elif not target:
             for record in source:
                 unused = inactive(record['key'], en_meta)
-                excluded[record['line']] = '英語版で無効化された設定' if unused else '英語版で削除された設定'
+                translated = bool(translation_lines.get(record['line']))
+                subject = '翻訳項目' if translated else '設定'
+                excluded[record['line']] = f'英語版で使用対象外になった{subject}' if unused else f'英語版に対応する{subject}がありません'
                 summary[excluded[record['line']]] += 1
         else:
             uncertain.update(record['line'] for record in source)
             uncertain_en.update(record['line'] for record in target)
-    for key in bmap.keys() - amap.keys():
-        summary['英語版だけの設定を保持'] += len(bmap[key])
+    for key in bmap:
+        if key in amap:
+            continue
+        for record in bmap[key]:
+            subject = '翻訳項目' if metadata_allowed(kind, record['key']) and record['value'] else '設定'
+            summary[f'英語版だけの{subject}があります'] += 1
     pairs, removed, ambiguous, ambiguous_en = align_commands(ac, bc)
     for i, j in pairs.items():
         a, b = ac[i], bc[j]
@@ -197,18 +203,20 @@ def align(ja, en, kind, parse):
         if a['line'] != b['line']:
             summary['コマンド列による行ずれ補正'] += 1
         if command_key(a) != command_key(b):
-            summary['コマンド引数の差を保持して関連付け'] += 1
+            summary['コマンド引数が日英で異なります'] += 1
         elif a['numbers'] != b['numbers']:
-            summary['旧形式の文字列操作に追加された引数を補正'] += 1
+            summary['旧形式の文字列操作の引数形式の違いを吸収'] += 1
     for i in removed:
-        excluded[ac[i]['line']] = '英語版で削除されたコマンド'
-        summary['英語版で削除されたコマンド'] += 1
+        count = translation_lines.get(ac[i]['line'], 0)
+        reason = '英語版に対応する翻訳項目がありません' if count else '英語版に対応するコマンドがありません'
+        excluded[ac[i]['line']] = reason
+        summary[reason] += count or 1
     uncertain.update(ac[i]['line'] for i in ambiguous)
     uncertain_en.update(bc[i]['line'] for i in ambiguous_en)
     matched_en = set(pairs.values())
     for j, command in enumerate(bc):
         if j not in matched_en:
-            summary['英語版だけのコメントを保持' if command['code'] == 103 else '英語版だけのコマンドを保持'] += 1
+            summary['英語版だけのコメントがあります' if command['code'] == 103 else '英語版だけのコマンドがあります'] += 1
     # A merged display sequence preserves order in each language independently.
     display_pairs, x, y = [], 0, 0
     for i, j in sorted(pairs.items()) + [(len(ac), len(bc))]:

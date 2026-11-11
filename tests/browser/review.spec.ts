@@ -517,7 +517,7 @@ test('diagnostic text viewer opens errors at the source line and switches langua
 test('warning locations open both the removed setting and its English count field',async({page})=>{
   test.skip(!corpus,'Private reference files not available');await loadReal(page,'BasicData/CDataBase/04.txt');
   await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:/^読み込み結果/}).click();
-  await page.getByRole('tab',{name:/^自動補正/}).click();await page.locator('.diagnostic.warning').filter({hasText:'無効化された設定'}).first().click();
+  await page.getByRole('tab',{name:/^警告/}).click();await page.locator('.diagnostic.warning').filter({hasText:'使用対象外になった翻訳項目'}).first().click();
   await expect(page.locator('.focus-line code')).toContainText('CHOICE_NAME_0_0=');
   await page.getByRole('tab',{name:'英語',exact:true}).click();await expect(page.locator('.focus-line code')).toHaveText('CHOICE_NAME_0_NUM=0');
 });
@@ -770,7 +770,7 @@ test('context controls retain all options and full view marks every variable usa
 
 test('diagnostic errors and warnings open translation items and Back restores the results tab',async({page},info)=>{
   test.skip(!corpus,'Private reference files not available');await loadReal(page,'BasicData/CDataBase/04.txt');
-  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:/^読み込み結果/}).click();await page.getByRole('tab',{name:/^自動補正/}).click();
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:/^読み込み結果/}).click();await page.getByRole('tab',{name:/^警告/}).click();
   const row=page.locator('.diagnostic-row').filter({has:page.locator('[data-action=diagnostic-item]')}).first(),text=row.locator('.diagnostic-open'),item=row.locator('.diagnostic-item');
   const alignment=async()=>{const a=await text.boundingBox(),b=await item.boundingBox(),r=await row.boundingBox();expect(b!.x).toBeGreaterThanOrEqual(a!.x+a!.width);expect(Math.abs(b!.x+b!.width-r!.x-r!.width+8)).toBeLessThan(1);expect(Math.abs(b!.y+b!.height/2-r!.y-r!.height/2)).toBeLessThan(1);};
   await expect(text).toHaveJSProperty('tagName','SPAN');await expect(row.locator('strong')).toHaveCSS('font-weight','700');
@@ -781,8 +781,8 @@ test('diagnostic errors and warnings open translation items and Back restores th
   if(info.project.name==='desktop') await item.hover();else await item.dispatchEvent('pointerdown',{pointerType:'touch'});
   await expect(page.getByRole('tooltip')).toHaveText((await item.getAttribute('aria-label'))!);
   if(info.project.name==='mobile') {await item.dispatchEvent('pointerup',{pointerType:'touch'});await item.dispatchEvent('click');await expect(page.getByRole('dialog',{name:'読み込み結果',exact:true})).toBeVisible();}
-  await text.click();await expect(page.getByRole('dialog',{name:'テキスト表示',exact:true})).toBeVisible();await page.goBack();await expect(page.getByRole('tab',{name:/^自動補正/})).toHaveAttribute('aria-selected','true');
-  await page.locator('[data-action=diagnostic-item]').first().click();await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.locator('.source')).toBeVisible();await page.goBack();await expect(page.getByRole('tab',{name:/^自動補正/})).toHaveAttribute('aria-selected','true');
+  await text.click();await expect(page.getByRole('dialog',{name:'テキスト表示',exact:true})).toBeVisible();await page.goBack();await expect(page.getByRole('tab',{name:/^警告/})).toHaveAttribute('aria-selected','true');
+  await page.locator('[data-action=diagnostic-item]').first().click();await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.locator('.source')).toBeVisible();await page.goBack();await expect(page.getByRole('tab',{name:/^警告/})).toHaveAttribute('aria-selected','true');
   await loadReal(page,'MapData/SampleMapA/Event_0019.txt');await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:/^読み込み結果/}).click();
   await page.locator('.diagnostic.error').first().locator('..').getByRole('button',{name:'翻訳項目を開く',exact:true}).click();await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.locator('.source')).toHaveText('');await expect(page.getByRole('button',{name:'原文を補う',exact:true})).toBeVisible();await page.goBack();await expect(page.getByRole('tab',{name:/^エラー/})).toHaveAttribute('aria-selected','true');
 });
@@ -881,6 +881,6 @@ test('import results separate automatic corrections from warnings and keep error
   const path='BasicData/DataBase/00.txt';
   for(const [name,text] of [['ja','TYPE_ID=0\r\nITEM_NUM=0\r\nMEMO=日本語\r\n'],['en','TYPE_ID=0\nITEM_NUM=0\nMEMO=English\nEXTRA_SETTING=1\n']]) await page.locator(`input[name=${name}]`).setInputFiles({name:name+'.zip',mimeType:'application/zip',buffer:Buffer.from(zipSync({[path]:Buffer.from(text)}))});
   await page.getByRole('button',{name:'読み込む',exact:true}).click();await expect(page.locator('.busy')).toHaveCount(0,{timeout:90000});await expect(page.getByRole('tab',{name:/^エラー/})).toHaveAttribute('aria-selected','true');
-  await page.getByRole('tab',{name:/^警告/}).click();await expect(page.locator('.diagnostic.warning')).toHaveCount(1);await expect(page.locator('.diagnostic.warning')).toContainText('改行形式');
-  await page.getByRole('tab',{name:/^自動補正/}).click();await expect(page.locator('#diagnostic-panel')).toContainText('行数差を自動補正');await expect(page.locator('#diagnostic-panel')).not.toContainText('改行形式');
+  await page.getByRole('tab',{name:/^警告/}).click();await expect(page.locator('.diagnostic.warning')).toHaveCount(2);await expect(page.locator('#diagnostic-panel')).toContainText('改行形式');await expect(page.locator('#diagnostic-panel')).toContainText('英語版だけの設定があります');
+  await page.getByRole('tab',{name:/^自動補正/}).click();await expect(page.locator('#diagnostic-panel')).toContainText('行数差を自動補正');await expect(page.locator('#diagnostic-panel')).not.toContainText('改行形式');await expect(page.locator('.diagnostic').first()).toHaveCSS('color','rgb(0, 0, 0)');await expect(page.locator('.diagnostic').first()).toHaveCSS('border-left-color','rgb(0, 0, 0)');
 });

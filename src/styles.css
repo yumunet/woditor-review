@@ -76,6 +76,7 @@ body{position:fixed;inset:0}
 .diagnostic-open{display:block;color:var(--accent);font-size:11px;margin-top:5px}
 .diagnostic-row{position:relative;border-bottom:1px solid var(--line)}
 .diagnostic-row .diagnostic{border-bottom:0}
+#diagnostic-panel[aria-labelledby=diagnostic-tab-automatic] .diagnostic{color:#000;border-left-color:#000}
 .diagnostic-row.has-item .diagnostic{padding-right:60px}
 .diagnostic-item{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:40px;height:40px;color:var(--accent)}
 .diagnostic-item:hover{background:#e8f0fe}

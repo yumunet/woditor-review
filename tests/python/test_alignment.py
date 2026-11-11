@@ -23,7 +23,7 @@ class AlignmentTests(unittest.TestCase):
     def test_deleted_database_settings_and_shifted_metadata(self):
         data = self.pair('BasicData/CDataBase/04.txt')
         self.assertFalse(data['errors'])
-        self.assertTrue(any('無効化' in w for w in data['warnings']))
+        self.assertTrue(any('使用対象外になった翻訳項目' in w for w in data['warnings']))
         self.assertFalse(any(s['key'].startswith('CHOICE_NAME_') for s in data['slots']))
         self.assertTrue(any(s['key'] == 'ITEMNAME0' and 'Rate' in s['translation'] for s in data['slots']))
         shifted = self.pair('BasicData/CDataBase/01.txt')
@@ -32,7 +32,7 @@ class AlignmentTests(unittest.TestCase):
     def test_removed_common_argument_choices_keep_later_slots(self):
         data = self.pair('BasicData/CommonEvent/014.txt')
         self.assertFalse(data['errors'])
-        self.assertTrue(any(s['key'].startswith('CHOICE_STR_1_') and '無効化' in s['reason'] for s in data['excluded']))
+        self.assertTrue(any(s['key'].startswith('CHOICE_STR_1_') and '使用対象外' in s['reason'] for s in data['excluded']))
         self.assertTrue(any(s['key'].startswith('CSELF_NAME_') for s in data['slots']))
         for slot in data['slots']:
             line = data['enText'].splitlines()[slot['enLine'] - 1]
@@ -60,7 +60,7 @@ class AlignmentTests(unittest.TestCase):
     def test_changed_numeric_parameters_warn_without_losing_db_text(self):
         data = self.pair('BasicData/CommonEvent/074.txt')
         self.assertFalse(data['errors'])
-        self.assertTrue(any('コマンド引数の差' in w for w in data['warnings']))
+        self.assertTrue(any('コマンド引数が日英で異なります' in w for w in data['warnings']))
         self.assertTrue(any(s['command'] and s['command']['code'] == 250 and 'Learned' in s['translation'] for s in data['slots']))
 
     def test_every_real_accepted_slot_matches_its_english_field(self):

@@ -48,7 +48,7 @@ class PairTests(unittest.TestCase):
     def test_legacy_string_arguments_automatically_aligned(self):
         data = self.pair('MapData/SampleMapA/Event_0009.txt')
         self.assertFalse(data['errors'])
-        self.assertTrue(any('追加された引数' in warning for warning in data['warnings']))
+        self.assertTrue(any('引数形式の違いを吸収' in warning for warning in data['warnings']))
         self.assertTrue(any('Eat here' in s['translation'] for s in data['slots']))
 
     def test_structure_and_slot_position(self):

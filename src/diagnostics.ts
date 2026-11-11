@@ -4,7 +4,7 @@ export type DiagnosticTab=Diagnostic['severity']|'automatic';
 const tabs: [DiagnosticTab, string][] = [['error', 'エラー'], ['warning', '警告'], ['automatic','自動補正'],['skip', '対象外']];
 export function diagnosticTabFor(diagnostic:Diagnostic):DiagnosticTab {
   if(diagnostic.severity!=='warning') return diagnostic.severity;
-  return /^(?:原文部分の行数差を自動補正|設定キーによる行ずれ補正|コマンド列による行ずれ補正|コマンド引数の差を保持して関連付け|旧形式の文字列操作に追加された引数を補正|設定値の差を保持|英語版(?:で(?:無効化|削除)された(?:設定|コマンド)|だけの(?:設定|コメント|コマンド)を保持)|CSVの数値・非文字列設定の差を保持)/.test(diagnostic.message)?'automatic':'warning';
+  return /^(?:原文部分の行数差を自動補正|設定キーによる行ずれ補正|コマンド列による行ずれ補正|旧形式の文字列操作の引数形式の違いを吸収)/.test(diagnostic.message)?'automatic':'warning';
 }
 export function diagnosticsView(diagnostics: Diagnostic[], active: DiagnosticTab,workspace?:Workspace) {
   const selected = diagnostics.map((diagnostic,index)=>({diagnostic,index})).filter(({diagnostic}) => diagnosticTabFor(diagnostic) === active);
@@ -21,11 +21,12 @@ export function diagnosticLocation(file:ReviewFile,message:string):Pick<Diagnost
   else if(message.includes('コマンド列による')) slot=file.slots.find(s=>s.command && s.line>0 && s.enLine!==s.line);
   else if(message.includes('旧形式')) slot=file.slots.find(s=>s.command?.code===122 && s.command.numbers.length===2);
   if(slot) {line=slot.line>0?slot.line:undefined;enLine=slot.enLine;}
-  if(message.includes('無効化された設定')) {
-    const setting=file.excluded.find(s=>s.reason==='英語版で無効化された設定');
+  if(/英語版で使用対象外になった(?:翻訳項目|設定)|英語版に対応する(?:翻訳項目|設定|コマンド)がありません/.test(message)) {
+    const label=message.split(/[:：]/,1)[0];
+    const setting=file.excluded.find(s=>s.reason===label);
     if(setting?.line && setting.key) {
       line=setting.line;
-      const countKey=setting.key.replace(/_\d+$/,'_NUM');
+      const countKey=setting.key.replace(/^(VALINPUT|STRINPUT)_NAME_\d+$/,'$1_NUM').replace(/^ITEMNAME\d+$/,'ITEM_NUM').replace(/_\d+$/,'_NUM');
       const index=file.enText.split(/\r\n|\r|\n/).findIndex(l=>l.startsWith(countKey+'='));
       if(index>=0) enLine=index+1;
     }

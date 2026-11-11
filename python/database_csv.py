@@ -121,9 +121,9 @@ def pair_cells(ja, en, warning_for):
                       **({'sourceMissing': True} if missing else {})})
     for key, source in a['fields'].items():
         if source['quoted'] and source['value'] != '' and key not in b['fields']:
-            errors.append(f'行 {source["line"]}: CSV文字列が英語版にありません（{key}）')
+            errors.append(f'行 {source["line"]}: 英語版に対応する翻訳項目がありません（CSV: {key}）')
     if non_text:
-        warnings.append(f'CSVの数値・非文字列設定の差を保持: {non_text}件')
+        warnings.append(f'翻訳対象外の設定値が日英で異なります（CSVの数値・非文字列）: {non_text}件')
     return slots, errors, warnings
 
 
