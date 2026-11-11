@@ -97,7 +97,6 @@ body{position:fixed;inset:0}
 .pick-source{font-size:11px;line-height:14px;min-height:14px;color:#8b97a5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .item-search{padding:8px 15px;border-bottom:1px solid var(--line);flex:none}
 .item-search input{width:100%;min-height:38px;border:1px solid #dce5f5;border-radius:8px;padding:7px 11px;background:#f8faff;font-size:14px}
-.slot-warning.subtle{color:#8b97a5}
 .database-context-body{margin:0 16px 16px}
 .database-original,.database-translation{background:#f2f4f6}
 .context-translations{display:grid;gap:10px}

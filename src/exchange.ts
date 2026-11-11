@@ -33,7 +33,7 @@ export const chatInstructions = (request: ReviewRequest) => request.mode === 'in
 提供の woditor_review_tool.py の build → validate → apply を使い、${reviewFileNames(request).response} と修正済み英訳ZIPを出力してください。
 build用の判断JSON: {"responses":[{"commentId":"依頼のID","decision":"accepted","reason":"理由","changes":[{"slotId":"対象ID","before":"slots.translation","after":"最終案"}]}],"suggestions":[]}。
 changesはSlotごと・全回答で重複なし。保留案を維持・修正する場合も最終案を記載し、撤回は rejected と changes: []。変更なしも changes: []。追加案は suggestions に {id,path,itemId,fileVersion,reason,changes}。
-依頼のID・相対パス・バージョン、TXTのコマンド構造・メタデータキー・CSVの行列構造と数値・COMMAND_TEXT・BOM・改行形式・制御文字・置換文字列・名前指定フィールドを保持。引用符付きCSV設定値には実際の改行を使えます（引用符はツールが処理）。データ名は1行のまま編集。AI判断はユーザー承認と区別してください。`;
+依頼のID・相対パス・バージョン、TXTのコマンド構造・メタデータキー・CSVの行列構造と数値・COMMAND_TEXT・BOM・改行形式・特殊文字列・名前指定フィールドを保持。改行・引用符表記とルビは特殊文字列の保護対象外。引用符付きCSV設定値には実際の改行を使えます（引用符はツールが処理）。データ名は1行のまま編集。AI判断はユーザー承認と区別してください。`;
 
 interface Edit {slotId: string; before: string; after: string}
 interface Answer {commentId: string; path: string; itemId: string; fileVersion: string; decision: Decision; reason: string; explanation?: string; changes: Edit[]}

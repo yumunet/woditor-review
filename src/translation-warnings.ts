@@ -1,18 +1,39 @@
-import {sourceText, type Slot,type ReviewFile} from './model';
-import {isDatabaseMemo} from './display-text';
-// Equivalent to the original Python translator's SPECIAL regex. Ruby is
-// translatable; the remaining controls are compared without altering text.
-const special = /<<\\n>>|<\\n>|\\r\\n|\\n|\\r(?!\[)|\\(?!r\[)[a-zA-Z][a-zA-Z0-9_]*\[[^\]\r\n]*\]|<<[A-Z][A-Z0-9_]*>>|<DIR>|<(?!dqrt>)[A-Za-z][A-Za-z0-9_:-]*>|%(?:\d+\$)?[-+ #0]*(?:\d+|\*)?(?:\.(?:\d+|\*))?[diuoxXfFeEgGaAcsp]|@\d+/g;
-const newlines = new Set([String.raw`<\n>`,String.raw`<<\n>>`,String.raw`\n`,String.raw`\r`,String.raw`\r\n`]);
-export const controlWarning='制御文字・置換文字列が原文と異なります';
-export const newlineWarning='改行が異なります';
-export function translationWarnings(source:string,translation:string):string[] {
-  const before=source.match(special)??[],after=translation.match(special)??[];
-  if(JSON.stringify(before)===JSON.stringify(after)) return [];
-  return [JSON.stringify(before.filter(t=>!newlines.has(t)))===JSON.stringify(after.filter(t=>!newlines.has(t)))?newlineWarning:controlWarning];
+import {sourceText, type Slot} from './model';
+
+const bare=[String.raw`\\`,String.raw`\!`,String.raw`\.`,String.raw`\^`,String.raw`\>`,String.raw`\<`,String.raw`\E`,String.raw`\N`,String.raw`\A+`,String.raw`\A-`];
+export const controlWarning='特殊文字列が原文と異なります';
+export function specialStrings(value:string):string[] {
+  const ends=new Map<number,number>(),stack:number[]=[],tokens:string[]=[];
+  // Pair all brackets once, so nested arguments and malformed input stay linear.
+  for(let i=0;i<value.length;i++) {
+    if(value[i]==='[') stack.push(i);
+    else if(value[i]===']' && stack.length) ends.set(stack.pop()!,i+1);
+  }
+  const name=/[\p{L}\p{N}_+\-]+/uy;
+  for(let i=0;i<value.length;) {
+    if(value[i]==='\\') {
+      name.lastIndex=i+1;const match=name.exec(value),open=match?i+1+match[0].length:-1,end=ends.get(open);
+      if(match && value[open]==='[' && end!==undefined) {
+        if(match[0]!=='r') tokens.push(value.slice(i,end));
+        i=end;continue;
+      }
+      const token=bare.find(token=>value.startsWith(token,i));
+      if(token) {tokens.push(token);i+=token.length;continue;}
+    } else if(value[i]==='<' && ['<L>','<C>','<R>'].some(token=>value.startsWith(token,i))) {
+      tokens.push(value.slice(i,i+3));i+=3;continue;
+    } else if(value[i]==='@' && /[0-9]/.test(value[i+1]??'')) {
+      let end=i+2;while(end<value.length && /[0-9]/.test(value[end])) end++;
+      tokens.push(value.slice(i,end));i=end;continue;
+    }
+    i++;
+  }
+  return tokens;
 }
-export function slotWarnings(slot:Slot,file?:Pick<ReviewFile,'type'>):string[] {
-  const other=slot.warnings.filter(w=>w!==controlWarning && w!==newlineWarning);
+export function translationWarnings(source:string,translation:string):string[] {
+  return JSON.stringify(specialStrings(source))===JSON.stringify(specialStrings(translation))?[]:[controlWarning];
+}
+export function slotWarnings(slot:Slot):string[] {
+  const other=slot.warnings.filter(w=>![controlWarning,'制御文字・置換文字列が原文と異なります','改行が異なります'].includes(w));
   if(slot.sourceMissing && !sourceText(slot)) return other;
-  return [...other,...translationWarnings(sourceText(slot),slot.translation).filter(w=>!isDatabaseMemo(file,slot)||w!==newlineWarning)];
+  return [...other,...translationWarnings(sourceText(slot),slot.translation)];
 }

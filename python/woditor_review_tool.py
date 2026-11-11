@@ -10,9 +10,9 @@ import json
 import re
 from uuid import uuid4
 from pathlib import Path, PurePosixPath
-from review_parser import decode, digest, render_file
+from review_parser import decode, digest, render_file,special_strings
 from database_csv import catalog,cell_for_key
-from woditor_translation_tool import COMMAND, META, fields, tokens
+from woditor_translation_tool import COMMAND, META, fields
 
 SCHEMAS = Path(__file__).resolve().parent.parent / 'docs/schemas'
 
@@ -182,8 +182,8 @@ def apply_files(request: dict, response: dict, english_root: Path, output_root: 
                 actual = match['args'][a:b]
             if actual != edit['before']:
                 raise ValueError('Before text does not match the actual English TXT')
-            if tokens(actual) != tokens(edit['after']):
-                raise ValueError('Protected control tokens changed')
+            if special_strings(actual) != special_strings(edit['after']):
+                raise ValueError('Woditor special strings changed')
             writes[str(path)][2].append({**by_id[edit['slotId']], 'translation': edit['after']})
     rendered = {path: (b'\xef\xbb\xbf' if bom else b'') + render_file(text, slots)['text'].encode('utf-8') for path, (text, bom, slots) in writes.items()}
     for path, raw in rendered.items():

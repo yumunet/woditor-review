@@ -8,9 +8,9 @@ ROOT = Path('.reference')
 
 class WarningTests(unittest.TestCase):
     def test_newlines_only_are_not_control_warnings(self):
-        self.assertEqual(translation_warnings(r'a<\n>b','ab'),['改行が異なります'])
-        self.assertEqual(translation_warnings(r'a\c[1]<\n>b',r'ab\c[1]'),['改行が異なります'])
-        self.assertEqual(translation_warnings(r'a\c[1]<\n>b',r'ab\c[2]'),['制御文字・置換文字列が原文と異なります'])
+        self.assertEqual(translation_warnings(r'a<\n>b','ab'),[])
+        self.assertEqual(translation_warnings(r'a\c[1]<\n>b',r'ab\c[1]'),[])
+        self.assertEqual(translation_warnings(r'a\c[1]<\n>b',r'ab\c[2]'),['特殊文字列が原文と異なります'])
 
 
 @unittest.skipUnless((ROOT / 'ja-JP/texts').exists(), 'Private corpus not installed')

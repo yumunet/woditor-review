@@ -14,7 +14,7 @@ from database_csv import catalog, pair_cells,masked_csv,replace_spans,text_cell
 
 from woditor_translation_tool import (
     COMMAND, META, JP, analyze, fields, file_type, command_mask,
-    command_display_pairs, metadata_allowed, source_lines, tokens,
+    command_display_pairs, metadata_allowed, source_lines,
     validate_text,
 )
 
@@ -34,14 +34,48 @@ def digest(value: str) -> str:
     return hashlib.sha256(value.encode('utf-8')).hexdigest()
 
 
+def special_strings(value: str) -> list[str]:
+    ends, stack, result = {}, [], []
+    for index, char in enumerate(value):
+        if char == '[':
+            stack.append(index)
+        elif char == ']' and stack:
+            ends[stack.pop()] = index + 1
+    bare = ('\\\\', r'\!', r'\.', r'\^', r'\>', r'\<', r'\E', r'\N', r'\A+', r'\A-')
+    index = 0
+    while index < len(value):
+        if value[index] == '\\':
+            opened = index + 1
+            while opened < len(value) and (value[opened].isalnum() or value[opened] in '_+-'):
+                opened += 1
+            end = ends.get(opened)
+            if opened > index + 1 and opened < len(value) and value[opened] == '[' and end is not None:
+                if value[index + 1:opened] != 'r':
+                    result.append(value[index:end])
+                index = end
+                continue
+            token = next((token for token in bare if value.startswith(token, index)), None)
+            if token:
+                result.append(token)
+                index += len(token)
+                continue
+        elif value[index] == '<' and value[index:index + 3] in ('<L>', '<C>', '<R>'):
+            result.append(value[index:index + 3])
+            index += 3
+            continue
+        elif value[index] == '@' and index + 1 < len(value) and value[index + 1] in '0123456789':
+            end = index + 2
+            while end < len(value) and value[end] in '0123456789':
+                end += 1
+            result.append(value[index:end])
+            index = end
+            continue
+        index += 1
+    return result
+
+
 def translation_warnings(source: str, translation: str) -> list[str]:
-    before, after = tokens(source), tokens(translation)
-    if before == after:
-        return []
-    newlines = {r'<\n>', r'<<\n>>', r'\n', r'\r', r'\r\n'}
-    if [t for t in before if t not in newlines] == [t for t in after if t not in newlines]:
-        return ['改行が異なります']
-    return ['制御文字・置換文字列が原文と異なります']
+    return [] if special_strings(source) == special_strings(translation) else ['特殊文字列が原文と異なります']
 
 
 def command_info(line: str, parent: int | None = None) -> dict:
@@ -182,8 +216,6 @@ def pair_file(path: str, ja_raw: bytes, en_raw: bytes) -> dict:
             start, end = spans[s['position'] - 1]
             translation = m['args'][start:end]
         issues = translation_warnings(s['source'], translation)
-        if data['type'] == 'database' and s['key'] == 'MEMO':
-            issues = [issue for issue in issues if issue != '改行が異なります']
         structure = command_mask(a[s['line'] - 1]) if s['command'] else s['key']
         slots.append({**s, 'enLine': en_line, 'translation': translation, 'warnings': issues,
                       'fingerprint': digest(s['key'] + '\0' + s['source'] + '\0' + (structure or ''))})
