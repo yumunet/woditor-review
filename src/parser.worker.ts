@@ -1,8 +1,6 @@
 import type { PyodideInterface } from 'pyodide';
-import original from '../python/woditor_translation_tool.py?raw';
-import adapter from '../python/review_parser.py?raw';
-import alignment from '../python/review_alignment.py?raw';
-import databaseCsv from '../python/database_csv.py?raw';
+import parser from '../python/woditor_parser.py?raw';
+import adapter from '../python/review_adapter.py?raw';
 import { readZip } from './archive';
 import type { Diagnostic, DiagnosticDocument, ReviewFile } from './model';
 import {diagnosticLocation} from './diagnostics';
@@ -14,17 +12,15 @@ async function python() {
     const indexURL = new URL(`${import.meta.env.BASE_URL}pyodide/`, self.location.origin).href;
     const {loadPyodide} = await import(/* @vite-ignore */ `${indexURL}pyodide.mjs`);
     const py: PyodideInterface = await loadPyodide({indexURL});
-    py.globals.set('original_code', original);
+    py.globals.set('parser_code', parser);
     py.globals.set('adapter_code', adapter);
-    py.globals.set('alignment_code', alignment);
-    py.globals.set('csv_code',databaseCsv);
     await py.runPythonAsync(`
 import types, sys, json
-for name, code in [('woditor_translation_tool', original_code), ('database_csv',csv_code), ('review_alignment', alignment_code), ('review_parser', adapter_code)]:
+for name, code in [('woditor_parser', parser_code), ('review_adapter', adapter_code)]:
     module = types.ModuleType(name)
     sys.modules[name] = module
     exec(compile(code, name + '.py', 'exec'), module.__dict__)
-from review_parser import pair_file, file_type, decode, render_file
+from review_adapter import pair_file, file_type, decode, render_file
 def supported(raw):
     text, _ = decode(bytes(raw))
     try:

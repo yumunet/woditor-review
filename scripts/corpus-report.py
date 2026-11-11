@@ -9,8 +9,8 @@ from time import perf_counter
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'python'))
-from review_parser import decode, extract_source, pair_file
-from woditor_translation_tool import file_type
+from review_adapter import decode, extract_source, pair_file
+from woditor_parser import file_type
 
 
 def main():

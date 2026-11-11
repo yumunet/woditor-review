@@ -1,37 +1,20 @@
-"""Structural alignment of independently edited WOLF exports.
+"""Bilingual alignment and conversion to application review items and diagnostics.
 
-Unique metadata keys and ordered command anchors establish correspondence.
-Within changed command spans, only pairs shared by every minimum-cost edit
-alignment are accepted. Ambiguous spans do not invalidate the rest of a file.
+Parsing and safe writes are owned by woditor_parser; this module only adapts
+source/translation pairs to the app's review model.
 """
+from __future__ import annotations
+import re
 from array import array
 from bisect import bisect_left
 from collections import Counter, defaultdict
-import re
-from woditor_translation_tool import COMMAND, META, source_lines, metadata_allowed
+from dataclasses import asdict
+from woditor_parser import (COMMAND, META, JP, analyze, fields, file_type, command_mask,
+    command_display_pairs, metadata_allowed, source_lines, decode, digest, special_strings,
+    translation_warnings, command_info, slot_policy, render_file, catalog, text_cell,
+    metadata_values, database_choice_key, database_choice_mode, reviewable_metadata)
 
-
-def metadata_values(text):
-    return {match[1]: match[2] for line in source_lines(text) if (match := META.fullmatch(line))}
-
-
-def database_choice_key(key):
-    match = re.fullmatch(r'CHOICE_(NAME|VAL)_(\d+)_(NUM|\d+)', key)
-    return (match[1], int(match[2]), match[3]) if match else None
-
-
-def database_choice_mode(meta, group):
-    value = meta.get(f'ITEM_LOADTYPE_{group}', '0')
-    mode = int(value) if re.fullmatch(r'\d+', value) else 0
-    return mode if mode in (0, 1, 2, 3) else 0
-
-
-def reviewable_metadata(kind, key, meta=None):
-    if not metadata_allowed(kind, key) or kind == 'database' and key == 'DATANAME_LOAD_NAME':
-        return False
-    choice = database_choice_key(key) if kind == 'database' else None
-    return not choice or database_choice_mode(meta or {}, choice[1]) in (2, 3)
-
+SCHEMA_VERSION = 1
 
 def database_choice_notices(am, bm, ja_meta, en_meta):
     summary, errors = Counter(), []
@@ -307,3 +290,228 @@ def align(ja, en, kind, parse, translation_lines):
         warnings.insert(0, f'原文部分の行数差を自動補正しました（日本語 {len(source_lines(ja))} / 英語 {len(source_lines(en))}）')
     return {'lines': line_map, 'excluded': excluded, 'ambiguous': uncertain, 'ambiguousEn': uncertain_en,
             'warnings': warnings, 'errors': errors, 'commands': display_pairs, 'enCommands': {c['line']: c for c in bc}}
+
+
+def pair_cells(ja, en, warning_for):
+    slots, errors, warnings = [], [], []
+    try:
+        a, b = catalog(ja), catalog(en)
+    except ValueError as error:
+        return slots, [f'CSVを解析できません: {error}'], warnings
+    if (a is None) != (b is None):
+        return slots, ['CSVセクションが一致しません'], warnings
+    if a is None:
+        return slots, errors, warnings
+    if len(a['rows']) != len(b['rows']):
+        errors.append(f'CSVのデータ件数が一致しません（日本語 {len(a["rows"])} / 英語 {len(b["rows"])}）')
+    non_text = 0
+    for key, target in b['fields'].items():
+        if target.get('dataName') and a['nameMode'] != 0:
+            continue
+        source = a['fields'].get(key)
+        if source and text_cell(source) and source['value'] == '':
+            continue
+        if not text_cell(target):
+            if source and not text_cell(source) and source['value'] != target['value']:
+                non_text += 1
+            elif source and text_cell(source):
+                errors.append(f'行 {source["line"]}: CSVの文字列項目が英語版では文字列ではありません（{key}）')
+            continue
+        missing = not source or not text_cell(source)
+        if missing:
+            errors.append(f'英語行 {target["line"]}: CSV文字列に対応する原文がありません（{key}）')
+        source_value = '' if missing else source['value']
+        descriptor = target['csv']
+        title = f'データ名 {descriptor["row"]}' if descriptor['dataName'] else f'データ {descriptor["row"]} / 項目 {descriptor["item"]}'
+        slots.append({'id': ('E:' if missing else '') + key, 'key': key, 'kind': 'database_csv',
+                      'line': -target['line'] if missing else source['line'], 'enLine': target['line'],
+                      'start': 0 if missing else source['start'], 'end': 0 if missing else source['end'],
+                      'source': source_value, 'translation': target['value'], 'command': None,
+                      'title': title, 'position': target['position'], 'csv': descriptor,
+                      'warnings': [] if missing else warning_for(source_value, target['value']),
+                      'fingerprint': digest(key + '\0' + source_value),
+                      **({'sourceMissing': True} if missing else {})})
+    for key, source in a['fields'].items():
+        if source.get('dataName') and b['nameMode'] != 0:
+            continue
+        if text_cell(source) and source['value'] != '' and key not in b['fields']:
+            errors.append(f'行 {source["line"]}: 英語版に対応する翻訳項目がありません（CSV: {key}）')
+    if non_text:
+        warnings.append(f'翻訳対象外の設定値が日英で異なります（CSVの数値・非文字列）: {non_text}件')
+    return slots, errors, warnings
+
+
+def metadata_title(key: str) -> str:
+    rules = [(r'VALINPUT_NAME_(\d+)', '数値引数名'), (r'STRINPUT_NAME_(\d+)', '文字列引数名'),
+             (r'CHOICE_STR_(\d+)_(\d+)', '選択肢'), (r'CSELF_NAME_(\d+)', 'セルフ変数名'),
+             (r'ITEMNAME(\d+)', '項目名'), (r'CHOICE_NAME_(\d+)_(\d+)', '選択肢名'),
+             (r'VMEMO_NAME_(\d+)', '変数名')]
+    for pattern, title in rules:
+        if m := re.fullmatch(pattern, key):
+            if title == '選択肢名':
+                return f'選択肢名 {int(m[1])}-{int(m[2]) + 1}'
+            return title + ' ' + '-'.join(str(int(n) + (0 if title in ('セルフ変数名', '項目名') else 1)) for n in m.groups())
+    return {'EVENT_NAME': 'イベント名', 'COMMON_NAME': 'コモンイベント名',
+            'COMMON_EVENT_NAME': 'コモンイベント名', 'COMMONEVENT_NAME': 'コモンイベント名',
+            'TYPENAME': 'タイプ名', 'MEMO': 'メモ', 'RETURN_VAL_NAME': '返り値名',
+            'DATANAME_LOAD_NAME': 'データ名'}.get(key, 'メタデータ')
+
+
+def extract_source(text: str) -> dict:
+    ftype = file_type(text)
+    meta = metadata_values(text)
+    slots, unhandled = analyze(text, ftype)
+    lines = text.splitlines()
+    infos, parents = {}, {}
+    for n, line in enumerate(source_lines(text), 1):
+        if line in ('WoditorEvCOMMAND_START', 'WoditorEvCOMMAND_END'):
+            parents.clear()
+        if COMMAND.fullmatch(line):
+            info = command_info(line)
+            depth = info['depth']
+            if info['code'] == 401:
+                info = command_info(line, parents.get(depth))
+            elif info['code'] in (102, 111, 112):
+                parents[depth] = info['code']
+            elif info['code'] == 499:
+                parents.pop(depth, None)
+            infos[n] = info
+    included, excluded = [], []
+    for s in slots:
+        entry = asdict(s)
+        entry['key'] = s.id.split(':', 1)[1]
+        if s.kind == 'metadata' and not reviewable_metadata(ftype, entry['key'], meta):
+            choice = database_choice_key(entry['key']) if ftype == 'database' else None
+            reason = 'データ名の参照先設定'
+            if choice:
+                reason = '直接入力の項目に残る選択肢名' if database_choice_mode(meta, choice[1]) == 0 else 'ファイル読み込みの既定フォルダパス'
+            excluded.append({**entry, 'reason': reason})
+            continue
+        info = infos.get(s.line)
+        entry['command'] = info
+        if info:
+            position = int(entry['key'][1:])
+            allowed, reason = slot_policy(info, position)
+            entry['position'] = position
+            if not allowed:
+                excluded.append({**entry, 'reason': reason})
+                continue
+        entry['title'] = (info['kind'] or 'コマンド文字列') if info else metadata_title(entry['key'])
+        included.append(entry)
+    return {'type': ftype, 'slots': included, 'excluded': excluded,
+            'unhandled': [{'line': n, 'text': l} for n, l in unhandled],
+            'commands': infos}
+
+
+def pair_file(path: str, ja_raw: bytes, en_raw: bytes) -> dict:
+    ja, ja_bom = decode(ja_raw)
+    en, en_bom = decode(en_raw)
+    data = extract_source(ja)
+    if file_type(en) != data['type']:
+        raise ValueError('日本語・英語のファイル形式が一致しません')
+    analyze(en, data['type'])  # Validate CSV markers on the English side too.
+    a, b = source_lines(ja), source_lines(en)
+    alignment = align(ja, en, data['type'], command_info, Counter(s['line'] for s in data['slots']))
+    warnings = alignment['warnings']
+    errors = list(alignment['errors'])
+    en_meta = metadata_values(en)
+    # Newlines belong to each input version and are never normalized in storage.
+    endings = lambda s: [re.search(r'(\r\n|\r|\n)$', l)[0] if re.search(r'(\r\n|\r|\n)$', l) else ''
+                         for l in s.splitlines(keepends=True)]
+    ja_endings, en_endings = endings(ja), endings(en)
+    if any(ja_endings[n - 1] != en_endings[e - 1] for n, e in alignment['lines'].items()):
+        warnings.append('日本語と英語の改行形式が異なります（読み込み時の形式を保持）')
+    slots = []
+    for s in data['slots']:
+        en_line = alignment['lines'].get(s['line'])
+        if en_line is None:
+            reason = alignment['excluded'].get(s['line'], '対応候補が複数あり自動関連付けできません')
+            data['excluded'].append({**s, 'reason': reason})
+            if s['line'] in alignment['ambiguous']:
+                errors.append(f'行 {s["line"]}（{s["title"]}）: {reason}')
+            continue
+        line = b[en_line - 1]
+        if s['kind'] == 'metadata':
+            translation = META.fullmatch(line)[2]
+        else:
+            m = COMMAND.fullmatch(line)
+            spans = fields(m['args'])
+            if spans is None or s['position'] > len(spans):
+                raise ValueError(f'文字列スロットが一致しません（行 {s["line"]}）')
+            start, end = spans[s['position'] - 1]
+            translation = m['args'][start:end]
+        issues = translation_warnings(s['source'], translation)
+        structure = command_mask(a[s['line'] - 1]) if s['command'] else s['key']
+        slots.append({**s, 'enLine': en_line, 'translation': translation, 'warnings': issues,
+                      'fingerprint': digest(s['key'] + '\0' + s['source'] + '\0' + (structure or ''))})
+    # Keep English candidates available for human review without inventing a
+    # Japanese counterpart. Their negative context line identifies the existing
+    # English-only display row; writes always use their real English line.
+    for en_line in sorted(alignment['ambiguousEn']):
+        raw = b[en_line - 1]
+        if match := META.fullmatch(raw):
+            key, value = match.groups()
+            values = [(key, value, None, 'metadata')] if reviewable_metadata(data['type'], key, en_meta) else []
+        else:
+            info = alignment['enCommands'][en_line]
+            values = [(f'S{index}', value, index, 'command_string')
+                      for index, value in enumerate(info['strings'], 1)
+                      if value and slot_policy(info, index)[0]]
+        for key, value, position, kind in values:
+            if not value:
+                continue
+            info = alignment['enCommands'].get(en_line) if kind == 'command_string' else None
+            structure = command_mask(raw) if info else key
+            slots.append({'id': f'E{en_line:05d}:{key}', 'line': -en_line, 'enLine': en_line,
+                          'start': 0, 'end': 0, 'source': '', 'sourceMissing': True,
+                          'translation': value, 'kind': kind, 'key': key, 'position': position,
+                          'command': info, 'title': (info['kind'] or 'コマンド文字列') if info else metadata_title(key),
+                          'warnings': [], 'fingerprint': digest('unpaired\0' + key + '\0' + (structure or ''))})
+    if data['type'] == 'database':
+        csv_slots,csv_errors,csv_warnings = pair_cells(ja,en,translation_warnings)
+        slots.extend(csv_slots);errors.extend(csv_errors);warnings.extend(csv_warnings)
+    slots.sort(key=lambda slot: (slot['enLine'], slot.get('position') or 0))
+    items, serial = [], Counter()
+    for s in slots:
+        info = s['command']
+        prev = items[-1] if items else None
+        if (info and info['code'] == 103 and prev and prev['code'] == 103
+                and prev['lastLine'] + 1 == s['line']
+                and prev['depth'] == info['depth']):
+            prev['slotIds'].append(s['id'])
+            prev['lastLine'] = s['line']
+            prev['lastEnLine'] = s['enLine']
+        else:
+            title = s['title']
+            serial[title] += 1
+            items.append({'id': 'R:' + s['id'], 'slotIds': [s['id']],
+                          'title': f'{title} {serial[title]}' if info else title,
+                          'code': info['code'] if info else None,
+                          'depth': info['depth'] if info else None,
+                          'lastLine': s['line'], 'lastEnLine': s['enLine'], 'approved': False, 'threads': [], 'changes': []})
+    commands = []
+    if data['type'] != 'database':
+        jp, ep = command_display_pairs(ja), command_display_pairs(en)
+        jp = {n: (dn, display) for n, dn, display in jp}
+        ep = {n: (dn, display) for n, dn, display in ep}
+        for n, en_n in alignment['commands']:
+            dn, display = jp[n] if n is not None else (0, '')
+            edn, edisplay = ep[en_n] if en_n is not None else (0, '')
+            info = data['commands'][n] if n is not None else alignment['enCommands'][en_n]
+            commands.append({**info, 'line': n if n is not None else -en_n, 'enLine': en_n,
+                             'ja': display, 'en': edisplay, 'displayLineJa': dn, 'displayLineEn': edn})
+    usages = {}
+    if data['type'] == 'common':
+        for s in slots:
+            if s['key'].startswith('CSELF_NAME_'):
+                index = int(s['key'].split('_')[-1])
+                num = re.compile(rf'(?<!\d){1600000 + index}(?!\d)')
+                special = re.compile(rf'\\cself\[{index}\]', re.I)
+                usages[s['id']] = [c['line'] for c in commands
+                                   if c['line'] > 0 and (num.search(a[c['line'] - 1]) or special.search(a[c['line'] - 1]))]
+    if data['unhandled']:
+        warnings.append(f'未認識の日本語行: {len(data["unhandled"])}')
+    return {'path': path, 'type': data['type'], 'jaText': ja, 'enText': en,
+            'jaBom': ja_bom, 'enBom': en_bom, 'sourceVersion': digest(ja), 'version': digest(en),
+            'slots': slots, 'items': items, 'commands': commands, 'usages': usages,
+            'excluded': data['excluded'], 'warnings': warnings, 'errors': errors}

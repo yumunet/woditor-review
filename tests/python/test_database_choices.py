@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from review_parser import extract_source, pair_file, render_file
+from review_adapter import extract_source, pair_file, render_file
 
 
 def database(mode, names=(), values=None, declared=None, duplicate=False):

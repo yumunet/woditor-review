@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
-from review_parser import pair_file, render_file, decode, translation_warnings
-from woditor_translation_tool import command_display_pairs, COMMAND, fields, META
+from review_adapter import pair_file, render_file, decode, translation_warnings
+from woditor_parser import command_display_pairs, COMMAND, fields, META
 
 ROOT = Path('.reference')
 
@@ -71,7 +71,7 @@ class AlignmentTests(unittest.TestCase):
             except ValueError:
                 continue
             lines = data['enText'].splitlines()
-            from database_csv import catalog
+            from woditor_parser import catalog
             csv_fields = catalog(data['enText'])['fields'] if data['type']=='database' and '<<--CSV_START-->>' in data['enText'] else {}
             mapped = set()
             for slot in data['slots']:

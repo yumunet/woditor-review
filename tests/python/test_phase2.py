@@ -1,8 +1,8 @@
 import unittest
 from pathlib import Path
 from collections import Counter
-from review_parser import pair_file, decode
-from woditor_translation_tool import file_type
+from review_adapter import pair_file, decode
+from woditor_parser import file_type
 
 ROOT = Path('.reference')
 

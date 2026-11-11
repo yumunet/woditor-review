@@ -44,7 +44,7 @@ test('corrected CSV column labels preserve reviews by physical source cells, eve
 function realFile(path='MapData/SampleMapA/Event_0000.txt'): ReviewFile {
   const local = '.tools/python';
   const command = process.env.PYTHON || (existsSync(local) ? readdirSync(local).map(p => join(local, p, 'python.exe')).find(existsSync) : null) || (process.platform === 'win32' ? 'py' : 'python3');
-  const result = spawnSync(command, ['-c', `import json;from pathlib import Path;from review_parser import pair_file;p=${JSON.stringify(path)};print(json.dumps(pair_file(p,(Path('.reference/ja-JP/texts')/p).read_bytes(),(Path('.reference/en-US/texts')/p).read_bytes())))`], {encoding: 'utf8', env: {...process.env, PYTHONPATH: 'python', PYTHONUTF8: '1'}});
+  const result = spawnSync(command, ['-c', `import json;from pathlib import Path;from review_adapter import pair_file;p=${JSON.stringify(path)};print(json.dumps(pair_file(p,(Path('.reference/ja-JP/texts')/p).read_bytes(),(Path('.reference/en-US/texts')/p).read_bytes())))`], {encoding: 'utf8', env: {...process.env, PYTHONPATH: 'python', PYTHONUTF8: '1'}});
   if (result.status !== 0) throw new Error(result.stderr); return JSON.parse(result.stdout);
 }
 const reference = corpus ? realFile() : null;

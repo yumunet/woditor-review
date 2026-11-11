@@ -1,8 +1,8 @@
 import unittest
 from pathlib import Path
 
-from review_parser import decode, extract_source, command_info, slot_policy, metadata_title
-from woditor_translation_tool import analyze, file_type
+from review_adapter import decode, extract_source, command_info, slot_policy, metadata_title
+from woditor_parser import analyze, file_type
 
 ROOT = Path('.reference/ja-JP/texts')
 

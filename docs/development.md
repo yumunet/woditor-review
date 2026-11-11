@@ -126,17 +126,9 @@ python python/woditor_review_tool.py apply --request review_request_ID.json --re
 
 ### 補助ツールの受け渡し
 
-補助ツールを別の作業場所へ渡す場合は、次の7ファイルを用意する。ChatGPTへは個別に添付できる。
+レビュー補助ツールを別の作業場所へ渡す場合は、`python/woditor_review_tool.py` と `python/woditor_parser.py` の2ファイルを同じ階層に置く。JSONスキーマはレビューCLIに内包され、作業ディレクトリや外部JSONファイルに依存しない。`python/schemas/` は仕様参照用のコピーで、テストで内包版との一致を検証する。
 
-- `python/woditor_review_tool.py`
-- `python/review_parser.py`
-- `python/review_alignment.py`
-- `python/database_csv.py`
-- `python/woditor_translation_tool.py`
-- `python/schemas/review-request.schema.json`
-- `python/schemas/review-response.schema.json`
-
-実行先ではPythonの5ファイルを同じ階層に置く。スキーマJSONの2ファイルは、その階層の `schemas/` 内でも、Pythonファイルと同じ階層でも読み込める。探索先はスクリプト横の `schemas/`、次にスクリプトと同じ階層で、実行時の作業ディレクトリには依存しない。
+新規翻訳のCLIは `woditor_translation_tool.py` と `woditor_parser.py` の2ファイルで実行できる。`review_adapter.py` はアプリ専用で、どちらのCLIにも不要。
 
 指示文には実行時の作業場所を固定せず `woditor_review_tool.py` とだけ記載する。
 
@@ -195,7 +187,7 @@ DBの翻訳項目は、各データ名を同じデータ番号の設定値の前
 src/                    TypeScript UI・状態・保存・JSON受け渡し
 src/parser.worker.ts    ZIP処理とPyodideのWorker
 python/                 元の翻訳CLI・読み取り用解析層・レビュー用CLI
-python/schemas/         Python補助ツール用JSONスキーマ
+python/schemas/         JSONスキーマの仕様参照用コピー
 scripts/                ランタイム同梱・PWA生成・実データレポート
 tests/python/           解析・実データ・Python補助ツールのテスト
 tests/browser/          実ZIP・保存・AI差分・PWA・操作テスト

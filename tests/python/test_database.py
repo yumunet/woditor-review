@@ -1,8 +1,8 @@
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from review_parser import pair_file,render_file
-from database_csv import catalog,cell_for_key,masked_csv
+from review_adapter import pair_file,render_file
+from woditor_parser import catalog,cell_for_key,masked_csv
 from woditor_review_tool import build,apply_files
 
 
