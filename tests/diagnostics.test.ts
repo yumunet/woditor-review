@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {diagnosticsView, diagnosticItem,diagnosticLocation,withoutReplacedDiagnostics} from '../src/diagnostics';
+import {diagnosticsView, diagnosticTabFor,diagnosticItem,diagnosticLocation,withoutReplacedDiagnostics} from '../src/diagnostics';
 import {emptyWorkspace,type Diagnostic,type ReviewFile} from '../src/model';
 const diagnostics: Diagnostic[] = [
   {path:'a.txt',severity:'error',message:'Cannot match'},
@@ -18,6 +18,13 @@ test('diagnostic tabs show only their own severity with counts and escaping',()=
 });
 test('successful re-import removes stale errors for the attempted paths',()=>{
   assert.deepEqual(withoutReplacedDiagnostics(diagnostics,['a.txt','b.txt']),[diagnostics[2]]);
+});
+test('automatic alignment notices have their own tab without hiding actual warnings or errors',()=>{
+  const automatic={path:'db.txt',severity:'warning',message:'設定キーによる行ずれ補正: 10件'} as Diagnostic;
+  const warning={path:'db.txt',severity:'warning',message:'日本語と英語の改行形式が異なります'} as Diagnostic;
+  assert.equal(diagnosticTabFor(automatic),'automatic');assert.equal(diagnosticTabFor(warning),'warning');assert.equal(diagnosticTabFor({...automatic,severity:'error'}),'error');
+  const html=diagnosticsView([automatic,warning],'automatic');assert.ok(html.includes(automatic.message));assert.ok(!html.includes(warning.message));assert.ok(html.includes('自動補正 (1)'));assert.ok(html.includes('警告 (1)'));
+  assert.ok(!diagnosticsView([automatic,warning],'warning').includes(automatic.message));
 });
 test('diagnostic links use exact or nearby slots, including English-only originals',()=>{
   const file={path:'a.txt',slots:[{id:'s',line:10,enLine:8},{id:'missing',line:-20,enLine:20}],items:[{id:'a',slotIds:['s']},{id:'b',slotIds:['missing']}],commands:[],excluded:[]} as unknown as ReviewFile;

@@ -57,8 +57,8 @@ test('system Back closes panels and confirmation before returning to the folder 
 
 test('Back returns from diagnostic text to the selected warning tab',async({page})=>{
   test.skip(!corpus,'Private reference files not available');await loadReal(page,'BasicData/CDataBase/04.txt');
-  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:/^読み込み結果/}).click();await page.getByRole('tab',{name:/^警告/}).click();await page.locator('.diagnostic.warning').first().click();
-  await expect(page.getByRole('dialog',{name:'テキスト表示',exact:true})).toBeVisible();await page.goBack();await expect(page.getByRole('tab',{name:/^警告/})).toHaveAttribute('aria-selected','true');await page.goBack();await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.locator('.source')).toBeVisible();
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:/^読み込み結果/}).click();await page.getByRole('tab',{name:/^自動補正/}).click();await page.locator('.diagnostic.warning').first().click();
+  await expect(page.getByRole('dialog',{name:'テキスト表示',exact:true})).toBeVisible();await page.goBack();await expect(page.getByRole('tab',{name:/^自動補正/})).toHaveAttribute('aria-selected','true');await page.goBack();await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.locator('.source')).toBeVisible();
 });
 
 test('comment drafts survive closing and Back but clear on item changes and submission',async({page})=>{
@@ -243,7 +243,7 @@ test('full real corpus in worker, diagnostics, all folder progress and restart',
   await expect(page.locator('.diagnostic.warning, .diagnostic.skip')).toHaveCount(0);
   await page.getByRole('tab',{name:/^警告/}).click();
   await expect(page.locator('.diagnostic.error, .diagnostic.skip')).toHaveCount(0);
-  await expect(page.locator('.diagnostic.warning').first()).toBeVisible();
+  await page.getByRole('tab',{name:/^自動補正/}).click();await expect(page.locator('.diagnostic.warning').first()).toBeVisible();
   await page.getByRole('tab',{name:'対象外 (20)',exact:true}).click();
   await expect(page.locator('.diagnostic.skip')).toHaveCount(20);
   await page.getByRole('tab',{name:'エラー (10)',exact:true}).click();
@@ -493,7 +493,7 @@ test('diagnostic text viewer opens errors at the source line and switches langua
 test('warning locations open both the removed setting and its English count field',async({page})=>{
   test.skip(!corpus,'Private reference files not available');await loadReal(page,'BasicData/CDataBase/04.txt');
   await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:/^読み込み結果/}).click();
-  await page.getByRole('tab',{name:/^警告/}).click();await page.locator('.diagnostic.warning').filter({hasText:'無効化された設定'}).first().click();
+  await page.getByRole('tab',{name:/^自動補正/}).click();await page.locator('.diagnostic.warning').filter({hasText:'無効化された設定'}).first().click();
   await expect(page.locator('.focus-line code')).toContainText('CHOICE_NAME_0_0=');
   await page.getByRole('tab',{name:'英語',exact:true}).click();await expect(page.locator('.focus-line code')).toHaveText('CHOICE_NAME_0_NUM=0');
 });
@@ -746,17 +746,19 @@ test('context controls retain all options and full view marks every variable usa
 
 test('diagnostic errors and warnings open translation items and Back restores the results tab',async({page},info)=>{
   test.skip(!corpus,'Private reference files not available');await loadReal(page,'BasicData/CDataBase/04.txt');
-  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:/^読み込み結果/}).click();await page.getByRole('tab',{name:/^警告/}).click();
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:/^読み込み結果/}).click();await page.getByRole('tab',{name:/^自動補正/}).click();
   const row=page.locator('.diagnostic-row').filter({has:page.locator('[data-action=diagnostic-item]')}).first(),text=row.locator('.diagnostic-open'),item=row.locator('.diagnostic-item');
   const alignment=async()=>{const a=await text.boundingBox(),b=await item.boundingBox(),r=await row.boundingBox();expect(b!.x).toBeGreaterThanOrEqual(a!.x+a!.width);expect(Math.abs(b!.x+b!.width-r!.x-r!.width+8)).toBeLessThan(1);expect(Math.abs(b!.y+b!.height/2-r!.y-r!.height/2)).toBeLessThan(1);};
   await expect(text).toHaveJSProperty('tagName','SPAN');await expect(row.locator('strong')).toHaveCSS('font-weight','700');
   await alignment();await page.setViewportSize({width:320,height:844});await alignment();expect(await item.evaluate(el=>el.getBoundingClientRect().right<=innerWidth)).toBe(true);await page.setViewportSize(info.project.name==='mobile'?{width:390,height:844}:{width:1280,height:900});
   await captureUi(page,info,'results');
+  await item.scrollIntoViewIfNeeded();
+  await page.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));
   if(info.project.name==='desktop') await item.hover();else await item.dispatchEvent('pointerdown',{pointerType:'touch'});
   await expect(page.getByRole('tooltip')).toHaveText((await item.getAttribute('aria-label'))!);
   if(info.project.name==='mobile') {await item.dispatchEvent('pointerup',{pointerType:'touch'});await item.dispatchEvent('click');await expect(page.getByRole('dialog',{name:'読み込み結果',exact:true})).toBeVisible();}
-  await text.click();await expect(page.getByRole('dialog',{name:'テキスト表示',exact:true})).toBeVisible();await page.goBack();await expect(page.getByRole('tab',{name:/^警告/})).toHaveAttribute('aria-selected','true');
-  await page.locator('[data-action=diagnostic-item]').first().click();await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.locator('.source')).toBeVisible();await page.goBack();await expect(page.getByRole('tab',{name:/^警告/})).toHaveAttribute('aria-selected','true');
+  await text.click();await expect(page.getByRole('dialog',{name:'テキスト表示',exact:true})).toBeVisible();await page.goBack();await expect(page.getByRole('tab',{name:/^自動補正/})).toHaveAttribute('aria-selected','true');
+  await page.locator('[data-action=diagnostic-item]').first().click();await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.locator('.source')).toBeVisible();await page.goBack();await expect(page.getByRole('tab',{name:/^自動補正/})).toHaveAttribute('aria-selected','true');
   await loadReal(page,'MapData/SampleMapA/Event_0019.txt');await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:/^読み込み結果/}).click();
   await page.locator('.diagnostic.error').first().locator('..').getByRole('button',{name:'翻訳項目を開く',exact:true}).click();await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.locator('.source')).toHaveText('');await expect(page.getByRole('button',{name:'原文を補う',exact:true})).toBeVisible();await page.goBack();await expect(page.getByRole('tab',{name:/^エラー/})).toHaveAttribute('aria-selected','true');
 });
@@ -835,4 +837,13 @@ test('database CSV multiline strings round trip through AI approval, ZIP and Eng
   await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'英訳TXTを出力',exact:true}).click();const event=page.waitForEvent('download');await page.getByRole('button',{name:'英訳TXTを出力',exact:true}).click();const zip=readFileSync((await(await event).path())!);const output=Buffer.from(unzipSync(zip)[`en-US/texts/${path}`]).toString('utf8');
   const original=readFileSync(`.reference/en-US/texts/${path}`,'utf8');expect(output).toBe(original.replace('"'+slot.translation.replaceAll('"','""')+'"','"'+after.replaceAll('"','""')+'"'));await closeReviewSheet(page);
   await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'ファイルを読み込む',exact:true}).click();await page.locator('input[name=en]').setInputFiles({name:'csv-reviewed.zip',mimeType:'application/zip',buffer:zip});await page.getByRole('button',{name:'読み込む',exact:true}).click();await expect(page.locator('.busy')).toHaveCount(0);if(await page.getByRole('dialog').count()) await closeReviewSheet(page);await expect(page.locator('.translation')).toHaveText(after);await expect(page.locator('.translation-after')).toHaveCount(0);
+});
+
+test('import results separate automatic corrections from warnings and keep errors as the default',async({page})=>{
+  await page.goto('/');await expect(page.locator('.busy')).toHaveCount(0);await page.getByRole('button',{name:'ファイルを読み込む',exact:true}).click();
+  const path='BasicData/DataBase/00.txt';
+  for(const [name,text] of [['ja','TYPE_ID=0\r\nITEM_NUM=0\r\nMEMO=日本語\r\n'],['en','TYPE_ID=0\nITEM_NUM=0\nMEMO=English\nEXTRA_SETTING=1\n']]) await page.locator(`input[name=${name}]`).setInputFiles({name:name+'.zip',mimeType:'application/zip',buffer:Buffer.from(zipSync({[path]:Buffer.from(text)}))});
+  await page.getByRole('button',{name:'読み込む',exact:true}).click();await expect(page.locator('.busy')).toHaveCount(0,{timeout:90000});await expect(page.getByRole('tab',{name:/^エラー/})).toHaveAttribute('aria-selected','true');
+  await page.getByRole('tab',{name:/^警告/}).click();await expect(page.locator('.diagnostic.warning')).toHaveCount(1);await expect(page.locator('.diagnostic.warning')).toContainText('改行形式');
+  await page.getByRole('tab',{name:/^自動補正/}).click();await expect(page.locator('#diagnostic-panel')).toContainText('行数差を自動補正');await expect(page.locator('#diagnostic-panel')).not.toContainText('改行形式');
 });

@@ -14,7 +14,7 @@ import {displaySlotText} from './display-text';
 import { strToU8, zipSync } from 'fflate';
 import { registerPwa } from './pwa';
 import { canMerge, canSplit, mergeGroup, splitGroup } from './grouping';
-import { diagnosticDocument,diagnosticItem,diagnosticsView,replaceDiagnosticDocuments,withoutReplacedDiagnostics } from './diagnostics';
+import { diagnosticDocument,diagnosticItem,diagnosticsView,type DiagnosticTab,replaceDiagnosticDocuments,withoutReplacedDiagnostics } from './diagnostics';
 import { threadView } from './comments';
 import { updateManualSources } from './source-edit';
 import {newlineWarning,slotWarnings} from './translation-warnings';
@@ -48,7 +48,7 @@ let noticeInstructions: string | null = null, instructionsPreview: string | null
 function updateBusy(message: string) {busy = message; const el = root.querySelector('.busy > div:last-child'); if (el) el.textContent = message;}
 let lastFocus: HTMLElement | null = null;
 let commentTab: 'open' | 'all' = 'open', replyTarget: string | null = null;
-let diagnosticTab: 'error' | 'warning' | 'skip' = 'error';
+let diagnosticTab:DiagnosticTab='error';
 let editTarget: {threadId: string; postId: string} | null = null;
 let commentDraft='',commentDraftItem='';
 let commentAnchor:string|null=null;

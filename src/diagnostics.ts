@@ -1,10 +1,15 @@
 import type { Diagnostic, DiagnosticDocument, ReviewFile, Workspace } from './model';
 import { escape,icon } from './ui';
-const tabs: [Diagnostic['severity'], string][] = [['error', 'エラー'], ['warning', '警告'], ['skip', '対象外']];
-export function diagnosticsView(diagnostics: Diagnostic[], active: Diagnostic['severity'],workspace?:Workspace) {
-  const selected = diagnostics.map((diagnostic,index)=>({diagnostic,index})).filter(({diagnostic}) => diagnostic.severity === active);
+export type DiagnosticTab=Diagnostic['severity']|'automatic';
+const tabs: [DiagnosticTab, string][] = [['error', 'エラー'], ['warning', '警告'], ['automatic','自動補正'],['skip', '対象外']];
+export function diagnosticTabFor(diagnostic:Diagnostic):DiagnosticTab {
+  if(diagnostic.severity!=='warning') return diagnostic.severity;
+  return /^(?:原文部分の行数差を自動補正|設定キーによる行ずれ補正|コマンド列による行ずれ補正|コマンド引数の差を保持して関連付け|旧形式の文字列操作に追加された引数を補正|設定値の差を保持|英語版(?:で(?:無効化|削除)された(?:設定|コマンド)|だけの(?:設定|コメント|コマンド)を保持)|CSVの数値・非文字列設定の差を保持)/.test(diagnostic.message)?'automatic':'warning';
+}
+export function diagnosticsView(diagnostics: Diagnostic[], active: DiagnosticTab,workspace?:Workspace) {
+  const selected = diagnostics.map((diagnostic,index)=>({diagnostic,index})).filter(({diagnostic}) => diagnosticTabFor(diagnostic) === active);
   const label = tabs.find(([key]) => key === active)![1];
-  return `<div class="filters" role="tablist" aria-label="読み込み結果の種類">${tabs.map(([key, name]) => `<button class="pill ${active === key ? 'active' : ''}" role="tab" aria-selected="${active === key}" aria-controls="diagnostic-panel" id="diagnostic-tab-${key}" data-action="diagnostic-tab" data-value="${key}">${name} (${diagnostics.filter(d => d.severity === key).length})</button>`).join('')}</div><div class="sheet-body" id="diagnostic-panel" role="tabpanel" aria-labelledby="diagnostic-tab-${active}">${selected.map(({diagnostic:d,index}) => {const target=workspace && diagnosticItem(workspace,d);const label=target?.exact?'翻訳項目を開く':'近くの翻訳項目を開く';return `<div class="diagnostic-row ${target?'has-item':''}" data-action="open-diagnostic" data-value="${index}"><button class="diagnostic ${d.severity}" data-action="open-diagnostic" data-value="${index}"><strong>${escape(d.path)}</strong>${escape(d.message)}<span class="diagnostic-open">テキストを開く ›</span></button>${target?`<button class="icon diagnostic-item" data-action="diagnostic-item" data-value="${index}" aria-label="${label}" data-tooltip="${label}">${icon('item-jump')}</button>`:''}</div>`;}).join('') || `<div class="empty">${label}はありません</div>`}</div>`;
+  return `<div class="filters" role="tablist" aria-label="読み込み結果の種類">${tabs.map(([key, name]) => `<button class="pill ${active === key ? 'active' : ''}" role="tab" aria-selected="${active === key}" aria-controls="diagnostic-panel" id="diagnostic-tab-${key}" data-action="diagnostic-tab" data-value="${key}">${name} (${diagnostics.filter(d => diagnosticTabFor(d) === key).length})</button>`).join('')}</div><div class="sheet-body" id="diagnostic-panel" role="tabpanel" aria-labelledby="diagnostic-tab-${active}">${selected.map(({diagnostic:d,index}) => {const target=workspace && diagnosticItem(workspace,d);const label=target?.exact?'翻訳項目を開く':'近くの翻訳項目を開く';return `<div class="diagnostic-row ${target?'has-item':''}" data-action="open-diagnostic" data-value="${index}"><button class="diagnostic ${d.severity}" data-action="open-diagnostic" data-value="${index}"><strong>${escape(d.path)}</strong>${escape(d.message)}<span class="diagnostic-open">テキストを開く ›</span></button>${target?`<button class="icon diagnostic-item" data-action="diagnostic-item" data-value="${index}" aria-label="${label}" data-tooltip="${label}">${icon('item-jump')}</button>`:''}</div>`;}).join('') || `<div class="empty">${label}はありません</div>`}</div>`;
 }
 export function diagnosticLocation(file:ReviewFile,message:string):Pick<Diagnostic,'line'|'enLine'> {
   const rawLine=/(?:行\s*|line\s+)(-?\d+)/i.exec(message)?.[1];
