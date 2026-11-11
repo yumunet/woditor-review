@@ -9,6 +9,11 @@ test('saved self-variable labels use their key without changing saved IDs or tit
   assert.equal(itemTitle(file,item),'セルフ変数名 0');
   assert.equal(item.title,'セルフ変数名 1');assert.equal(item.id,'stable');
 });
+test('database field names use the stored zero-based key even in older reviews',()=>{
+  const item={id:'stable',title:'項目名 1',slotIds:['s']} as Item;
+  const file={type:'database',slots:[{id:'s',key:'ITEMNAME0'}]} as ReviewFile;
+  assert.equal(itemTitle(file,item),'項目名 0');assert.equal(item.title,'項目名 1');assert.equal(item.id,'stable');
+});
 test('one-line previews show an ellipsis when later source lines are hidden',()=>{
   const item={id:'a',title:'Comment',slotIds:['s'],approved:false,threads:[],changes:[]} as unknown as Item;
   const file={slots:[{id:'s',key:'S1',source:'First line\nHidden second line'}]} as ReviewFile;

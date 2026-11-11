@@ -60,7 +60,9 @@ export const sourceText = (slot: Slot) => slot.sourceOverride ?? slot.source;
 export function itemTitle(file:ReviewFile,item:Item):string {
   const slot=item.slotIds.length===1 ? file.slots.find(s=>s.id===item.slotIds[0]) : undefined;
   const index=slot && /^CSELF_NAME_(\d+)$/.exec(slot.key)?.[1];
-  return index!==undefined ? `セルフ変数名 ${Number(index)}` : item.title;
+  if(index!==undefined) return `セルフ変数名 ${Number(index)}`;
+  const field=file.type==='database' && slot ? /^ITEMNAME(\d+)$/.exec(slot.key)?.[1] : undefined;
+  return field!==undefined ? `項目名 ${Number(field)}` : item.title;
 }
 export const unresolved = (item: Item) => item.threads.filter(t => !t.resolved);
 export const isDone = (item: Item) => item.approved && !unresolved(item).length && !item.changes.some(c => c.status === 'pending');

@@ -12,6 +12,8 @@ class MetadataTitleTests(unittest.TestCase):
         self.assertEqual(metadata_title('CSELF_NAME_0'), 'セルフ変数名 0')
         self.assertEqual(metadata_title('CSELF_NAME_99'), 'セルフ変数名 99')
         self.assertEqual(metadata_title('VALINPUT_NAME_0'), '数値引数名 1')
+        self.assertEqual(metadata_title('ITEMNAME0'), '項目名 0')
+        self.assertEqual(metadata_title('ITEMNAME37'), '項目名 37')
 
 
 @unittest.skipUnless(ROOT.exists(), 'Private reference corpus is not installed')
