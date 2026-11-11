@@ -12,204 +12,471 @@ from uuid import uuid4
 from pathlib import Path, PurePosixPath
 from woditor_parser import decode, digest, render_file, special_strings, catalog, cell_for_key, COMMAND, META, fields
 
-_SCHEMAS = {'review-request.schema.json': {'$schema': 'https://json-schema.org/draft/2020-12/schema',
-                                '$id': 'woditor-review/request/v1',
-                                'type': 'object',
-                                'required': ['schemaVersion', 'requestId', 'createdAt', 'entries'],
-                                'additionalProperties': False,
-                                'properties': {'schemaVersion': {'const': 1},
-                                               'requestId': {'type': 'string', 'minLength': 1},
-                                               'createdAt': {'type': 'string'},
-                                               'entries': {'type': 'array',
-                                                           'items': {'type': 'object',
-                                                                     'additionalProperties': False,
-                                                                     'required': ['path',
-                                                                                  'fileVersion',
-                                                                                  'itemId',
-                                                                                  'slotIds',
-                                                                                  'commentId',
-                                                                                  'slots',
-                                                                                  'posts',
-                                                                                  'context'],
-                                                                     'properties': {'path': {'type': 'string'},
-                                                                                    'fileVersion': {'type': 'string',
-                                                                                                    'pattern': '^[a-f0-9]{64}$'},
-                                                                                    'itemId': {'type': 'string'},
-                                                                                    'slotIds': {'type': 'array',
-                                                                                                'items': {'type': 'string'}},
-                                                                                    'commentId': {'type': 'string',
-                                                                                                  'minLength': 1},
-                                                                                    'slots': {'type': 'array',
-                                                                                              'items': {'type': 'object',
-                                                                                                        'additionalProperties': False,
-                                                                                                        'required': ['id',
-                                                                                                                     'source',
-                                                                                                                     'translation',
-                                                                                                                     'line',
-                                                                                                                     'key',
-                                                                                                                     'kind'],
-                                                                                                        'properties': {'id': {'type': 'string'},
-                                                                                                                       'source': {'type': 'string'},
-                                                                                                                       'translation': {'type': 'string'},
-                                                                                                                       'line': {'type': 'integer',
-                                                                                                                                'minimum': 1},
-                                                                                                                       'key': {'type': 'string'},
-                                                                                                                       'kind': {'enum': ['metadata',
-                                                                                                                                         'command_string',
-                                                                                                                                         'database_csv']},
-                                                                                                                       'position': {'type': 'integer',
-                                                                                                                                    'minimum': 1}}}},
-                                                                                    'pendingChanges': {'type': 'array',
-                                                                                                       'items': {'type': 'object',
-                                                                                                                 'additionalProperties': False,
-                                                                                                                 'required': ['id',
-                                                                                                                              'slotId',
-                                                                                                                              'before',
-                                                                                                                              'after'],
-                                                                                                                 'properties': {'id': {'type': 'string'},
-                                                                                                                                'slotId': {'type': 'string'},
-                                                                                                                                'before': {'type': 'string'},
-                                                                                                                                'after': {'type': 'string'}}}},
-                                                                                    'posts': {'type': 'array',
-                                                                                              'items': {'type': 'object',
-                                                                                                        'required': ['id',
-                                                                                                                     'author',
-                                                                                                                     'text',
-                                                                                                                     'createdAt'],
-                                                                                                        'properties': {'id': {'type': 'string'},
-                                                                                                                       'author': {'enum': ['user',
-                                                                                                                                           'ai']},
-                                                                                                                       'text': {'type': 'string'},
-                                                                                                                       'createdAt': {'type': 'string'},
-                                                                                                                       'decision': {'enum': ['accepted',
-                                                                                                                                             'rejected',
-                                                                                                                                             'partial',
-                                                                                                                                             'needs_review']},
-                                                                                                                       'requestId': {'type': 'string'}}}},
-                                                                                    'context': {'type': 'array',
-                                                                                                'items': {'type': 'object'}}}}},
-                                               'mode': {'enum': ['comments', 'initial']},
-                                               'targets': {'type': 'array',
-                                                           'items': {'type': 'object',
-                                                                     'additionalProperties': False,
-                                                                     'required': ['path',
-                                                                                  'fileVersion',
-                                                                                  'sourceVersion',
-                                                                                  'itemId',
-                                                                                  'title',
-                                                                                  'slotIds',
-                                                                                  'slots',
-                                                                                  'context',
-                                                                                  'threads',
-                                                                                  'pendingChanges'],
-                                                                     'properties': {'path': {'type': 'string'},
-                                                                                    'fileVersion': {'type': 'string',
-                                                                                                    'pattern': '^[a-f0-9]{64}$'},
-                                                                                    'itemId': {'type': 'string'},
-                                                                                    'slotIds': {'type': 'array',
-                                                                                                'items': {'type': 'string'}},
-                                                                                    'slots': {'type': 'array',
-                                                                                              'items': {'type': 'object',
-                                                                                                        'additionalProperties': False,
-                                                                                                        'required': ['id',
-                                                                                                                     'source',
-                                                                                                                     'translation',
-                                                                                                                     'line',
-                                                                                                                     'key',
-                                                                                                                     'kind'],
-                                                                                                        'properties': {'id': {'type': 'string'},
-                                                                                                                       'source': {'type': 'string'},
-                                                                                                                       'translation': {'type': 'string'},
-                                                                                                                       'line': {'type': 'integer',
-                                                                                                                                'minimum': 1},
-                                                                                                                       'key': {'type': 'string'},
-                                                                                                                       'kind': {'enum': ['metadata',
-                                                                                                                                         'command_string',
-                                                                                                                                         'database_csv']},
-                                                                                                                       'position': {'type': 'integer',
-                                                                                                                                    'minimum': 1}}}},
-                                                                                    'pendingChanges': {'type': 'array',
-                                                                                                       'items': {'type': 'object',
-                                                                                                                 'additionalProperties': False,
-                                                                                                                 'required': ['id',
-                                                                                                                              'slotId',
-                                                                                                                              'before',
-                                                                                                                              'after'],
-                                                                                                                 'properties': {'id': {'type': 'string'},
-                                                                                                                                'slotId': {'type': 'string'},
-                                                                                                                                'before': {'type': 'string'},
-                                                                                                                                'after': {'type': 'string'}}}},
-                                                                                    'context': {'type': 'array',
-                                                                                                'items': {'type': 'object'}},
-                                                                                    'sourceVersion': {'type': 'string',
-                                                                                                      'pattern': '^[a-f0-9]{64}$'},
-                                                                                    'title': {'type': 'string'},
-                                                                                    'threads': {'type': 'array',
-                                                                                                'items': {'type': 'object'}}}}}}},
- 'review-response.schema.json': {'$schema': 'https://json-schema.org/draft/2020-12/schema',
-                                 '$id': 'woditor-review/response/v1',
-                                 'title': 'Woditor Review response',
-                                 'type': 'object',
-                                 'additionalProperties': False,
-                                 'required': ['schemaVersion', 'requestId', 'responses', 'suggestions'],
-                                 'properties': {'schemaVersion': {'const': 1},
-                                                'requestId': {'type': 'string', 'minLength': 1},
-                                                'responses': {'type': 'array',
-                                                              'items': {'$ref': '#/$defs/response'}},
-                                                'suggestions': {'type': 'array',
-                                                                'items': {'$ref': '#/$defs/suggestion'}}},
-                                 '$defs': {'change': {'type': 'object',
-                                                      'additionalProperties': False,
-                                                      'required': ['slotId', 'before', 'after'],
-                                                      'properties': {'slotId': {'type': 'string'},
-                                                                     'before': {'type': 'string'},
-                                                                     'after': {'type': 'string'}}},
-                                           'response': {'type': 'object',
-                                                        'additionalProperties': False,
-                                                        'required': ['commentId',
-                                                                     'path',
-                                                                     'itemId',
-                                                                     'fileVersion',
-                                                                     'decision',
-                                                                     'reason',
-                                                                     'changes'],
-                                                        'properties': {'commentId': {'type': 'string',
-                                                                                     'minLength': 1},
-                                                                       'path': {'type': 'string',
-                                                                                'minLength': 1},
-                                                                       'itemId': {'type': 'string',
-                                                                                  'minLength': 1},
-                                                                       'fileVersion': {'type': 'string',
-                                                                                       'pattern': '^[a-f0-9]{64}$'},
-                                                                       'decision': {'enum': ['accepted',
-                                                                                             'rejected',
-                                                                                             'partial',
-                                                                                             'needs_review']},
-                                                                       'reason': {'type': 'string',
-                                                                                  'minLength': 1},
-                                                                       'explanation': {'type': 'string'},
-                                                                       'changes': {'type': 'array',
-                                                                                   'items': {'$ref': '#/$defs/change'}}}},
-                                           'suggestion': {'type': 'object',
-                                                          'additionalProperties': False,
-                                                          'required': ['id',
-                                                                       'path',
-                                                                       'itemId',
-                                                                       'fileVersion',
-                                                                       'reason',
-                                                                       'changes'],
-                                                          'properties': {'id': {'type': 'string',
-                                                                                'minLength': 1},
-                                                                         'path': {'type': 'string',
-                                                                                  'minLength': 1},
-                                                                         'itemId': {'type': 'string',
-                                                                                    'minLength': 1},
-                                                                         'fileVersion': {'type': 'string',
-                                                                                         'pattern': '^[a-f0-9]{64}$'},
-                                                                         'reason': {'type': 'string',
-                                                                                    'minLength': 1},
-                                                                         'changes': {'type': 'array',
-                                                                                     'items': {'$ref': '#/$defs/change'}}}}}}}
+_SCHEMAS = json.loads(r'''
+{
+  "review-request.schema.json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "woditor-review/request/v1",
+    "type": "object",
+    "required": [
+      "schemaVersion",
+      "requestId",
+      "createdAt",
+      "entries"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "schemaVersion": {
+        "const": 1
+      },
+      "requestId": {
+        "type": "string",
+        "minLength": 1
+      },
+      "createdAt": {
+        "type": "string"
+      },
+      "entries": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "fileVersion",
+            "itemId",
+            "slotIds",
+            "commentId",
+            "slots",
+            "posts",
+            "context"
+          ],
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "fileVersion": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "itemId": {
+              "type": "string"
+            },
+            "slotIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "commentId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "slots": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "source",
+                  "translation",
+                  "line",
+                  "key",
+                  "kind"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "translation": {
+                    "type": "string"
+                  },
+                  "line": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "key": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "enum": [
+                      "metadata",
+                      "command_string",
+                      "database_csv"
+                    ]
+                  },
+                  "position": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              }
+            },
+            "pendingChanges": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "slotId",
+                  "before",
+                  "after"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "slotId": {
+                    "type": "string"
+                  },
+                  "before": {
+                    "type": "string"
+                  },
+                  "after": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "posts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "author",
+                  "text",
+                  "createdAt"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "author": {
+                    "enum": [
+                      "user",
+                      "ai"
+                    ]
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "createdAt": {
+                    "type": "string"
+                  },
+                  "decision": {
+                    "enum": [
+                      "accepted",
+                      "rejected",
+                      "partial",
+                      "needs_review"
+                    ]
+                  },
+                  "requestId": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "context": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      },
+      "mode": {
+        "enum": [
+          "comments",
+          "initial"
+        ]
+      },
+      "targets": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "fileVersion",
+            "sourceVersion",
+            "itemId",
+            "title",
+            "slotIds",
+            "slots",
+            "context",
+            "threads",
+            "pendingChanges"
+          ],
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "fileVersion": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "itemId": {
+              "type": "string"
+            },
+            "slotIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "slots": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "source",
+                  "translation",
+                  "line",
+                  "key",
+                  "kind"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "translation": {
+                    "type": "string"
+                  },
+                  "line": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "key": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "enum": [
+                      "metadata",
+                      "command_string",
+                      "database_csv"
+                    ]
+                  },
+                  "position": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              }
+            },
+            "pendingChanges": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "slotId",
+                  "before",
+                  "after"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "slotId": {
+                    "type": "string"
+                  },
+                  "before": {
+                    "type": "string"
+                  },
+                  "after": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "context": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            },
+            "sourceVersion": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "title": {
+              "type": "string"
+            },
+            "threads": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "review-response.schema.json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "woditor-review/response/v1",
+    "title": "Woditor Review response",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "schemaVersion",
+      "requestId",
+      "responses",
+      "suggestions"
+    ],
+    "properties": {
+      "schemaVersion": {
+        "const": 1
+      },
+      "requestId": {
+        "type": "string",
+        "minLength": 1
+      },
+      "responses": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/response"
+        }
+      },
+      "suggestions": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/suggestion"
+        }
+      }
+    },
+    "$defs": {
+      "change": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "slotId",
+          "before",
+          "after"
+        ],
+        "properties": {
+          "slotId": {
+            "type": "string"
+          },
+          "before": {
+            "type": "string"
+          },
+          "after": {
+            "type": "string"
+          }
+        }
+      },
+      "response": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "commentId",
+          "path",
+          "itemId",
+          "fileVersion",
+          "decision",
+          "reason",
+          "changes"
+        ],
+        "properties": {
+          "commentId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "itemId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "fileVersion": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "decision": {
+            "enum": [
+              "accepted",
+              "rejected",
+              "partial",
+              "needs_review"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "explanation": {
+            "type": "string"
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/change"
+            }
+          }
+        }
+      },
+      "suggestion": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "path",
+          "itemId",
+          "fileVersion",
+          "reason",
+          "changes"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "itemId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "fileVersion": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/change"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+''')
 
 
 def read(path: str | Path):
