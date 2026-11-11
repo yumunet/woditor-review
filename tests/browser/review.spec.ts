@@ -1,4 +1,5 @@
 import {captureUi} from './screenshots';
+import {emptyWorkspace} from '../../src/model';
 import { test, expect, type Page, type Locator } from '@playwright/test';
 import { readFileSync, existsSync, readdirSync, mkdirSync, writeFileSync } from 'node:fs';
 import { zipSync, unzipSync } from 'fflate';
@@ -21,6 +22,29 @@ export async function loadReal(page: Page, importPath = sourcePath) {
   if (importPath === sourcePath) await expect(page.locator('.source')).toContainText('夕一');
   else await expect(page.locator('.source')).toBeVisible();
 }
+
+test('import results restore each tab scroll after text view and system Back',async({page})=>{
+  const path='BasicData/CDataBase/00.txt',workspace=emptyWorkspace();
+  workspace.diagnosticDocuments=[{path,jaText:Array.from({length:400},(_,i)=>`日本語 ${i}`).join('\n'),enText:Array.from({length:400},(_,i)=>`English ${i}`).join('\n')}];
+  for(const severity of ['error','warning'] as const) for(let i=0;i<60;i++) workspace.diagnostics.push({path,severity,message:`${severity} 行 ${i+200}`,line:i+200,enLine:i+190});
+  for(let i=0;i<60;i++) workspace.diagnostics.push({path,severity:'warning',message:`設定キーによる行ずれ補正: 行 ${i+200}`,line:i+200,enLine:i+190});
+  await page.goto('/');await expect(page.locator('.busy')).toHaveCount(0);await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'バックアップを復元',exact:true}).click();
+  await page.locator('input[name=backup]').setInputFiles({name:'scroll.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(workspace))});await page.getByRole('button',{name:'復元する',exact:true}).click();await page.getByRole('button',{name:'確定',exact:true}).click();await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:/^読み込み結果/}).click();
+  const body=page.locator('#diagnostic-panel');
+  for(const [index,tab] of ['エラー','警告','自動補正'].entries()) {
+    await page.getByRole('tab',{name:new RegExp(`^${tab}`)}).click();
+    const row=body.locator('.diagnostic').nth(20+index*5);await row.scrollIntoViewIfNeeded();const offset=await body.evaluate(el=>el.scrollTop);expect(offset).toBeGreaterThan(100);
+    for(const systemBack of [false,true]) {
+      await row.click();await expect(page.getByRole('dialog',{name:'テキスト表示',exact:true})).toBeVisible();
+      await page.locator('.text-scroll').evaluate(el=>{el.scrollTop=el.scrollHeight;});
+      if(systemBack) await page.goBack();else await page.locator('[data-action=diagnostic-back]').click();
+      await expect(page.getByRole('tab',{name:new RegExp(`^${tab}`)})).toHaveAttribute('aria-selected','true');
+      await expect.poll(()=>body.evaluate(el=>el.scrollTop)).toBe(offset);await expect(row).toBeInViewport();
+    }
+    await page.getByRole('tab',{name:/^対象外/}).click();await page.getByRole('tab',{name:new RegExp(`^${tab}`)}).click();await expect.poll(()=>body.evaluate(el=>el.scrollTop)).toBe(offset);
+  }
+});
 
 test('unified import accepts English alone and preserves comments and other files',async({page})=>{
   test.skip(!corpus,'Private reference files not available');

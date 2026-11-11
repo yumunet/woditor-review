@@ -49,6 +49,8 @@ function updateBusy(message: string) {busy = message; const el = root.querySelec
 let lastFocus: HTMLElement | null = null;
 let commentTab: 'open' | 'all' = 'open', replyTarget: string | null = null;
 let diagnosticTab:DiagnosticTab='error';
+const diagnosticScroll=new Map<string,number>();
+let diagnosticScrollRevision=0;
 let editTarget: {threadId: string; postId: string} | null = null;
 let commentDraft='',commentDraftItem='';
 let commentAnchor:string|null=null;
@@ -218,6 +220,9 @@ function render() {
   const folder=root.querySelector('.file-scroll');if(folder) folderScroll=folder.scrollTop;
   const scroll = renderedPath===path ? root.querySelector('.review')?.scrollTop ?? 0 : 0;
   const sheetScroll = root.querySelector('.sheet-body')?.scrollTop ?? 0;
+  const oldResults=root.querySelector<HTMLElement>('#diagnostic-panel');
+  if(diagnosticScrollRevision!==workspaceRevision) {diagnosticScroll.clear();diagnosticScrollRevision=workspaceRevision;}
+  else if(oldResults) diagnosticScroll.set(oldResults.getAttribute('aria-labelledby')!,oldResults.scrollTop);
   const file = currentFile(), tree = fileTree(workspace.files, homeFilter), p = percent(tree.done, tree.total);
   root.innerHTML = `<header class="top">${file ? `<button class="icon" aria-label="戻る" data-action="home">${icon('back')}</button>` : ''}<h1 title="${e(file?.path ?? 'Woditor Review')}">${e(file?.path.split('/').at(-1) ?? 'Woditor Review')}</h1>${!file ? `<button class="overall" data-action="progress" aria-label="全体の進捗"><span class="ring" style="--progress:${p ?? 0}%"></span>${p === null ? '—' : p + '%'}</button>` : ''}<button class="icon" aria-label="メニュー" data-action="menu" aria-expanded="${menu}">${icon('menu')}</button></header>${menu ? `<div class="menu-dismiss" data-action="dismiss-menu" aria-hidden="true"></div><nav class="menu" aria-label="メニュー"><button data-action="load">ファイルを読み込む</button><button data-action="diagnostics">読み込み結果 (エラー${workspace.diagnostics.filter(d => d.severity === 'error').length})</button><button data-action="export">AIレビューを依頼</button><button data-action="response">AIレビュー結果を読み込む</button><button data-action="backup">状態をバックアップ</button><button data-action="restore">バックアップを復元</button></nav>` : ''}${file ? review(file) : `${filterButtons(homeFilter, 'home')}<main class="scroll file-scroll">${workspace.files.length ? treeRows(tree) || '<div class="empty">対象のファイルはありません</div>' : `<div class="empty">日本語と英語のTXTを読み込んでください<br><button class="primary" data-action="load">${icon('upload')} ファイルを読み込む</button></div>`}</main>`}${sheet ? `<div class="scrim" data-action="close"></div><section class="sheet" role="dialog" aria-modal="true" aria-label="${e(({load: 'ファイルを読み込む', items: '翻訳項目', comments: 'コメント', progress: '全体の進捗', diagnostics: '読み込み結果'} as Record<string,string>)[sheet] ?? '')}"><button class="handle" aria-label="下にスワイプして閉じる" tabindex="-1"></button><div class="sheet-head"><h2>${({load: 'ファイルを読み込む', items: '翻訳項目', comments: 'コメント', progress: '全体の進捗', diagnostics: '読み込み結果'} as Record<string,string>)[sheet] ?? ''}</h2><button class="icon" aria-label="閉じる" data-action="close">${icon('close')}</button></div>${sheetBody()}</section>` : ''}${toastMarkup()}${busy ? `<div class="busy" role="status"><div class="spinner"></div><div>${e(busy)}</div></div>` : ''}`;
   root.querySelector('.sheet')?.setAttribute('aria-label', sheetTitles[sheet ?? ''] ?? '');
@@ -229,7 +234,7 @@ function render() {
   root.querySelectorAll<HTMLButtonElement>('.menu [data-action]').forEach(button => button.insertAdjacentHTML('afterbegin', menuIcon(button.dataset.action!)));
   root.querySelector('.review')?.scrollTo(0, scroll);
   root.querySelector('.file-scroll')?.scrollTo(0,folderScroll);renderedPath=path;
-  root.querySelector('.sheet-body')?.scrollTo(0, sheetScroll);
+  root.querySelector('.sheet-body')?.scrollTo(0,sheet==='diagnostics'?diagnosticScroll.get(`diagnostic-tab-${diagnosticTab}`)??0:sheetScroll);
   const all = root.querySelector<HTMLInputElement>('#export-all');
   if (all) {const count = exportFiles().filter(f => exportSelection.has(f.path)).length; all.indeterminate = count > 0 && count < exportFiles().length;}
   root.querySelectorAll<HTMLInputElement>('[data-export-folder]').forEach(input=>{
