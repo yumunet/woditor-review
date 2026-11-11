@@ -27,6 +27,7 @@ import {workspaceHash} from './drive-sync';
 import {ScreenHistory} from './screen-history';
 import {loadPreferences,preferencesFrom,savePreferences,type Preferences} from './preferences';
 import {exportTree,folderFiles} from './export-tree';
+import {installExportSelection} from './export-selection';
 
 const root = document.querySelector<HTMLDivElement>('#app')!;
 const hideTooltips=installTooltips();
@@ -109,7 +110,18 @@ function toastMarkup() {return notice ? `<div class="toast" role="status">${e(no
 function toast(message: string, instructions: string | null = null) {notice = message; noticeInstructions = instructions; clearTimeout(toastTimer); root.querySelector('.toast')?.remove(); if (!menu) root.querySelector('.menu')?.remove(); root.insertAdjacentHTML('beforeend', toastMarkup()); screenHistory?.sync(historyScreen()); toastTimer = setTimeout(() => {notice = ''; noticeInstructions = null; root.querySelector('.toast')?.remove();}, instructions ? 10000 : 5000);}
 function closeInstructions() {instructionsPreview = null; render(); root.querySelector<HTMLElement>('[data-action="preview-instructions"], [data-action="copy-instructions"]')?.focus();}
 function exportFiles() {return workspace.files.filter(f => sheet === 'english' || reviewMode === 'initial' || f.items.some(i => unresolved(i).length));}
-function resetExportSelection() {exportSelection = new Set(exportFiles().filter(f => !path || f.path === path).map(f => f.path)); preparedRequest = null;}
+function resetExportSelection() {exportRange.reset();exportSelection = new Set(exportFiles().filter(f => !path || f.path === path).map(f => f.path)); preparedRequest = null;}
+function refreshExportSelection() {
+  if(sheet!=='export' && sheet!=='english') return;
+  const files=exportFiles(),all=root.querySelector<HTMLInputElement>('#export-all'),count=files.filter(f=>exportSelection.has(f.path)).length;
+  if(all) {all.checked=!!files.length && count===files.length;all.indeterminate=count>0 && count<files.length;}
+  root.querySelectorAll<HTMLInputElement>('[data-export-path]').forEach(input=>{input.checked=exportSelection.has(input.dataset.exportPath!);});
+  root.querySelectorAll<HTMLInputElement>('[data-export-folder]').forEach(input=>{
+    const descendants=folderFiles(files,input.dataset.exportFolder!),checked=descendants.filter(f=>exportSelection.has(f.path)).length;
+    input.checked=!!descendants.length && checked===descendants.length;input.indeterminate=checked>0 && checked<descendants.length;
+  });
+  root.querySelectorAll<HTMLButtonElement>('[data-action=export-request],[data-action=copy-instructions],[data-action=english-zip]').forEach(button=>{button.disabled=count===0;});
+}
 function exportRows() {
   const files = exportFiles(), checked = files.filter(f => exportSelection.has(f.path)).length;
   return `<div class="sheet-body"><label class="export-row export-all"><input id="export-all" type="checkbox" ${files.length && checked === files.length ? 'checked' : ''} ${!files.length ? 'disabled' : ''}>すべて選択</label>${files.length ? exportTree(files,exportSelection,exportCollapsed) : '<div class="empty">出力対象のファイルはありません</div>'}</div>`;
@@ -212,6 +224,7 @@ function sheetBody() {
   return '<div class="sheet-body"><div class="empty">コメントはありません</div></div>';
 }
 function render() {
+  exportRange.cancel();
   hideTooltips();
   commentResize.disconnect();
   const draftItem=JSON.stringify([workspaceRevision,path,currentId]);
@@ -235,12 +248,7 @@ function render() {
   root.querySelector('.review')?.scrollTo(0, scroll);
   root.querySelector('.file-scroll')?.scrollTo(0,folderScroll);renderedPath=path;
   root.querySelector('.sheet-body')?.scrollTo(0,sheet==='diagnostics'?diagnosticScroll.get(`diagnostic-tab-${diagnosticTab}`)??0:sheetScroll);
-  const all = root.querySelector<HTMLInputElement>('#export-all');
-  if (all) {const count = exportFiles().filter(f => exportSelection.has(f.path)).length; all.indeterminate = count > 0 && count < exportFiles().length;}
-  root.querySelectorAll<HTMLInputElement>('[data-export-folder]').forEach(input=>{
-    const files=folderFiles(exportFiles(),input.dataset.exportFolder!),count=files.filter(f=>exportSelection.has(f.path)).length;
-    input.indeterminate=count>0 && count<files.length;
-  });
+  refreshExportSelection();
   if (instructionsPreview !== null) root.insertAdjacentHTML('beforeend', `<div class="dialog-overlay instructions-overlay"><section class="dialog instructions-dialog" role="dialog" aria-modal="true" aria-label="指示文"><div class="instructions-head"><h2>指示文</h2><button class="icon" aria-label="指示文を閉じる" data-action="close-instructions">${icon('close')}</button></div><pre class="instructions-text" tabindex="0">${e(instructionsPreview)}</pre></section></div>`);
   if(sheet==='text') refreshTextView();
   positionContextMenu(root);
@@ -252,6 +260,8 @@ function render() {
   preservePreviousScreen=false;
 }
 
+const exportRange=installExportSelection(root,{paths:()=>exportFiles().map(file=>file.path),selected:()=>exportSelection,
+  change:(selected,preview)=>{exportSelection=selected;preparedRequest=null;if(preview) refreshExportSelection();else render();}});
 document.addEventListener('pointerdown',event=>{if((menu||contextMenu) && !root.contains(event.target as Node)) {menu=false;contextMenu=null;render();}});
 root.addEventListener('click', event => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-action]');
@@ -357,7 +367,7 @@ root.addEventListener('scroll',event=>{
   if(sheet==='text' && textView && element.matches('.text-scroll')) paintTextView(textView,element);
   if(element.matches('.comments-list')) updateCommentScroll(root);
 },true);
-root.addEventListener('change', event => {const el = event.target as HTMLInputElement; if (el.name === 'review-mode') {reviewMode = el.value as ReviewMode; setPreferences({reviewMode}); resetExportSelection(); render(); return;} if(el.dataset.exportFolder) {for(const file of folderFiles(exportFiles(),el.dataset.exportFolder)) {if(el.checked) exportSelection.add(file.path);else exportSelection.delete(file.path);}preparedRequest=null;render();return;} if (el.id === 'drive-auto') {void drive.setAutomatic(el.checked).catch(error => toast(String(error))); return;} if (el.id === 'export-all') {exportSelection = new Set(el.checked ? exportFiles().map(f => f.path) : []); preparedRequest = null; render(); return;} if (el.dataset.exportPath) {if (el.checked) exportSelection.add(el.dataset.exportPath); else exportSelection.delete(el.dataset.exportPath); preparedRequest = null; render();}});
+root.addEventListener('change', event => {const el = event.target as HTMLInputElement; if (el.name === 'review-mode') {reviewMode = el.value as ReviewMode; setPreferences({reviewMode}); resetExportSelection(); render(); return;} if (el.id === 'drive-auto') {void drive.setAutomatic(el.checked).catch(error => toast(String(error))); return;} if (el.id === 'export-all') {exportSelection = new Set(el.checked ? exportFiles().map(f => f.path) : []); preparedRequest = null; render(); return;}});
 root.addEventListener('submit', async event => {
   const form = event.target as HTMLFormElement;
   if (form.id === 'drive-config-form') {
@@ -459,7 +469,7 @@ document.addEventListener('keydown', event => {
 let swipe: {x: number; y: number; target: HTMLElement; allowed: boolean} | null = null;
 root.addEventListener('touchstart', event => {
   const target = event.target as HTMLElement, el = target.closest<HTMLElement>('.sheet');
-  if (!el || target.closest('input,textarea,select,[contenteditable=true]') || target.closest('button:not(.handle):not(.pick-row)')) return;
+  if (!el || target.closest('.export-tree,input,textarea,select,[contenteditable=true]') || target.closest('button:not(.handle):not(.pick-row)')) return;
   const body = el.querySelector('.sheet-body');
   swipe = {x: event.touches[0].clientX, y: event.touches[0].clientY, target: el, allowed: !!target.closest('.handle') || !!target.closest('.sheet-body') && (body?.scrollTop ?? 0) <= 0};
 }, {passive: true});
