@@ -48,8 +48,8 @@ def main():
             continue
         paired[kind] += 1
         if result['errors']:
-            counts['filesWithAlignmentErrors'] += 1
-        counts['unmatchedSlots'] += len(result['errors'])
+            counts['filesWithErrors'] += 1
+        counts['diagnosticErrors'] += len(result['errors'])
         counts['alignmentExcludedSlots'] += len(result['excluded']) - len(data['excluded'])
         for error in result['errors']:
             errors.append({'path': path, 'type': kind, 'reason': error})

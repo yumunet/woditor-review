@@ -1,6 +1,6 @@
 import type {ReviewFile,Item} from './model';
 import {metadataHeader,metadataContextText,metadataItem} from './metadata-text';
-import {databaseChoicesEnabled} from './database-choice-policy';
+import {databaseChoicesEnabled,commonChoicesEnabled,databaseChoiceMode} from './database-choice-policy';
 import {escape,icon} from './ui';
 
 function headerKeys(header:string,prefix:string):Map<number,string> {
@@ -19,14 +19,15 @@ function choiceRows(file:ReviewFile,item:Item) {
   if(group===undefined) return [];
   const prefix=`${file.type==='database'?'CHOICE_NAME':'CHOICE_STR'}_${Number(group)}_`;
   const ja=metadataHeader(file.jaText,file.type),en=metadataHeader(file.enText,file.type);
-  const sourceEnabled=file.type!=='database'||databaseChoicesEnabled(ja,Number(group));
-  const translationEnabled=file.type!=='database'||databaseChoicesEnabled(en,Number(group));
+  const enabled=file.type==='common'?commonChoicesEnabled:databaseChoicesEnabled;
+  const sourceEnabled=enabled(ja,Number(group)),translationEnabled=enabled(en,Number(group));
   if(!sourceEnabled && !translationEnabled) return [];
   const sources=headerKeys(ja,prefix),translations=headerKeys(en,prefix);
   const count=(header:string)=>{
+    const reference=file.type==='common'?new RegExp(`^LOADTYPE${Number(group)}=1\\r?$`,'m').test(header):databaseChoiceMode(header,Number(group))===2;
     const value=new RegExp(`^${prefix}NUM=([^\\r\\n]*)`,'m').exec(header)?.[1];
-    if(value===undefined || !/^\d+$/.test(value)) return undefined;
-    const parsed=Number(value);return Number.isSafeInteger(parsed)?parsed:undefined;
+    if(value===undefined || !/^\d+$/.test(value)) return reference?3:undefined;
+    const parsed=Number(value);return Number.isSafeInteger(parsed)?reference?Math.min(3,parsed):parsed:reference?3:undefined;
   };
   const jaCount=count(ja),enCount=count(en);
   return [...new Set([...sources.keys(),...translations.keys()])].sort((a,b)=>a-b).flatMap(index=>{

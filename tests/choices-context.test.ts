@@ -6,7 +6,8 @@ import type {ReviewFile,Item,Slot} from '../src/model';
 
 const item={id:'item',slotIds:['field']} as Item;
 function fixture(type:ReviewFile['type']='database',key='ITEMNAME0',ja='',en=''):ReviewFile {
-  return {type,jaText:ja,enText:en,items:[] as Item[],slots:[{id:'field',key,kind:'metadata',command:null}]} as ReviewFile;
+  const modes=type==='common'?'LOADTYPE0=2\nLOADTYPE1=2\nLOADTYPE2=2\nLOADTYPE3=2\nLOADTYPE4=2\n':'';
+  return {type,jaText:modes+ja,enText:modes+en,items:[] as Item[],slots:[{id:'field',key,kind:'metadata',command:null}]} as ReviewFile;
 }
 const rows=(html:string)=>[...html.matchAll(/<tr class="choice-row">([\s\S]*?)<\/tr>/g)].map(match=>match[1]);
 
@@ -83,5 +84,23 @@ test('database choice modes are independent per language and only active choice 
     const file=fixture('database','ITEMNAME0',source,folder);file.slots.push({id:'stale-folder',kind:'metadata',key:'CHOICE_NAME_0_0',translation:'Latest folder path'} as Slot);
     const html=choicesContextView(file,item,true);assert.equal(rows(html).length,1);assert.ok(html.includes('有効な選択肢'));assert.ok(html.includes('（対応なし）'));assert.ok(!html.includes('Folder/path'));assert.ok(!html.includes('Latest folder path'));
     const reversed=choicesContextView(fixture('database','ITEMNAME0',folder,source.replace('有効な選択肢','Active choice')),item,true);assert.equal(rows(reversed).length,1);assert.ok(reversed.includes('Active choice'));assert.ok(reversed.includes('（対応なし）'));assert.ok(!reversed.includes('Folder/path'));
+  }
+});
+
+test('common direct-input and unused numeric arguments hide residual labels independently in each language',()=>{
+  const file=fixture('common','VALINPUT_NAME_0','CHOICE_STR_0_NUM=1\nCHOICE_STR_0_0=残存ラベル\n','CHOICE_STR_0_NUM=1\nCHOICE_STR_0_0=Active label\n');
+  file.jaText=file.jaText.replace('LOADTYPE0=2','LOADTYPE0=0');
+  const html=choicesContextView(file,item,true);assert.ok(!html.includes('残存ラベル'));assert.ok(html.includes('Active label'));assert.ok(html.includes('（対応なし）'));
+  file.enText=file.enText.replace('LOADTYPE0=2','LOADTYPE0=0');assert.equal(choicesContextView(file,item,true),'');
+  const unused=fixture('common','VALINPUT_NAME_2','VALINPUT_NUM=2\nCHOICE_STR_2_0=残存\n','VALINPUT_NUM=2\nCHOICE_STR_2_0=Unused\n');assert.equal(choicesContextView(unused,item,true),'');
+});
+
+test('reference choice lists hide fixed-size trailing settings even when old counts are larger',()=>{
+  for(const type of ['common','database'] as const) {
+    const family=type==='common'?'STR':'NAME',key=type==='common'?'VALINPUT_NAME_0':'ITEMNAME0';
+    const header=(type==='common'?'LOADTYPE0=1\n':'ITEM_LOADTYPE_0=2\n')+`CHOICE_${family}_0_NUM=4\n`+['有効A','有効B','有効C','残存'].map((value,index)=>`CHOICE_${family}_0_${index}=${value}\n`).join('');
+    const file=fixture(type,key,header,header);
+    if(type==='common') {file.jaText=file.jaText.replace('LOADTYPE0=2','LOADTYPE0=1');file.enText=file.enText.replace('LOADTYPE0=2','LOADTYPE0=1');}
+    const html=choicesContextView(file,item,true);assert.equal(rows(html).length,3);assert.ok(!html.includes('残存'));
   }
 });

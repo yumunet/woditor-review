@@ -155,7 +155,7 @@ def analyze(text: str, ftype: str) -> tuple[list[Slot], list[tuple[int, str]]]:
                     if JP.search(value):
                         a = offset + len(key) + 1
                         slots.append(Slot(f"L{num:05d}:{key}", num, a, a + len(value), value, "metadata"))
-                elif not is_resource_metadata(key):
+                elif not is_resource_metadata(key) and not choice_key(ftype,key):
                     unhandled.append((num, line))
             elif ftype in ("map", "common") and (m := COMMAND.fullmatch(line)):
                 arg = m.group("args")
@@ -186,6 +186,8 @@ def normalize_translation(value: str, kind: str) -> str:
         if '\\"' in value:
             raise ValueError("Use a normal double quote in translation, not \\\"; it is converted to <dqrt>")
         return value.replace('"', '<dqrt>').replace('\r\n', '<\\n>').replace('\r', '<\\n>').replace('\n', '<\\n>')
+    if kind=='database_csv':
+        return value
     if '\r' in value or '\n' in value:
         raise ValueError("Metadata values cannot contain actual newline characters")
     return value
@@ -552,19 +554,194 @@ def metadata_values(text):
     return {match[1]: match[2] for line in source_lines(text) if (match := META.fullmatch(line))}
 
 
-def database_choice_key(key):
-    match = re.fullmatch(r'CHOICE_(NAME|VAL)_(\d+)_(NUM|\d+)', key)
-    return (match[1], int(match[2]), match[3]) if match else None
-
-
-def database_choice_mode(meta, group):
-    value = meta.get(f'ITEM_LOADTYPE_{group}', '0')
-    mode = int(value) if re.fullmatch(r'\d+', value) else 0
-    return mode if mode in (0, 1, 2, 3) else 0
-
-
 def reviewable_metadata(kind, key, meta=None):
     if not metadata_allowed(kind, key) or kind == 'database' and key == 'DATANAME_LOAD_NAME':
         return False
-    choice = database_choice_key(key) if kind == 'database' else None
-    return not choice or database_choice_mode(meta or {}, choice[1]) in (2, 3)
+    choice = choice_key(kind, key)
+    if not choice:
+        return True
+    meta = meta or {}
+    return choice[0] != 'VAL' and choice[2] != 'NUM' and choice_mode(kind,meta,choice[1]) in ((1,2) if kind=='common' else (2,3)) and choice_record_active(kind,key,meta)
+
+
+def choice_key(kind, key):
+    family = 'STR' if kind == 'common' else 'NAME' if kind == 'database' else None
+    match = re.fullmatch(rf'CHOICE_({family}|VAL)_(\d+)_(NUM|\d+)',key) if family else None
+    return (match[1],int(match[2]),match[3]) if match else None
+
+
+def choice_mode(kind, meta, group):
+    limit = meta.get('VALINPUT_NUM' if kind=='common' else 'ITEM_NUM')
+    if kind=='common' and group>=5 or limit is not None and re.fullmatch(r'\d+',limit) and group>=int(limit):
+        return 0
+    value = meta.get(f'LOADTYPE{group}' if kind=='common' else f'ITEM_LOADTYPE_{group}','0')
+    return int(value) if re.fullmatch(r'\d+',value) and int(value) in ((0,1,2) if kind=='common' else (0,1,2,3)) else None
+
+
+def choice_record_active(kind, key, meta):
+    choice=choice_key(kind,key)
+    if not choice:
+        return True
+    family,group,index=choice
+    if choice_mode(kind,meta,group) in (None,0):
+        return False
+    if index=='NUM':
+        return True
+    count=choice_count(kind,key,meta)
+    return count is None or int(index)<count
+
+
+def choice_limit(kind, mode, family):
+    return 3 if mode==(1 if kind=='common' else 2) else 1 if kind=='database' and mode==1 and family=='VAL' else None
+
+
+def choice_count(kind, key, meta):
+    family,group,_=choice_key(kind,key)
+    value=meta.get(f'CHOICE_{family}_{group}_NUM')
+    count=int(value) if value is not None and re.fullmatch(r'\d+',value) else None
+    maximum=choice_limit(kind,choice_mode(kind,meta,group),family)
+    return maximum if count is None else count if maximum is None else min(count,maximum)
+
+
+def choice_records(text):
+    """Header-only records; offsets include each original line ending."""
+    result=[];offset=0
+    for number,complete in enumerate(text.splitlines(keepends=True),1):
+        line=complete.rstrip('\r\n')
+        if line in ('WoditorEvCOMMAND_START','[COMMAND_TEXT_START]','<<--CSV_START-->>') or COMMAND.fullmatch(line):
+            break
+        if match:=META.fullmatch(line):
+            result.append(dict(key=match[1],value=match[2],line=number,start=offset,end=offset+len(complete),valueStart=offset+match.start(2),valueEnd=offset+match.end(2)))
+        offset+=len(complete)
+    return result
+
+
+def inspect_choices(text):
+    """Inspect a single export, without bilingual data or application modules.
+
+    Automatic notices identify unused entries/counts only. Malformed active
+    settings are errors and are never guessed or deleted by cleanup.
+    """
+    kind=file_type(text);records=choice_records(text);meta={r['key']:r['value'] for r in records}
+    diagnostics=[];unused=[];changes=[];groups={}
+    def issue(severity, message, record, group):
+        diagnostics.append(dict(severity=severity,message=f'{message}（{"数値引数" if kind=="common" else "項目"} {group}、行 {record["line"]}）',line=record['line'],key=record['key'],group=group))
+    for record in records:
+        if choice:=choice_key(kind,record['key']):
+            groups.setdefault(choice[1],[]).append((choice,record))
+    # Validate explicitly configured modes even if they have no choice rows.
+    for record in records:
+        match=re.fullmatch(r'LOADTYPE(\d+)' if kind=='common' else r'ITEM_LOADTYPE_(\d+)',record['key']) if kind in ('common','database') else None
+        if match and (kind!='common' or int(match[1])<5):
+            groups.setdefault(int(match[1]),[])
+    label='STR' if kind=='common' else 'NAME'
+    for group,entries in sorted(groups.items()):
+        change_start=len(changes)
+        mode=choice_mode(kind,meta,group)
+        anchor=entries[0][1] if entries else next(r for r in records if r['key']==(f'LOADTYPE{group}' if kind=='common' else f'ITEM_LOADTYPE_{group}'))
+        if mode is None:
+            issue('error','選択肢の入力形式が不正です',anchor,group);continue
+        if mode==0:
+            numbers={};ignored=[]
+            for (family,_,index),record in entries:
+                if index=='NUM':
+                    if family in numbers:
+                        changes.append((record['start'],record['end'],''))
+                    else:
+                        numbers[family]=record
+                        if record['value']!='0': changes.append((record['valueStart'],record['valueEnd'],'0'))
+                else:
+                    ignored.append(record);unused.append({**record,'family':family,'reason':'使用対象外の引数・項目または直接入力'})
+                    changes.append((record['start'],record['end'],''))
+            if ignored or any(r['value']!='0' for r in numbers.values()) or len(numbers)!=sum(index=='NUM' for (family,_,index),record in entries):
+                issue('automatic',f'未使用の選択肢設定を無視しました（ラベル {sum(r["key"].startswith("CHOICE_"+label+"_") for r in ignored)}件・内部値 {sum(r["key"].startswith("CHOICE_VAL_") for r in ignored)}件）',anchor,group)
+            continue
+        counts={};active={};family_records={}
+        for family in (label,'VAL'):
+            family_entries=[(index,record) for (f,_,index),record in entries if f==family]
+            declared=[record for index,record in family_entries if index=='NUM']
+            values=[(int(index),record) for index,record in family_entries if index!='NUM']
+            family_records[family]=values
+            if len(declared)>1:
+                issue('error','選択肢の件数設定が重複しています',declared[1],group)
+            if declared and not re.fullmatch(r'\d+',declared[0]['value']):
+                issue('error','選択肢の件数が非負整数ではありません',declared[0],group)
+                counts[family]=None;active[family]={};continue
+            count=int(declared[0]['value']) if declared else max((i+1 for i,_ in values),default=0)
+            # Fixed-size reference arguments cannot use entries after index 2.
+            # Folder internal values similarly have exactly one usable entry.
+            maximum=choice_limit(kind,mode,family)
+            if maximum is not None and count>maximum:
+                count=maximum
+                if declared: changes.append((declared[0]['valueStart'],declared[0]['valueEnd'],str(count)))
+            counts[family]=count;active[family]={}
+            if not declared and values:
+                issue('warning','選択肢の件数設定がありません（実際の添字を使用）',values[0][1],group)
+            for index,record in values:
+                if index>=count:
+                    unused.append({**record,'family':family,'reason':'有効件数の範囲外'})
+                    changes.append((record['start'],record['end'],''));continue
+                if index in active[family]:
+                    issue('error','有効な選択肢のキーが重複しています',record,group)
+                active[family][index]=record
+            if len(active[family])!=count:
+                issue('error',f'選択肢の件数と実際の設定が一致しません（{family}: 件数 {count}・実際 {len(active[family])}件）',declared[0] if declared else anchor,group)
+        if any(entry['group']==group and entry['severity']=='error' for entry in diagnostics):
+            continue
+        name_count,value_count=counts[label],counts['VAL']
+        reference=mode==(1 if kind=='common' else 2)
+        if reference and (name_count not in (0,3) or value_count!=3):
+            issue('error','データベース参照はラベル0件または3件・内部値3件が必要です',anchor,group)
+        elif kind=='database' and mode==1:
+            if name_count!=1 or value_count!=1 or len(family_records[label])!=1:
+                message='ファイル読み込み設定に既定フォルダパスが複数あります' if name_count>1 or len(family_records[label])>1 else 'ファイル読み込み設定は既定フォルダパス1件・内部値1件が必要です'
+                issue('error',message,anchor,group)
+        elif not reference and name_count!=value_count:
+            issue('error','選択肢のラベル数と内部値数が一致しません',anchor,group)
+        ignored=[record for record in unused if choice_key(kind,record['key'])[1]==group]
+        if len(changes)>change_start:
+            issue('automatic',f'未使用の選択肢設定を無視しました（有効件数の範囲外 {len(ignored)}件）',ignored[0] if ignored else anchor,group)
+    return dict(type=kind,diagnostics=diagnostics,unused=unused,changes=changes,
+                counts={severity:sum(d['severity']==severity for d in diagnostics) for severity in ('error','warning','automatic')})
+
+
+def clean_unused_choices(text):
+    report=inspect_choices(text)
+    if report['counts']['error']:
+        raise ValueError('有効な選択肢設定にエラーがあるため削除しません: '+next(d['message'] for d in report['diagnostics'] if d['severity']=='error'))
+    result=replace_spans(text,report['changes'])
+    checked=inspect_choices(result)
+    if checked['counts']['error'] or checked['changes']:
+        raise ValueError('選択肢の削除後の検証に失敗しました')
+    return result,report
+
+
+def command_infos(text):
+    """Parsed commands keyed by physical line, with branch parent information."""
+    infos={};parents={}
+    for number,line in enumerate(source_lines(text),1):
+        if line in ('WoditorEvCOMMAND_START','WoditorEvCOMMAND_END'): parents.clear()
+        if COMMAND.fullmatch(line):
+            info=command_info(line);depth=info['depth']
+            if info['code']==401: info=command_info(line,parents.get(depth))
+            elif info['code'] in (102,111,112): parents[depth]=info['code']
+            elif info['code']==499: parents.pop(depth,None)
+            infos[number]=info
+    return infos
+
+
+def translation_slots(text):
+    """Translation CLI extraction using the same eligibility as the app."""
+    kind=file_type(text);meta=metadata_values(text);slots,unhandled=analyze(text,kind)
+    infos=command_infos(text)
+    selected=[]
+    for slot in slots:
+        key=slot.id.split(':',1)[1]
+        if slot.kind=='metadata' and not reviewable_metadata(kind,key,meta): continue
+        if slot.kind=='command_string' and not slot_policy(infos[slot.line],int(key[1:]))[0]: continue
+        selected.append(slot)
+    if kind=='database' and (section:=catalog(text)):
+        for key,cell in section['fields'].items():
+            if text_cell(cell) and cell['value'] and JP.search(cell['value']):
+                selected.append(Slot(f'L{cell["line"]:05d}:{key}',cell['line'],cell['start'],cell['end'],cell['value'],'database_csv'))
+    return sorted(selected,key=lambda slot:slot.start),unhandled

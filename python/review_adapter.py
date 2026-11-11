@@ -12,57 +12,44 @@ from dataclasses import asdict
 from woditor_parser import (COMMAND, META, JP, analyze, fields, file_type, command_mask,
     command_display_pairs, metadata_allowed, source_lines, decode, digest, special_strings,
     translation_warnings, command_info, slot_policy, render_file, catalog, text_cell,
-    metadata_values, database_choice_key, database_choice_mode, reviewable_metadata)
+    metadata_values, reviewable_metadata,
+    choice_key, choice_mode, choice_record_active, choice_count, inspect_choices, command_infos)
 
 SCHEMA_VERSION = 1
 
-def database_choice_notices(am, bm, ja_meta, en_meta):
+def choice_notices(ja, en, kind):
     summary, errors = Counter(), []
-    ignored = {record['key'] for records, meta in ((am, ja_meta), (bm, en_meta))
-               for record in records if (choice := database_choice_key(record['key']))
-               and choice[0] == 'NAME' and choice[2] != 'NUM' and database_choice_mode(meta, choice[1]) == 0}
-    if ignored:
-        summary['直接入力の項目に残る選択肢名を無視'] = len(ignored)
-    folder_paths, invalid = [], set()
-    for language, records, meta in (('日本語', am, ja_meta), ('英語', bm, en_meta)):
-        paths, declared = defaultdict(list), defaultdict(list)
-        for record in records:
-            choice = database_choice_key(record['key'])
-            if not choice or choice[0] != 'NAME' or database_choice_mode(meta, choice[1]) != 1:
-                continue
-            if choice[2] == 'NUM':
-                declared[choice[1]].append(record)
-            else:
-                paths[choice[1]].append(record)
-        groups = set(paths) | set(declared)
-        for group in sorted(groups):
-            counts = [int(record['value']) for record in declared[group] if re.fullmatch(r'\d+', record['value'])]
-            if len(paths[group]) > 1 or any(count > 1 for count in counts):
-                first = (paths[group] or declared[group])[0]
-                errors.append(f'{language}のファイル読み込み設定に既定フォルダパスが複数あります（項目 {group}、行 {first["line"]}）')
-                invalid.add(group)
-        folder_paths.append(paths)
-    a_paths, b_paths = folder_paths
-    for group in sorted(set(a_paths) | set(b_paths)):
-        if group in invalid or database_choice_mode(ja_meta, group) != 1 or database_choice_mode(en_meta, group) != 1:
-            continue
-        a = a_paths[group][0]['value'] if a_paths[group] else ''
-        b = b_paths[group][0]['value'] if b_paths[group] else ''
-        if a != b:
-            summary['ファイル読み込みの既定フォルダパスが日英で異なります'] += 1
+    for language, text in (('日本語', ja), ('英語', en)):
+        report = inspect_choices(text)
+        if any(d['severity'] == 'automatic' for d in report['diagnostics']):
+            line=report['unused'][0]['line'] if report['unused'] else next(d['line'] for d in report['diagnostics'] if d['severity']=='automatic')
+            summary[f'未使用の選択肢設定を無視しました（{language}、行 {line}）'] = len(report['changes'])
+        for diagnostic in report['diagnostics']:
+            if diagnostic['severity'] == 'error':
+                errors.append(f'{language}の{diagnostic["message"]}')
+            elif diagnostic['severity'] == 'warning':
+                summary[f'{language}の{diagnostic["message"]}'] += 1
+    if kind == 'database':
+        am, bm = metadata_values(ja), metadata_values(en)
+        groups = {choice[1] for key in am.keys() | bm.keys() if (choice := choice_key(kind, key))}
+        for group in groups:
+            if choice_mode(kind, am, group) == choice_mode(kind, bm, group) == 1:
+                key = f'CHOICE_NAME_{group}_0'
+                if key in am and key in bm and am[key] != bm[key]:
+                    summary['ファイル読み込みの既定フォルダパスが日英で異なります'] += 1
     return summary, errors
 
 
 def aligned_metadata_record(kind, record, meta, other_meta):
-    choice = database_choice_key(record['key']) if kind == 'database' else None
+    choice = choice_key(kind, record['key'])
     if not choice:
         return True
-    if database_choice_mode(meta, choice[1]) in (0, 1):
+    family, group, index = choice
+    if not choice_record_active(kind, record['key'], meta):
         return False
-    # Counts and choice values have no active counterpart when the other
-    # language uses direct input or a folder setting. Name entries alone can
-    # still produce an accurate missing/added translation notice.
-    return choice[0] == 'NAME' and choice[2] != 'NUM' or database_choice_mode(other_meta, choice[1]) not in (0, 1)
+    if kind == 'database' and choice_mode(kind, meta, group) == 1 and family == 'NAME':
+        return False  # Folder paths have their own configuration-difference notice.
+    return family != 'VAL' and index != 'NUM' or choice_mode(kind, other_meta, group) not in (None, 0)
 
 
 def records(text, parse):
@@ -227,7 +214,7 @@ def align(ja, en, kind, parse, translation_lines):
         if aligned_metadata_record(kind, record, en_meta, ja_meta):
             bmap[record['scope'], record['key']].append(record)
     line_map, excluded, uncertain, uncertain_en = {}, {}, set(), set()
-    summary, errors = database_choice_notices(am, bm, ja_meta, en_meta) if kind == 'database' else (Counter(), [])
+    summary, errors = choice_notices(ja, en, kind) if kind in ('database', 'common') else (Counter(), [])
     for key, source in amap.items():
         target = bmap.get(key, [])
         if len(source) == len(target) == 1:
@@ -236,12 +223,14 @@ def align(ja, en, kind, parse, translation_lines):
             if a['line'] != b['line']:
                 summary['設定キーによる行ずれ補正'] += 1
             if a['value'] != b['value'] and not reviewable_metadata(kind, a['key'], ja_meta):
-                summary['翻訳対象外の設定値が日英で異なります'] += 1
+                choice=choice_key(kind,a['key'])
+                if not choice or choice[2]!='NUM' or choice_count(kind,a['key'],ja_meta)!=choice_count(kind,b['key'],en_meta):
+                    summary['翻訳対象外の設定値が日英で異なります'] += 1
         elif not target:
             for record in source:
                 unused = inactive(record['key'], en_meta)
-                choice = database_choice_key(record['key']) if kind == 'database' else None
-                if choice and database_choice_mode(en_meta, choice[1]) in (0, 1):
+                choice = choice_key(kind, record['key'])
+                if choice and not reviewable_metadata(kind,record['key'],en_meta):
                     unused = True
                 translated = bool(translation_lines.get(record['line']))
                 subject = '翻訳項目' if translated else '設定'
@@ -361,30 +350,16 @@ def extract_source(text: str) -> dict:
     ftype = file_type(text)
     meta = metadata_values(text)
     slots, unhandled = analyze(text, ftype)
-    lines = text.splitlines()
-    infos, parents = {}, {}
-    for n, line in enumerate(source_lines(text), 1):
-        if line in ('WoditorEvCOMMAND_START', 'WoditorEvCOMMAND_END'):
-            parents.clear()
-        if COMMAND.fullmatch(line):
-            info = command_info(line)
-            depth = info['depth']
-            if info['code'] == 401:
-                info = command_info(line, parents.get(depth))
-            elif info['code'] in (102, 111, 112):
-                parents[depth] = info['code']
-            elif info['code'] == 499:
-                parents.pop(depth, None)
-            infos[n] = info
+    infos = command_infos(text)
     included, excluded = [], []
     for s in slots:
         entry = asdict(s)
         entry['key'] = s.id.split(':', 1)[1]
         if s.kind == 'metadata' and not reviewable_metadata(ftype, entry['key'], meta):
-            choice = database_choice_key(entry['key']) if ftype == 'database' else None
+            choice = choice_key(ftype,entry['key'])
             reason = 'データ名の参照先設定'
             if choice:
-                reason = '直接入力の項目に残る選択肢名' if database_choice_mode(meta, choice[1]) == 0 else 'ファイル読み込みの既定フォルダパス'
+                reason = 'ファイル読み込みの既定フォルダパス' if ftype=='database' and choice_mode(ftype,meta,choice[1])==1 else '使用対象外の選択肢設定'
             excluded.append({**entry, 'reason': reason})
             continue
         info = infos.get(s.line)

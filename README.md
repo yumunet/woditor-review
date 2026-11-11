@@ -75,3 +75,5 @@ english.zip:  en-US/texts/BasicData/CommonEvent/042.txt
 Google接続は再読み込みや認証期限切れの後にやり直してください。接続を解除してもローカルの作業は続けられます。
 
 開発・配信・検証・画面仕様は [docs/development.md](docs/development.md) にまとめています。
+
+Pythonでの新規翻訳や未使用選択肢の検査・削除は [Pythonツール](docs/python-tools.md) を参照してください。

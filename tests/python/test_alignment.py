@@ -23,7 +23,7 @@ class AlignmentTests(unittest.TestCase):
     def test_direct_input_database_ignores_residual_choices_and_keeps_shifted_metadata(self):
         data = self.pair('BasicData/CDataBase/04.txt')
         self.assertFalse(data['errors'])
-        self.assertTrue(any('直接入力の項目に残る選択肢名を無視' in w for w in data['warnings']))
+        self.assertTrue(any('未使用の選択肢設定を無視しました' in w for w in data['warnings']))
         self.assertFalse(any(s['key'].startswith('CHOICE_NAME_') for s in data['slots']))
         self.assertTrue(any(s['key'] == 'ITEMNAME0' and 'Rate' in s['translation'] for s in data['slots']))
         shifted = self.pair('BasicData/CDataBase/01.txt')

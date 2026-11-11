@@ -27,11 +27,11 @@ test('the collapsible field original is escaped and distinguishes missing and em
   assert.ok(html.includes('class="label">原文</div>'));assert.ok(html.includes('class="label">英訳</div>'));assert.ok(html.includes('database-translation'));
 });
 
-const common=(key:string)=>({type:'common',jaText:'COMMON_ID=0\r\nVALINPUT_NAME_0=呼び出すメニュー\r\nVALINPUT_NAME_1=\r\nVALINPUT_NAME_5=ASCII argument\r\nSTRINPUT_NAME_0=別の文字列引数\r\nWoditorEvCOMMAND_START\r\nVALINPUT_NAME_2=本文中の偽設定\r\n',enText:'COMMON_ID=0\r\nVALINPUT_NAME_0=Menu to open\r\nVALINPUT_NAME_1=\r\nVALINPUT_NAME_5=ASCII translation\r\nWoditorEvCOMMAND_START\r\nVALINPUT_NAME_2=Not a header\r\n',items:[] as Item[],slots:[{id:'s',key,kind:'metadata'}]} as ReviewFile);
+const common=(key:string)=>({type:'common',jaText:'COMMON_ID=0\r\nLOADTYPE0=2\r\nLOADTYPE1=2\r\nLOADTYPE2=2\r\nLOADTYPE4=2\r\nVALINPUT_NAME_0=呼び出すメニュー\r\nVALINPUT_NAME_1=\r\nVALINPUT_NAME_4=ASCII argument\r\nSTRINPUT_NAME_0=別の文字列引数\r\nWoditorEvCOMMAND_START\r\nVALINPUT_NAME_2=本文中の偽設定\r\n',enText:'COMMON_ID=0\r\nLOADTYPE0=2\r\nLOADTYPE1=2\r\nLOADTYPE2=2\r\nLOADTYPE4=2\r\nVALINPUT_NAME_0=Menu to open\r\nVALINPUT_NAME_1=\r\nVALINPUT_NAME_4=ASCII translation\r\nWoditorEvCOMMAND_START\r\nVALINPUT_NAME_2=Not a header\r\n',items:[] as Item[],slots:[{id:'s',key,kind:'metadata'}]} as ReviewFile);
 
 test('common argument choices use the numeric argument group and original header, including ASCII names',()=>{
   assert.deepEqual(commonArgumentOriginal(common('CHOICE_STR_0_8'),item),{index:0,source:'呼び出すメニュー',translation:'Menu to open'});
-  assert.deepEqual(commonArgumentOriginal(common('CHOICE_STR_5_0'),item),{index:5,source:'ASCII argument',translation:'ASCII translation'});
+  assert.deepEqual(commonArgumentOriginal(common('CHOICE_STR_4_0'),item),{index:4,source:'ASCII argument',translation:'ASCII translation'});
   assert.deepEqual(commonArgumentOriginal(common('CHOICE_STR_1_0'),item),{index:1,source:'',translation:''});
   assert.deepEqual(commonArgumentOriginal(common('CHOICE_STR_2_0'),item),{index:2,source:null,translation:null});
 });
@@ -46,7 +46,7 @@ test('common argument lookup ignores command bodies and applies only to common a
 });
 
 test('common argument context shares collapse controls and escapes bilingual text without duplicate argument captions',()=>{
-  const data=common('CHOICE_STR_0_0');data.jaText='COMMON_ID=0\nVALINPUT_NAME_0=<script>\n';
+  const data=common('CHOICE_STR_0_0');data.jaText='COMMON_ID=0\nLOADTYPE0=2\nVALINPUT_NAME_0=<script>\n';
   const html=databaseContextView(data,item,true);assert.ok(html.includes('>対応する引数<span'));assert.ok(!html.includes('数値引数名 1'));assert.ok(!html.includes('context-field-label'));assert.ok(html.includes('&lt;script&gt;'));assert.ok(!html.includes('<script>'));assert.ok(html.includes('Menu to open'));
   const closed=databaseContextView(data,item,false);assert.ok(closed.includes('aria-expanded="false"'));assert.ok(closed.includes('data-action="database-context"'));assert.ok(!closed.includes('class="text-box'));
   assert.ok(databaseContextView(common('CHOICE_STR_1_0'),item,true).includes('引数名は未設定'));

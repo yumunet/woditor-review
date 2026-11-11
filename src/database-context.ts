@@ -1,7 +1,7 @@
 import type {ReviewFile,Item} from './model';
 import {escape,icon} from './ui';
 import {metadataHeader,metadataContextText,metadataItem} from './metadata-text';
-import {databaseChoicesEnabled} from './database-choice-policy';
+import {databaseChoicesEnabled,commonChoicesEnabled} from './database-choice-policy';
 
 type ContextField={index:number;source:string|null;translation:string|null};
 
@@ -23,7 +23,11 @@ export function commonArgumentOriginal(file:ReviewFile,item:Item):ContextField|n
   if(file.type!=='common') return null;
   const slot=file.slots.find(slot=>slot.id===item.slotIds[0]);if(!slot) return null;
   const index=/^CHOICE_STR_(\d+)_\d+$/.exec(slot.key)?.[1];if(index===undefined) return null;
-  return {index:Number(index),...metadataContextText(file,`VALINPUT_NAME_${Number(index)}`)};
+  const group=Number(index),text=metadataContextText(file,`VALINPUT_NAME_${group}`);
+  const sourceEnabled=commonChoicesEnabled(metadataHeader(file.jaText,file.type),group);
+  const translationEnabled=commonChoicesEnabled(metadataHeader(file.enText,file.type),group);
+  if(!sourceEnabled && !translationEnabled) return null;
+  return {index:group,source:sourceEnabled?text.source:null,translation:translationEnabled?text.translation:null};
 }
 
 export function databaseContextView(file:ReviewFile,item:Item,open:boolean):string {

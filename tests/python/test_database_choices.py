@@ -37,22 +37,22 @@ class DatabaseChoicePolicyTests(unittest.TestCase):
         self.assertFalse(data['errors']);self.assertEqual(len(self.choices(data)),2)
 
     def test_direct_input_residue_ignores_names_counts_and_values_without_translation_errors(self):
-        for mode in (None,0,4,'invalid'):
+        for mode in (None,0):
             with self.subTest(mode=mode):
                 ja=database(mode,['残存名','別の残存名'],['10','20'],declared=5,duplicate=True)
                 en=database(mode,['Other'],['77'],declared=7)
                 data=self.pair(ja,en)
                 self.assertFalse(data['errors']);self.assertFalse(self.choices(data))
-                self.assertEqual(data['warnings'].count('直接入力の項目に残る選択肢名を無視: 1件'),1)
+                self.assertEqual(sum(w.startswith('未使用の選択肢設定を無視しました') for w in data['warnings']),2)
                 self.assertFalse(any('翻訳項目' in warning or '設定値が' in warning or '対応する設定' in warning or 'だけの設定' in warning for warning in data['warnings']))
 
     def test_direct_input_empty_count_does_not_generate_ignore_notices(self):
         data=self.pair(database(0),database(0))
         self.assertFalse(data['errors']);self.assertFalse(any('選択肢名を無視' in warning for warning in data['warnings']))
 
-    def test_only_residual_entry_keys_count_once_across_languages(self):
+    def test_unused_settings_counts_include_values_and_count_resets_per_language(self):
         data=self.pair(database(0,['名0','名1']),database(0,['Name0','Name1','Name2']))
-        self.assertIn('直接入力の項目に残る選択肢名を無視: 3件',data['warnings'])
+        self.assertTrue(any('（日本語、行 ' in w and w.endswith(': 6件') for w in data['warnings']));self.assertTrue(any('（英語、行 ' in w and w.endswith(': 8件') for w in data['warnings']))
         self.assertFalse(data['errors'])
 
     def test_folder_paths_are_configuration_and_language_differences_warn(self):
@@ -93,6 +93,6 @@ class DatabaseChoicePolicyTests(unittest.TestCase):
         ja=(Path('.reference/ja-JP/texts')/path).read_bytes();en=(Path('.reference/en-US/texts')/path).read_bytes()
         data=pair_file(str(path),ja,en)
         self.assertFalse(data['errors']);self.assertFalse(self.choices(data))
-        self.assertIn('直接入力の項目に残る選択肢名を無視: 1800件',data['warnings'])
+        self.assertTrue(any(w.startswith('未使用の選択肢設定を無視しました（日本語、行 ') and w.endswith(': 3800件') for w in data['warnings']))
         self.assertFalse(any('翻訳項目' in warning or '対応する設定' in warning for warning in data['warnings']))
         self.assertEqual(render_file(data['enText'],data['slots'])['text'],data['enText'])

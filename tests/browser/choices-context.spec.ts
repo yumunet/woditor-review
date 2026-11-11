@@ -14,10 +14,10 @@ async function openFile(page:Page,path:string) {
 for(const common of [false,true]) test(`${common?'common arguments':'database fields'} show bilingual choice tables with independent persistent collapse`,async({page},info)=>{
   const path=common?'BasicData/CommonEvent/000.txt':'BasicData/DataBase/00.txt';
   const family=common?'CHOICE_STR':'CHOICE_NAME',field=common?'VALINPUT_NAME_':'ITEMNAME';
-  const prefix=common?'COMMON_ID=0\nVALINPUT_NUM=2\n':'TYPE_ID=0\nDATANAME_LOAD_TYPE=1\nITEM_NUM=2\nITEM_LOADTYPE_0=3\nITEM_LOADTYPE_1=3\n';
+  const prefix=common?'COMMON_ID=0\nVALINPUT_NUM=2\nLOADTYPE0=2\nLOADTYPE1=2\n':'TYPE_ID=0\nDATANAME_LOAD_TYPE=1\nITEM_NUM=2\nITEM_LOADTYPE_0=3\nITEM_LOADTYPE_1=3\n';
   const tail=common?'WoditorEvCOMMAND_START\nWoditorEvCOMMAND_END\n[COMMAND_TEXT_START]\n[COMMAND_TEXT_END]\n':'<<--CSV_START-->>\n"分類名","選択肢なし",\n"隠すデータ値","隠す設定値",\n<<--CSV_END-->>\n';
-  const ja=prefix+`${field}0=分類名\n${field}1=選択肢なし\n${family}_0_NUM=2\n${family}_0_0=最初の選択\n${family}_0_1=二番目の選択\n${family}_1_NUM=0\n${family}_1_0=使用しない残存値\n`+tail;
-  const en=ja.replaceAll('分類名','Category').replaceAll('選択肢なし','No choices').replace(`${family}_0_NUM=2`,`${family}_0_NUM=1`).replace('最初の選択','First choice').replace('二番目の選択','Inactive English choice');
+  const ja=prefix+`${field}0=分類名\n${field}1=選択肢なし\n${family}_0_NUM=2\n${family}_0_0=最初の選択\n${family}_0_1=二番目の選択\n${family}_1_NUM=0\nCHOICE_VAL_0_NUM=2\nCHOICE_VAL_0_0=0\nCHOICE_VAL_0_1=1\nCHOICE_VAL_1_NUM=0\n${family}_1_0=使用しない残存値\n`+tail;
+  const en=ja.replaceAll('分類名','Category').replaceAll('選択肢なし','No choices').replace(`${family}_0_NUM=2`,`${family}_0_NUM=1`).replace('CHOICE_VAL_0_NUM=2','CHOICE_VAL_0_NUM=1').replace('最初の選択','First choice').replace('二番目の選択','Inactive English choice');
   const title=common?'数値引数名 1':'項目名 0',choiceTitle=common?'選択肢 1-1':'選択肢名 0-1';
   await load(page,path,ja,en);await openFile(page,path);
   const pick=async(title:string)=>{await page.locator('.entry-open').click();await page.locator('.pick-row').filter({has:page.locator('.pick-title',{hasText:new RegExp(`^${title}$`)})}).click();};

@@ -29,7 +29,7 @@ test('automatic alignment notices have their own tab without hiding actual warni
 
 test('only positional alignment and known format differences are automatic',()=>{
   const automatic=['原文部分の行数差を自動補正しました（日本語 10 / 英語 9）','設定キーによる行ずれ補正: 2件','コマンド列による行ずれ補正: 1件',
-    '旧形式の文字列操作の引数形式の違いを吸収: 1件','直接入力の項目に残る選択肢名を無視: 2件'];
+    '旧形式の文字列操作の引数形式の違いを吸収: 1件','未使用の選択肢設定を無視しました（日本語、行 3）: 2件'];
   const differences=['英語版で使用対象外になった翻訳項目: 3件','英語版に対応する翻訳項目がありません: 3件','翻訳対象外の設定値が日英で異なります: 2件','コマンド引数が日英で異なります: 2件','ファイル読み込みの既定フォルダパスが日英で異なります: 1件'];
   for(const message of automatic) assert.equal(diagnosticTabFor({path:'a',severity:'warning',message}),'automatic');
   for(const message of differences) assert.equal(diagnosticTabFor({path:'a',severity:'warning',message}),'warning');
@@ -54,6 +54,6 @@ test('database path warnings and ignored choice notices retain both text locatio
   const en='TYPE_ID=0\nITEM_LOADTYPE_0=0\nITEM_LOADTYPE_1=1\nCHOICE_NAME_1_0=Images/New/\n';
   const file={type:'database',jaText:ja,enText:en,slots:[],excluded:[],commands:[]} as unknown as ReviewFile;
   assert.deepEqual(diagnosticLocation(file,'ファイル読み込みの既定フォルダパスが日英で異なります: 1件'),{line:5,enLine:4});
-  assert.deepEqual(diagnosticLocation(file,'直接入力の項目に残る選択肢名を無視: 1件'),{line:3,enLine:2});
+  assert.deepEqual(diagnosticLocation(file,'未使用の選択肢設定を無視しました（日本語、行 3）: 1件'),{line:3,enLine:2});
   assert.deepEqual(diagnosticLocation(file,'英語のファイル読み込み設定に既定フォルダパスが複数あります（項目 1、行 4）'),{line:5,enLine:4});
 });
