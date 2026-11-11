@@ -6,7 +6,7 @@ export function searchedItems(file:ReviewFile,items:Item[],query:string):Item[] 
   if(!query) return items;
   const needle=query.toLocaleLowerCase(),slots=new Map(file.slots.map(s=>[s.id,s]));
   return items.filter(item=>{
-    const text=item.slotIds.map(id=>{const s=slots.get(id)!;return sourceText(s)+'\n'+s.translation;}).join('\n')+'\n'+item.changes.filter(c=>c.status==='pending').map(c=>c.after).join('\n');
+    const text=itemTitle(file,item)+'\n'+item.slotIds.map(id=>{const s=slots.get(id)!;return sourceText(s)+'\n'+s.translation;}).join('\n')+'\n'+item.changes.filter(c=>c.status==='pending').map(c=>c.after).join('\n');
     return text.toLocaleLowerCase().includes(needle);
   });
 }

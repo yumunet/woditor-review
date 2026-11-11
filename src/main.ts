@@ -216,7 +216,7 @@ function sheetBody() {
     return `<form class="form source-edit" id="source-form">${file.slots.filter(s=>item.slotIds.includes(s.id) && s.sourceMissing).map(s=>`<label>原文<textarea name="${e(s.id)}" aria-label="補完する原文">${e(sourceText(s))}</textarea></label>`).join('')}<button class="primary" type="submit">保存</button></form>`;
   }
   if (sheet === 'load') return `<form class="form" id="load-form"><label>日本語原文 ZIP${workspace.files.length ? '（省略すると現在の原文を使用）' : ''}<input type="file" name="ja" accept=".zip,application/zip" ${workspace.files.length ? '' : 'required'}></label><label>英訳済み ZIP<input type="file" name="en" accept=".zip,application/zip" required></label><button class="primary" type="submit">読み込む</button></form>`;
-  if (sheet === 'items') return `${filterButtons(itemFilter, 'item')}<div class="item-search"><input type="search" id="item-search" aria-label="翻訳項目を検索" placeholder="原文・英訳を検索" value="${e(itemQuery)}"></div><div class="sheet-body">${itemRows(currentFile()!,targets(),currentId,itemQuery)}</div>`;
+  if (sheet === 'items') return `${filterButtons(itemFilter, 'item')}<div class="item-search"><input type="search" id="item-search" aria-label="翻訳項目を検索" placeholder="検索" value="${e(itemQuery)}"></div><div class="sheet-body">${itemRows(currentFile()!,targets(),currentId,itemQuery)}</div>`;
   if (sheet === 'progress') return `<div class="sheet-body">${progressRows(fileTree(workspace.files, 'all'))}</div>`;
   if (sheet === 'diagnostics') return diagnosticsView(workspace.diagnostics, diagnosticTab,workspace);
   if (sheet === 'comments') return commentsBody();

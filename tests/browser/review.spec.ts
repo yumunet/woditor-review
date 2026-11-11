@@ -463,6 +463,7 @@ test('item search filters rows by either language without changing counters or n
   const count=(await page.locator('.counter').textContent())!.split('/')[1].trim();
   await page.locator('.entry-open').click();
   const search=page.getByRole('searchbox',{name:'翻訳項目を検索'});
+  await expect(search).toHaveAttribute('placeholder','検索');await search.fill('イベント名');await expect(page.locator('.pick-row')).toHaveCount(1);await expect(page.locator('.pick-title')).toHaveText('イベント名');
   await search.fill('HeY ThErE');await expect(page.locator('.pick-row')).toHaveCount(1);await expect(search).toBeFocused();
   await expect(page.locator('.counter')).toHaveText(`1 / ${count}`);
   await page.locator('.pick-row').click();await expect(page.locator('.counter')).toHaveText(`2 / ${count}`);
