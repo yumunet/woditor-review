@@ -10,6 +10,7 @@ import re
 from collections import Counter
 from dataclasses import asdict
 from review_alignment import align
+from database_csv import catalog, pair_cells,masked_csv,replace_spans
 
 from woditor_translation_tool import (
     COMMAND, META, JP, analyze, fields, file_type, command_mask,
@@ -198,6 +199,9 @@ def pair_file(path: str, ja_raw: bytes, en_raw: bytes) -> dict:
                           'translation': value, 'kind': kind, 'key': key, 'position': position,
                           'command': info, 'title': (info['kind'] or 'コマンド文字列') if info else metadata_title(key),
                           'warnings': [], 'fingerprint': digest('unpaired\0' + key + '\0' + (structure or ''))})
+    if data['type'] == 'database':
+        csv_slots,csv_errors,csv_warnings = pair_cells(ja,en,translation_warnings)
+        slots.extend(csv_slots);errors.extend(csv_errors);warnings.extend(csv_warnings)
     slots.sort(key=lambda slot: (slot['enLine'], slot.get('position') or 0))
     items, serial = [], Counter()
     for s in slots:
@@ -237,12 +241,6 @@ def pair_file(path: str, ja_raw: bytes, en_raw: bytes) -> dict:
                 special = re.compile(rf'\\cself\[{index}\]', re.I)
                 usages[s['id']] = [c['line'] for c in commands
                                    if c['line'] > 0 and (num.search(a[c['line'] - 1]) or special.search(a[c['line'] - 1]))]
-    if data['type'] == 'database':
-        marker = '<<--CSV_START-->>'
-        if (marker in ja) != (marker in en):
-            raise ValueError('CSVセクションが一致しません')
-        if marker in ja and ja[ja.index(marker):] != en[en.index(marker):]:
-            warnings.append('CSV部分に差があります。CSVは翻訳レビュー対象外です')
     if data['unhandled']:
         warnings.append(f'未認識の日本語行: {len(data["unhandled"])}')
     return {'path': path, 'type': data['type'], 'jaText': ja, 'enText': en,
@@ -259,10 +257,17 @@ def render_file(text: str, slots: list[dict]) -> dict:
         offsets.append(offset)
         offset += len(line)
     replacements, edited = [], set()
+    csv_section = catalog(text) if any(s['kind']=='database_csv' for s in slots) else None
     for slot in slots:
         n, value = slot.get('enLine', slot['line']), slot['translation']
-        if not isinstance(value, str) or any(c in value for c in ('\0', '\r', '\n')):
+        if not isinstance(value, str) or '\0' in value or slot['kind']!='database_csv' and any(c in value for c in ('\r', '\n')):
             raise ValueError('Translation must be a single encoded line')
+        if slot['kind']=='database_csv':
+            cell = csv_section['fields'].get(slot['key'])
+            if not cell or not cell['quoted']:
+                raise ValueError('CSV文字列の位置が一致しません')
+            replacements.append((cell['start'],cell['end'],value.replace('"','""')))
+            continue
         line = lines[n - 1].rstrip('\r\n')
         if slot['kind'] == 'metadata':
             m = META.fullmatch(line)
@@ -277,8 +282,12 @@ def render_file(text: str, slots: list[dict]) -> dict:
             a += m.start('args'); b += m.start('args')
         replacements.append((offsets[n - 1] + a, offsets[n - 1] + b, value))
         edited.add(n)
-    result = text
-    for a, b, value in sorted(replacements, reverse=True):
-        result = result[:a] + value + result[b:]
-    validate_text(text, result, edited)
-    return {'text': result, 'version': digest(result)}
+    result = replace_spans(text,replacements)
+    if csv_section is None:
+        validate_text(text, result, edited)
+    else:
+        revised = catalog(result)
+        validate_text(text[:csv_section['start']],result[:revised['start']],edited)
+        if masked_csv(text,csv_section)!=masked_csv(result,revised):
+            raise ValueError('CSVの行・列構造または数値・ヘッダーが変更されました')
+    return {'text': result, 'version': digest(result), **({'csvLines':{key:cell['line'] for key,cell in catalog(result)['fields'].items() if cell['quoted']}} if csv_section else {})}

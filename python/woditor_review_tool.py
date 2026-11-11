@@ -11,6 +11,7 @@ import re
 from uuid import uuid4
 from pathlib import Path, PurePosixPath
 from review_parser import decode, digest, render_file
+from database_csv import catalog,cell_for_key
 from woditor_translation_tool import COMMAND, META, fields, tokens
 
 SCHEMAS = Path(__file__).resolve().parent.parent / 'docs/schemas'
@@ -90,7 +91,7 @@ def validate(request: dict, response: dict):
             key = (answer['path'], edit['slotId'])
             if key in changed or edit['slotId'] not in slots or slots[edit['slotId']]['translation'] != edit['before']:
                 raise ValueError('Duplicate/unknown slot or changed before text')
-            if any(c in edit['after'] for c in ('\0', '\r', '\n')):
+            if '\0' in edit['after'] or slots[edit['slotId']]['kind']!='database_csv' and any(c in edit['after'] for c in ('\r', '\n')):
                 raise ValueError('Use encoded newlines, not literal newlines')
             changed.add(key)
     if answers != set(entries):
@@ -109,7 +110,7 @@ def validate(request: dict, response: dict):
             key = (suggestion['path'], edit['slotId'])
             if key in changed or edit['slotId'] not in slots or edit['before'] != slots[edit['slotId']]['translation']:
                 raise ValueError('Invalid suggestion edit')
-            if any(c in edit['after'] for c in ('\0', '\r', '\n')):
+            if '\0' in edit['after'] or slots[edit['slotId']]['kind']!='database_csv' and any(c in edit['after'] for c in ('\r', '\n')):
                 raise ValueError('Use encoded newlines, not literal newlines')
             changed.add(key)
 
@@ -145,7 +146,7 @@ def apply_files(request: dict, response: dict, english_root: Path, output_root: 
     src, dst = english_root.resolve(), output_root.resolve()
     if dst == src or src in dst.parents or dst in src.parents:
         raise ValueError('Output must be separate from input')
-    writes = {}
+    writes, csv_sections = {}, {}
     for answer in response['responses'] + response['suggestions']:
         path = PurePosixPath(answer['path'])
         if path.is_absolute() or '..' in path.parts or any(':' in p or '\\' in p for p in path.parts):
@@ -162,8 +163,12 @@ def apply_files(request: dict, response: dict, english_root: Path, output_root: 
         by_id = {s['id']: s for s in entry['slots']}
         for edit in answer['changes']:
             slot = by_id[edit['slotId']]
-            line = text.splitlines()[slot['line'] - 1]
-            if slot['kind'] == 'metadata':
+            line = text.splitlines()[slot['line'] - 1] if slot['kind']!='database_csv' else ''
+            if slot['kind'] == 'database_csv':
+                if str(path) not in csv_sections:
+                    csv_sections[str(path)] = catalog(text)
+                actual = cell_for_key(text,slot['key'],csv_sections[str(path)])['value']
+            elif slot['kind'] == 'metadata':
                 match = META.fullmatch(line)
                 if not match or match[1] != slot['key']:
                     raise ValueError('Metadata position mismatch')

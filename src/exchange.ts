@@ -33,7 +33,7 @@ export const chatInstructions = (request: ReviewRequest) => request.mode === 'in
 提供の woditor_review_tool.py の build → validate → apply を使い、${reviewFileNames(request).response} と修正済み英訳ZIPを出力してください。
 build用の判断JSON: {"responses":[{"commentId":"依頼のID","decision":"accepted","reason":"理由","changes":[{"slotId":"対象ID","before":"slots.translation","after":"最終案"}]}],"suggestions":[]}。
 changesはSlotごと・全回答で重複なし。保留案を維持・修正する場合も最終案を記載し、撤回は rejected と changes: []。変更なしも changes: []。追加案は suggestions に {id,path,itemId,fileVersion,reason,changes}。
-依頼のID・相対パス・バージョン、TXTのコマンド構造・メタデータキー・CSV・COMMAND_TEXT・BOM・改行形式・制御文字・置換文字列・名前指定フィールドを保持。AI判断はユーザー承認と区別してください。`;
+依頼のID・相対パス・バージョン、TXTのコマンド構造・メタデータキー・CSVの行列構造と数値・COMMAND_TEXT・BOM・改行形式・制御文字・置換文字列・名前指定フィールドを保持。CSV文字列セル内は実際の改行を使えます（引用符はツールが処理）。AI判断はユーザー承認と区別してください。`;
 
 interface Edit {slotId: string; before: string; after: string}
 interface Answer {commentId: string; path: string; itemId: string; fileVersion: string; decision: Decision; reason: string; explanation?: string; changes: Edit[]}
@@ -44,7 +44,7 @@ export function validateResponse(value: unknown): asserts value is ReviewRespons
   const obj = (v: any) => !!v && typeof v === 'object' && !Array.isArray(v);
   const text = (v: any) => typeof v === 'string' && v.length > 0;
   const keys = (v: any, allowed: string[]) => Object.keys(v).every(k => allowed.includes(k));
-  const edits = (v: any) => Array.isArray(v) && v.every(e => obj(e) && keys(e, ['slotId','before','after']) && text(e.slotId) && typeof e.before === 'string' && typeof e.after === 'string' && !e.after.includes('\0') && !/[\r\n]/.test(e.after));
+  const edits = (v: any) => Array.isArray(v) && v.every(e => obj(e) && keys(e, ['slotId','before','after']) && text(e.slotId) && typeof e.before === 'string' && typeof e.after === 'string' && !e.after.includes('\0'));
   const v = value as any;
   if (!obj(v) || !keys(v, ['schemaVersion','requestId','responses','suggestions']) || v.schemaVersion !== 1 || !text(v.requestId) || !Array.isArray(v.responses) || !Array.isArray(v.suggestions)) return fail();
   for (const a of v.responses) if (!obj(a) || !keys(a, ['commentId','path','itemId','fileVersion','decision','reason','explanation','changes']) || !text(a.commentId) || !text(a.path) || !text(a.itemId) || !/^[a-f0-9]{64}$/.test(a.fileVersion) || !['accepted','rejected','partial','needs_review'].includes(a.decision) || !text(a.reason) || a.explanation !== undefined && typeof a.explanation !== 'string' || !edits(a.changes)) return fail();
@@ -54,6 +54,7 @@ export function validateResponse(value: unknown): asserts value is ReviewRespons
 function propose(file: ReviewFile, item: Item, edit: Edit, threadId: string | null, origin: 'ai' | 'reload', aiPostId?: string) {
   const slot = file.slots.find(s => s.id === edit.slotId);
   if (!slot || !item.slotIds.includes(edit.slotId) || slot.translation !== edit.before) throw new Error(`翻訳単位・変更前の英訳が一致しません: ${edit.slotId}`);
+  if(slot.kind!=='database_csv' && /[\r\n]/.test(edit.after)) throw new Error('CSV文字列以外はエンコードされた改行を使用してください');
   if (edit.before === edit.after) return;
   if (item.changes.some(c => c.slotId === edit.slotId && c.status === 'pending')) throw new Error(`既に保留中の変更があります: ${edit.slotId}`);
   if (slot.kind === 'command_string' && /(?<!\\)"/.test(edit.after)) throw new Error('コマンド内の引用符は <dqrt> を使用してください');

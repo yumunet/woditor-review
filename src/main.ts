@@ -428,7 +428,7 @@ async function exportReview(action: string) {
   try {
     const files = workspace.files.filter(f => exportSelection.has(f.path));
     const rendered = await renderTranslations(files);
-    for (const r of rendered) {const file = files.find(f => f.path === r.path)!; file.enText = r.text; file.version = r.version;}
+    for (const r of rendered) {const file = files.find(f => f.path === r.path)!; file.enText = r.text; file.version = r.version;for(const slot of file.slots) {const line=r.csvLines?.[slot.key];if(line!==undefined) {slot.enLine=line;if(slot.sourceMissing) slot.line=-line;}}}
     if (action === 'english-zip') download('en-US-reviewed.zip', zipSync(Object.fromEntries(files.map(f => [`en-US/texts/${f.path}`, strToU8((f.enBom ? '\uFEFF' : '') + f.enText)]))), 'application/zip');
     else {
       if (!preparedRequest) {preparedRequest = createRequest(workspace, [...exportSelection], reviewMode); workspace.requests.push(preparedRequest);}

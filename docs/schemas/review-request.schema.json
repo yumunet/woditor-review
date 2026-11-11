@@ -89,7 +89,8 @@
                 "kind": {
                   "enum": [
                     "metadata",
-                    "command_string"
+                    "command_string",
+                    "database_csv"
                   ]
                 },
                 "position": {
@@ -248,7 +249,8 @@
                 "kind": {
                   "enum": [
                     "metadata",
-                    "command_string"
+                    "command_string",
+                    "database_csv"
                   ]
                 },
                 "position": {

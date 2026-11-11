@@ -1,7 +1,7 @@
 import type { Diagnostic, DiagnosticDocument, ReviewFile } from './model';
 let worker: Worker | undefined;
 let nextId = 0;
-export async function renderTranslations(files: ReviewFile[]): Promise<{path: string; text: string; version: string}[]> {
+export async function renderTranslations(files: ReviewFile[]): Promise<{path: string; text: string; version: string;csvLines?:Record<string,number>}[]> {
   worker ??= new Worker(new URL('./parser.worker.ts', import.meta.url), {type: 'module'});
   const target = worker, id = ++nextId;
   return new Promise((resolve, reject) => {

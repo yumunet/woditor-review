@@ -13,6 +13,15 @@ import { canMerge, mergeGroup, splitGroup } from '../src/grouping';
 import {updateManualSources} from '../src/source-edit';
 
 const corpus = existsSync('.reference/ja-JP/texts/MapData/SampleMapA/Event_0000.txt');
+test('CSV proposals accept literal newlines and quotes while metadata proposals reject them',{skip:!corpus},()=>{
+  const file=realFile('BasicData/DataBase/00.txt'),item=file.items.find(i=>file.slots.find(s=>s.id===i.slotIds[0])?.kind==='database_csv')!;
+  const slot=file.slots.find(s=>s.id===item.slotIds[0])!,thread=addComment(item,'Review this CSV cell');
+  const workspace={...emptyWorkspace(),files:[file]},request=createRequest(workspace,[file.path]);workspace.requests.push(request);
+  const response:ReviewResponse={schemaVersion:1,requestId:request.requestId,suggestions:[],responses:[{commentId:thread.id,path:file.path,itemId:item.id,fileVersion:file.version,decision:'accepted',reason:'Revised',changes:[{slotId:slot.id,before:slot.translation,after:'A "quoted", value\nNext line'}]}]};
+  const next=importResponse(workspace,response);const edited=next.files[0].items.find(i=>i.id===item.id)!;setResolved(edited,next.files[0].slots,thread.id,true);
+  assert.equal(next.files[0].slots.find(s=>s.id===slot.id)!.translation,'A "quoted", value\nNext line');assert.equal(restoreJson(backupJson(next)).files[0].slots.find(s=>s.id===slot.id)!.csv?.row,0);
+  slot.kind='metadata';assert.throws(()=>importResponse(workspace,response),/エンコードされた改行/);
+});
 function realFile(path='MapData/SampleMapA/Event_0000.txt'): ReviewFile {
   const local = '.tools/python';
   const command = process.env.PYTHON || (existsSync(local) ? readdirSync(local).map(p => join(local, p, 'python.exe')).find(existsSync) : null) || (process.platform === 'win32' ? 'py' : 'python3');

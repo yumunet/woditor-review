@@ -2,6 +2,7 @@ import type { PyodideInterface } from 'pyodide';
 import original from '../python/woditor_translation_tool.py?raw';
 import adapter from '../python/review_parser.py?raw';
 import alignment from '../python/review_alignment.py?raw';
+import databaseCsv from '../python/database_csv.py?raw';
 import { readZip } from './archive';
 import type { Diagnostic, DiagnosticDocument, ReviewFile } from './model';
 import {diagnosticLocation} from './diagnostics';
@@ -16,9 +17,10 @@ async function python() {
     py.globals.set('original_code', original);
     py.globals.set('adapter_code', adapter);
     py.globals.set('alignment_code', alignment);
+    py.globals.set('csv_code',databaseCsv);
     await py.runPythonAsync(`
 import types, sys, json
-for name, code in [('woditor_translation_tool', original_code), ('review_alignment', alignment_code), ('review_parser', adapter_code)]:
+for name, code in [('woditor_translation_tool', original_code), ('database_csv',csv_code), ('review_alignment', alignment_code), ('review_parser', adapter_code)]:
     module = types.ModuleType(name)
     sys.modules[name] = module
     exec(compile(code, name + '.py', 'exec'), module.__dict__)

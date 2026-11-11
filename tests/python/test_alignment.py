@@ -71,13 +71,17 @@ class AlignmentTests(unittest.TestCase):
             except ValueError:
                 continue
             lines = data['enText'].splitlines()
+            from database_csv import catalog
+            csv_fields = catalog(data['enText'])['fields'] if data['type']=='database' and '<<--CSV_START-->>' in data['enText'] else {}
             mapped = set()
             for slot in data['slots']:
                 line = lines[slot['enLine'] - 1]
                 position = (slot['enLine'], slot['key'])
                 self.assertNotIn(position, mapped)
                 mapped.add(position)
-                if slot['kind'] == 'metadata':
+                if slot['kind'] == 'database_csv':
+                    value = csv_fields[slot['key']]['value']
+                elif slot['kind'] == 'metadata':
                     value = META.fullmatch(line)[2]
                 else:
                     match = COMMAND.fullmatch(line)

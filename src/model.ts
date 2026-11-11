@@ -12,6 +12,7 @@ export interface Slot {
   id: string; line: number; start: number; end: number; source: string; translation: string;
   kind: string; key: string; title: string; position?: number; command: Command | null;
   fingerprint: string; warnings: string[];
+  csv?:{row:number;item:number|null;dataName:boolean};
 }
 export interface Post { id: string; author: 'user' | 'ai'; text: string; createdAt: string; decision?: Decision; requestId?: string }
 export type Decision = 'accepted' | 'rejected' | 'partial' | 'needs_review';
