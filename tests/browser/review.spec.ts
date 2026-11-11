@@ -816,3 +816,12 @@ test('completed item markers use a balanced green at the same size as other mark
   const sizes=await page.locator('.dot').evaluateAll(dots=>dots.map(dot=>{const rect=dot.getBoundingClientRect();return [rect.width,rect.height];}));expect(sizes.every(([width,height])=>width===8 && height===8)).toBe(true);
   await expect(page.locator('.dot.done')).toHaveCSS('box-shadow','none');await captureUi(page,info,'items');
 });
+
+test('database memo displays encoded line breaks and multiline previews without changing exported TXT',async({page})=>{
+  test.skip(!corpus,'Private reference files not available');const path='BasicData/DataBase/00.txt';await loadReal(page,path);await page.locator('.entry-open').click();
+  await expect(page.locator('.pick-title',{hasText:/^項目名 0$/})).toHaveCount(1);
+  const memo=page.locator('.pick-row').filter({has:page.locator('.pick-title',{hasText:/^メモ$/})});await expect(memo.locator('.pick-source')).toContainText('...');await memo.click();
+  const source=await page.locator('.source').textContent();expect(source).toContain('\n');expect(source).not.toContain(String.raw`<<\n>>`);await expect(page.locator('.slot-warning.subtle')).toHaveCount(0);
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'英訳TXTを出力',exact:true}).click();const event=page.waitForEvent('download');await page.getByRole('button',{name:'英訳TXTを出力',exact:true}).click();
+  const zip=unzipSync(readFileSync((await(await event).path())!));expect(Buffer.from(zip[`en-US/texts/${path}`]).equals(readFileSync(`.reference/en-US/texts/${path}`))).toBe(true);
+});

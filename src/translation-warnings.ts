@@ -1,4 +1,5 @@
-import {sourceText, type Slot} from './model';
+import {sourceText, type Slot,type ReviewFile} from './model';
+import {isDatabaseMemo} from './display-text';
 // Equivalent to the original Python translator's SPECIAL regex. Ruby is
 // translatable; the remaining controls are compared without altering text.
 const special = /<<\\n>>|<\\n>|\\r\\n|\\n|\\r(?!\[)|\\(?!r\[)[a-zA-Z][a-zA-Z0-9_]*\[[^\]\r\n]*\]|<<[A-Z][A-Z0-9_]*>>|<DIR>|<(?!dqrt>)[A-Za-z][A-Za-z0-9_:-]*>|%(?:\d+\$)?[-+ #0]*(?:\d+|\*)?(?:\.(?:\d+|\*))?[diuoxXfFeEgGaAcsp]|@\d+/g;
@@ -10,8 +11,8 @@ export function translationWarnings(source:string,translation:string):string[] {
   if(JSON.stringify(before)===JSON.stringify(after)) return [];
   return [JSON.stringify(before.filter(t=>!newlines.has(t)))===JSON.stringify(after.filter(t=>!newlines.has(t)))?newlineWarning:controlWarning];
 }
-export function slotWarnings(slot:Slot):string[] {
+export function slotWarnings(slot:Slot,file?:Pick<ReviewFile,'type'>):string[] {
   const other=slot.warnings.filter(w=>w!==controlWarning && w!==newlineWarning);
   if(slot.sourceMissing && !sourceText(slot)) return other;
-  return [...other,...translationWarnings(sourceText(slot),slot.translation)];
+  return [...other,...translationWarnings(sourceText(slot),slot.translation).filter(w=>!isDatabaseMemo(file,slot)||w!==newlineWarning)];
 }

@@ -170,6 +170,8 @@ def pair_file(path: str, ja_raw: bytes, en_raw: bytes) -> dict:
             start, end = spans[s['position'] - 1]
             translation = m['args'][start:end]
         issues = translation_warnings(s['source'], translation)
+        if data['type'] == 'database' and s['key'] == 'MEMO':
+            issues = [issue for issue in issues if issue != '改行が異なります']
         structure = command_mask(a[s['line'] - 1]) if s['command'] else s['key']
         slots.append({**s, 'enLine': en_line, 'translation': translation, 'warnings': issues,
                       'fingerprint': digest(s['key'] + '\0' + s['source'] + '\0' + (structure or ''))})
