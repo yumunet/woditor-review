@@ -14,11 +14,20 @@ from review_parser import decode, digest, render_file,special_strings
 from database_csv import catalog,cell_for_key
 from woditor_translation_tool import COMMAND, META, fields
 
-SCHEMAS = Path(__file__).resolve().parent.parent / 'docs/schemas'
+SCHEMAS = Path(__file__).resolve().parent / 'schemas'
 
 
 def read(path: str | Path):
     return json.loads(Path(path).read_text(encoding='utf-8-sig'))
+
+
+def read_schema(name: str):
+    # Keep the packaged layout, but also accept individually uploaded files.
+    for directory in (SCHEMAS, SCHEMAS.parent):
+        path = directory / name
+        if path.is_file():
+            return read(path)
+    raise FileNotFoundError(f'{name} not found; place it in {SCHEMAS} or {SCHEMAS.parent}')
 
 
 def check_schema(data, schema: dict, root: dict | None = None, location: str = '$'):
@@ -56,8 +65,8 @@ def check_schema(data, schema: dict, root: dict | None = None, location: str = '
 
 
 def validate(request: dict, response: dict):
-    check_schema(request, read(SCHEMAS / 'review-request.schema.json'))
-    check_schema(response, read(SCHEMAS / 'review-response.schema.json'))
+    check_schema(request, read_schema('review-request.schema.json'))
+    check_schema(response, read_schema('review-response.schema.json'))
     if request['requestId'] != response['requestId']:
         raise ValueError('Request ID mismatch')
     if request.get('mode') == 'initial':

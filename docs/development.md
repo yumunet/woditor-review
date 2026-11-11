@@ -89,8 +89,8 @@ Python補助ツールの初回レビュー用build入力は `{"responses":[],"su
 
 依頼・回答の `schemaVersion` は1です。
 
-- [review-request.schema.json](schemas/review-request.schema.json)：依頼ID、相対パス、版（UTF-8 BOMを除いたテキストのSHA-256）、項目ID、Slot ID・英語側の位置・原文・現訳、コメントID・全投稿、周辺コマンド、再審用の保留案 `pendingChanges`。内部では日本語側の `line` と英語側の `enLine` を分離し、依頼JSONの `line` は英語側の行番号です。
-- [review-response.schema.json](schemas/review-response.schema.json)：各コメントへの判断・理由・Slot別変更と新規改善案。既存IDと版をそのまま返します。
+- [review-request.schema.json](../python/schemas/review-request.schema.json)：依頼ID、相対パス、版（UTF-8 BOMを除いたテキストのSHA-256）、項目ID、Slot ID・英語側の位置・原文・現訳、コメントID・全投稿、周辺コマンド、再審用の保留案 `pendingChanges`。内部では日本語側の `line` と英語側の `enLine` を分離し、依頼JSONの `line` は英語側の行番号です。
+- [review-response.schema.json](../python/schemas/review-response.schema.json)：各コメントへの判断・理由・Slot別変更と新規改善案。既存IDと版をそのまま返します。
 - バックアップ：`schemaVersion`、全ファイル、原文・英訳・BOM、Slot、グループ、コメント、保留／確定変更、依頼履歴、取り込み済み回答ID、診断情報を含みます。復元時に参照関係を検証します。
 
 回答例（実際にはエクスポートしたIDと64桁の版を使います）：
@@ -124,7 +124,21 @@ python python/woditor_review_tool.py apply --request review_request_ID.json --re
 
 上記はリポジトリからの実行例です。`ID` は出力ファイル名の12文字の短縮IDに置き換えます。`apply` は英訳ファイルの版・変更前の文字列・保護トークンを検証し、新しい出力フォルダにのみ書き込みます。既存フォルダへの書き込みは拒否します。出力は回答に関係するファイルです。既存翻訳CLIも `python/woditor_translation_tool.py` で引き続き利用できます。
 
-補助ツールを別の作業場所へ渡す場合は、python/ の woditor_review_tool.py・review_parser.py・review_alignment.py・database_csv.py・woditor_translation_tool.py と、隣接する docs/schemas/ の依頼・回答スキーマを同じ相対構成で用意する。指示文には実行時の作業場所を固定せず woditor_review_tool.py とだけ記載する。
+### 補助ツールの受け渡し
+
+補助ツールを別の作業場所へ渡す場合は、次の7ファイルを用意する。ChatGPTへは個別に添付できる。
+
+- `python/woditor_review_tool.py`
+- `python/review_parser.py`
+- `python/review_alignment.py`
+- `python/database_csv.py`
+- `python/woditor_translation_tool.py`
+- `python/schemas/review-request.schema.json`
+- `python/schemas/review-response.schema.json`
+
+実行先ではPythonの5ファイルを同じ階層に置く。スキーマJSONの2ファイルは、その階層の `schemas/` 内でも、Pythonファイルと同じ階層でも読み込める。探索先はスクリプト横の `schemas/`、次にスクリプトと同じ階層で、実行時の作業ディレクトリには依存しない。
+
+指示文には実行時の作業場所を固定せず `woditor_review_tool.py` とだけ記載する。
 
 ## 検証
 
@@ -181,8 +195,8 @@ DBの翻訳項目は、各データ名を同じデータ番号の設定値の前
 src/                    TypeScript UI・状態・保存・JSON受け渡し
 src/parser.worker.ts    ZIP処理とPyodideのWorker
 python/                 元の翻訳CLI・読み取り用解析層・レビュー用CLI
+python/schemas/         Python補助ツール用JSONスキーマ
 scripts/                ランタイム同梱・PWA生成・実データレポート
-docs/schemas/           JSONスキーマ
 tests/python/           解析・実データ・Python補助ツールのテスト
 tests/browser/          実ZIP・保存・AI差分・PWA・操作テスト
 public/                 アイコンとManifest
