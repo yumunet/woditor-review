@@ -44,7 +44,7 @@ class NotificationTests(unittest.TestCase):
         self.assertFalse(data['errors']);self.assertIn('コマンド引数が日英で異なります: 1件',data['warnings'])
 
     def test_csv_numeric_differences_are_reported_without_changing_the_english_value(self):
-        ja='TYPE_ID=0\nITEM_NUM=1\n<<--CSV_START-->>\n"数",\n"データ",123,\n<<--CSV_END-->>\n'
+        ja='TYPE_ID=0\nITEM_NUM=2\n<<--CSV_START-->>\n"名前","数",\n"データ",123,\n<<--CSV_END-->>\n'
         en=ja.replace('"データ",123','"Data",456')
         data=self.pair(ja,en)
         self.assertIn('翻訳対象外の設定値が日英で異なります（CSVの数値・非文字列）: 1件',data['warnings'])

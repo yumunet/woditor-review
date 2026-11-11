@@ -11,6 +11,10 @@ import re
 from woditor_translation_tool import COMMAND, META, source_lines, metadata_allowed
 
 
+def reviewable_metadata(kind, key):
+    return metadata_allowed(kind, key) and not (kind == 'database' and key == 'DATANAME_LOAD_NAME')
+
+
 def records(text, parse):
     meta, commands = [], []
     page, saw_page_count = None, False
@@ -178,7 +182,7 @@ def align(ja, en, kind, parse, translation_lines):
             line_map[a['line']] = b['line']
             if a['line'] != b['line']:
                 summary['設定キーによる行ずれ補正'] += 1
-            if a['value'] != b['value'] and not metadata_allowed(kind, a['key']):
+            if a['value'] != b['value'] and not reviewable_metadata(kind, a['key']):
                 summary['翻訳対象外の設定値が日英で異なります'] += 1
         elif not target:
             for record in source:
@@ -194,7 +198,7 @@ def align(ja, en, kind, parse, translation_lines):
         if key in amap:
             continue
         for record in bmap[key]:
-            subject = '翻訳項目' if metadata_allowed(kind, record['key']) and record['value'] else '設定'
+            subject = '翻訳項目' if reviewable_metadata(kind, record['key']) and record['value'] else '設定'
             summary[f'英語版だけの{subject}があります'] += 1
     pairs, removed, ambiguous, ambiguous_en = align_commands(ac, bc)
     for i, j in pairs.items():

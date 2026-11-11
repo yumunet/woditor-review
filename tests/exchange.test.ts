@@ -20,7 +20,26 @@ test('CSV proposals accept literal newlines and quotes while metadata proposals 
   const response:ReviewResponse={schemaVersion:1,requestId:request.requestId,suggestions:[],responses:[{commentId:thread.id,path:file.path,itemId:item.id,fileVersion:file.version,decision:'accepted',reason:'Revised',changes:[{slotId:slot.id,before:slot.translation,after:'A "quoted", value\nNext line'}]}]};
   const next=importResponse(workspace,response);const edited=next.files[0].items.find(i=>i.id===item.id)!;setResolved(edited,next.files[0].slots,thread.id,true);
   assert.equal(next.files[0].slots.find(s=>s.id===slot.id)!.translation,'A "quoted", value\nNext line');assert.equal(restoreJson(backupJson(next)).files[0].slots.find(s=>s.id===slot.id)!.csv?.row,0);
-  slot.kind='metadata';assert.throws(()=>importResponse(workspace,response),/エンコードされた改行/);
+  slot.key='CSV_D0_NAME';assert.throws(()=>importResponse(workspace,response),/エンコードされた改行/);
+  response.responses[0].changes[0].after='Name, "quoted"';assert.doesNotThrow(()=>importResponse(workspace,response));
+  response.responses[0].changes[0].after='Broken\nname';slot.kind='metadata';assert.throws(()=>importResponse(workspace,response),/エンコードされた改行/);
+});
+
+test('corrected CSV column labels preserve reviews by physical source cells, even for repeated text',()=>{
+  const hash='0'.repeat(64),base={kind:'database_csv',source:'同じ',line:5,enLine:5,command:null,position:1,warnings:[],csv:{row:0,item:null,dataName:true}};
+  const file:ReviewFile={path:'db.txt',type:'database',jaText:'original',enText:'English',jaBom:false,enBom:false,sourceVersion:hash,version:hash,commands:[],excluded:[],usages:{},warnings:[],
+    slots:[{...base,id:'old-name',key:'CSV_D0_NAME',title:'データ名 0',translation:'First',start:10,end:12,fingerprint:'1'.repeat(64)},
+           {...base,id:'old-field',key:'CSV_D0_ITEM0',title:'データ 0 / 項目 0',translation:'Second',start:30,end:32,fingerprint:'2'.repeat(64)}],
+    items:[{id:'first',slotIds:['old-name'],title:'データ名 0',code:null,depth:null,lastLine:5,approved:true,threads:[],changes:[]},
+           {id:'second',slotIds:['old-field'],title:'データ 0 / 項目 0',code:null,depth:null,lastLine:5,approved:false,threads:[],changes:[]}]};
+  addComment(file.items[1],'Keep this comment on the second physical cell');
+  const incoming=structuredClone(file);
+  incoming.slots.forEach((slot,index)=>{slot.id=`CSV_D0_ITEM${index}`;slot.key=slot.id;slot.fingerprint=index===0?'2'.repeat(64):'3'.repeat(64);slot.csv={row:0,item:index,dataName:false};slot.title=`データ 0 / 項目 ${index}`;});
+  incoming.items.forEach((item,index)=>{item.id=`new-${index}`;item.slotIds=[incoming.slots[index].id];item.title=incoming.slots[index].title;item.approved=false;item.threads=[];});
+  const next=mergeFiles({...emptyWorkspace(),files:[file]},[incoming]);assert.deepEqual(next.diagnostics,[]);
+  assert.equal(next.files[0].items[0].approved,true);assert.equal(next.files[0].items[0].title,'データ 0 / 項目 0');
+  assert.equal(next.files[0].items[1].threads[0].posts[0].text,'Keep this comment on the second physical cell');
+  assert.deepEqual(next.files[0].slots.map(slot=>[slot.id,slot.key,slot.translation]),[['old-name','CSV_D0_ITEM0','First'],['old-field','CSV_D0_ITEM1','Second']]);
 });
 function realFile(path='MapData/SampleMapA/Event_0000.txt'): ReviewFile {
   const local = '.tools/python';

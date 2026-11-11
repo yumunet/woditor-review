@@ -91,7 +91,7 @@ def validate(request: dict, response: dict):
             key = (answer['path'], edit['slotId'])
             if key in changed or edit['slotId'] not in slots or slots[edit['slotId']]['translation'] != edit['before']:
                 raise ValueError('Duplicate/unknown slot or changed before text')
-            if '\0' in edit['after'] or slots[edit['slotId']]['kind']!='database_csv' and any(c in edit['after'] for c in ('\r', '\n')):
+            if '\0' in edit['after'] or (slots[edit['slotId']]['kind']!='database_csv' or re.fullmatch(r'CSV_D\d+_NAME',slots[edit['slotId']]['key'])) and any(c in edit['after'] for c in ('\r', '\n')):
                 raise ValueError('Use encoded newlines, not literal newlines')
             changed.add(key)
     if answers != set(entries):
@@ -110,7 +110,7 @@ def validate(request: dict, response: dict):
             key = (suggestion['path'], edit['slotId'])
             if key in changed or edit['slotId'] not in slots or edit['before'] != slots[edit['slotId']]['translation']:
                 raise ValueError('Invalid suggestion edit')
-            if '\0' in edit['after'] or slots[edit['slotId']]['kind']!='database_csv' and any(c in edit['after'] for c in ('\r', '\n')):
+            if '\0' in edit['after'] or (slots[edit['slotId']]['kind']!='database_csv' or re.fullmatch(r'CSV_D\d+_NAME',slots[edit['slotId']]['key'])) and any(c in edit['after'] for c in ('\r', '\n')):
                 raise ValueError('Use encoded newlines, not literal newlines')
             changed.add(key)
 

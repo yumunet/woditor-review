@@ -9,8 +9,8 @@ import hashlib
 import re
 from collections import Counter
 from dataclasses import asdict
-from review_alignment import align
-from database_csv import catalog, pair_cells,masked_csv,replace_spans
+from review_alignment import align,reviewable_metadata
+from database_csv import catalog, pair_cells,masked_csv,replace_spans,text_cell
 
 from woditor_translation_tool import (
     COMMAND, META, JP, analyze, fields, file_type, command_mask,
@@ -118,6 +118,9 @@ def extract_source(text: str) -> dict:
     for s in slots:
         entry = asdict(s)
         entry['key'] = s.id.split(':', 1)[1]
+        if s.kind == 'metadata' and not reviewable_metadata(ftype, entry['key']):
+            excluded.append({**entry, 'reason': 'データ名の参照先設定'})
+            continue
         info = infos.get(s.line)
         entry['command'] = info
         if info:
@@ -183,7 +186,7 @@ def pair_file(path: str, ja_raw: bytes, en_raw: bytes) -> dict:
         raw = b[en_line - 1]
         if match := META.fullmatch(raw):
             key, value = match.groups()
-            values = [(key, value, None, 'metadata')] if metadata_allowed(data['type'], key) else []
+            values = [(key, value, None, 'metadata')] if reviewable_metadata(data['type'], key) else []
         else:
             info = alignment['enCommands'][en_line]
             values = [(f'S{index}', value, index, 'command_string')
@@ -264,9 +267,11 @@ def render_file(text: str, slots: list[dict]) -> dict:
             raise ValueError('Translation must be a single encoded line')
         if slot['kind']=='database_csv':
             cell = csv_section['fields'].get(slot['key'])
-            if not cell or not cell['quoted']:
+            if not cell or not text_cell(cell):
                 raise ValueError('CSV文字列の位置が一致しません')
-            replacements.append((cell['start'],cell['end'],value.replace('"','""')))
+            if cell.get('dataName') and any(c in value for c in ('\r', '\n')):
+                raise ValueError('データ名には実際の改行を使用できません')
+            replacements.append((cell['start'],cell['end'],value if cell.get('dataName') else value.replace('"','""')))
             continue
         line = lines[n - 1].rstrip('\r\n')
         if slot['kind'] == 'metadata':
@@ -290,4 +295,4 @@ def render_file(text: str, slots: list[dict]) -> dict:
         validate_text(text[:csv_section['start']],result[:revised['start']],edited)
         if masked_csv(text,csv_section)!=masked_csv(result,revised):
             raise ValueError('CSVの行・列構造または数値・ヘッダーが変更されました')
-    return {'text': result, 'version': digest(result), **({'csvLines':{key:cell['line'] for key,cell in catalog(result)['fields'].items() if cell['quoted']}} if csv_section else {})}
+    return {'text': result, 'version': digest(result), **({'csvLines':{key:cell['line'] for key,cell in catalog(result)['fields'].items() if text_cell(cell)}} if csv_section else {})}

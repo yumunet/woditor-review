@@ -863,10 +863,31 @@ test('database CSV multiline strings round trip through AI approval, ZIP and Eng
   await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'ファイルを読み込む',exact:true}).click();await page.locator('input[name=en]').setInputFiles({name:'csv-reviewed.zip',mimeType:'application/zip',buffer:zip});await page.getByRole('button',{name:'読み込む',exact:true}).click();await expect(page.locator('.busy')).toHaveCount(0);if(await page.getByRole('dialog').count()) await closeReviewSheet(page);await expect(page.locator('.translation')).toHaveText(after);await expect(page.locator('.translation-after')).toHaveCount(0);
 });
 
+test('database CSV columns start at item zero and only mode zero exposes explicit names through AI and ZIP',async({page})=>{
+  const entries=[0,1,2,110000].map((mode,index)=>{
+    const path=`BasicData/DataBase/0${index}.txt`,ja=`TYPE_ID=${index}\nDATANAME_LOAD_TYPE=${mode}\nITEM_NUM=2\nITEMNAME0=最初の項目\nITEMNAME1=次の項目\n<<--CSV_START-->>\n"最初の項目","次の項目",\n"一つ目","二つ目",<<!--DATANAME--!>>独立名,\n<<--CSV_END-->>\n`;
+    return {path,mode,ja,en:ja.replaceAll('最初の項目','First field').replaceAll('次の項目','Second field').replace('一つ目','First').replace('二つ目','Second').replace('独立名','Explicit name')};
+  });
+  await page.goto('/');await expect(page.locator('.busy')).toHaveCount(0);await page.getByRole('button',{name:'ファイルを読み込む',exact:true}).click();
+  for(const name of ['ja','en'] as const) await page.locator(`input[name=${name}]`).setInputFiles({name:name+'.zip',mimeType:'application/zip',buffer:Buffer.from(zipSync(Object.fromEntries(entries.map(entry=>[entry.path,Buffer.from(entry[name])]))))});
+  await page.getByRole('button',{name:'読み込む',exact:true}).click();await expect(page.locator('.busy')).toHaveCount(0,{timeout:90000});if(await page.getByRole('dialog').count()) await closeReviewSheet(page);
+  for(const entry of entries) {
+    await openTreeFile(page,entry.path);await page.locator('.entry-open').click();const row=(title:string)=>page.locator('.pick-row').filter({has:page.locator('.pick-title',{hasText:new RegExp(`^${title}$`)})});
+    await expect(row('データ名 0')).toHaveCount(entry.mode===0?1:0);await row('データ 0 / 項目 0').click();await expect(page.locator('.source')).toHaveText('一つ目');
+    await page.locator('.entry-open').click();await row('データ 0 / 項目 1').click();await expect(page.locator('.source')).toHaveText('二つ目');
+  }
+  await openTreeFile(page,entries[0].path);await page.locator('.entry-open').click();await page.locator('.pick-row').filter({has:page.locator('.pick-title',{hasText:/^データ名 0$/})}).click();await expect(page.locator('.source')).toHaveText('独立名');
+  await postReviewComment(page,'Review the explicit name');const request=await exportCurrentRequest(page),slot=request.entries[0].slots[0],after='New, "quoted", name';expect(slot.key).toBe('CSV_D0_NAME');
+  const response={schemaVersion:1,requestId:request.requestId,suggestions:[],responses:[{commentId:request.entries[0].commentId,path:entries[0].path,itemId:request.entries[0].itemId,fileVersion:request.entries[0].fileVersion,decision:'accepted',reason:'Name revised',changes:[{slotId:slot.id,before:slot.translation,after}]}]};
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'AIレビュー結果を読み込む',exact:true}).click();await page.locator('input[name=answer]').setInputFiles({name:'name.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(response))});await page.getByRole('button',{name:'回答を読み込む',exact:true}).click();await resolveCurrentComment(page);
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'英訳TXTを出力',exact:true}).click();const download=page.waitForEvent('download');await page.getByRole('button',{name:'英訳TXTを出力',exact:true}).click();
+  const zip=unzipSync(readFileSync((await(await download).path())!));expect(Buffer.from(zip[`en-US/texts/${entries[0].path}`]).toString('utf8')).toBe(entries[0].en.replace('<<!--DATANAME--!>>Explicit name,',`<<!--DATANAME--!>>${after},`));
+});
+
 test('empty original database data cells are omitted from review while English-only contents survive export',async({page})=>{
   const path='BasicData/DataBase/00.txt';
-  const ja='TYPE_ID=0\nITEM_NUM=1\nITEMNAME0=説明\n<<--CSV_START-->>\n"説明",\n"名前","",\n"","本文",\n<<--CSV_END-->>\n';
-  const en=ja.replace('ITEMNAME0=説明','ITEMNAME0=Description').replace('"名前",""','"Name","Keep this English"').replace('"","本文"','"Keep this name","Text"');
+  const ja='TYPE_ID=0\nDATANAME_LOAD_TYPE=0\nITEM_NUM=1\nITEMNAME0=説明\n<<--CSV_START-->>\n"説明",\n"",<<!--DATANAME--!>>名前,\n"本文",<<!--DATANAME--!>>,\n<<--CSV_END-->>\n';
+  const en=ja.replace('ITEMNAME0=説明','ITEMNAME0=Description').replace('"",<<!--DATANAME--!>>名前','"Keep this English",<<!--DATANAME--!>>Name').replace('"本文",<<!--DATANAME--!>>','"Text",<<!--DATANAME--!>>Keep this name');
   await page.goto('/');await expect(page.locator('.busy')).toHaveCount(0);await page.getByRole('button',{name:'ファイルを読み込む',exact:true}).click();
   for(const [name,text] of [['ja',ja],['en',en]]) await page.locator(`input[name=${name}]`).setInputFiles({name:name+'.zip',mimeType:'application/zip',buffer:Buffer.from(zipSync({[path]:Buffer.from(text)}))});
   await page.getByRole('button',{name:'読み込む',exact:true}).click();await expect(page.locator('.busy')).toHaveCount(0,{timeout:90000});if(await page.getByRole('dialog').count()) await closeReviewSheet(page);

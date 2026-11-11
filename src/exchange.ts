@@ -33,7 +33,7 @@ export const chatInstructions = (request: ReviewRequest) => request.mode === 'in
 提供の woditor_review_tool.py の build → validate → apply を使い、${reviewFileNames(request).response} と修正済み英訳ZIPを出力してください。
 build用の判断JSON: {"responses":[{"commentId":"依頼のID","decision":"accepted","reason":"理由","changes":[{"slotId":"対象ID","before":"slots.translation","after":"最終案"}]}],"suggestions":[]}。
 changesはSlotごと・全回答で重複なし。保留案を維持・修正する場合も最終案を記載し、撤回は rejected と changes: []。変更なしも changes: []。追加案は suggestions に {id,path,itemId,fileVersion,reason,changes}。
-依頼のID・相対パス・バージョン、TXTのコマンド構造・メタデータキー・CSVの行列構造と数値・COMMAND_TEXT・BOM・改行形式・制御文字・置換文字列・名前指定フィールドを保持。CSV文字列セル内は実際の改行を使えます（引用符はツールが処理）。AI判断はユーザー承認と区別してください。`;
+依頼のID・相対パス・バージョン、TXTのコマンド構造・メタデータキー・CSVの行列構造と数値・COMMAND_TEXT・BOM・改行形式・制御文字・置換文字列・名前指定フィールドを保持。引用符付きCSV設定値には実際の改行を使えます（引用符はツールが処理）。データ名は1行のまま編集。AI判断はユーザー承認と区別してください。`;
 
 interface Edit {slotId: string; before: string; after: string}
 interface Answer {commentId: string; path: string; itemId: string; fileVersion: string; decision: Decision; reason: string; explanation?: string; changes: Edit[]}
@@ -54,7 +54,7 @@ export function validateResponse(value: unknown): asserts value is ReviewRespons
 function propose(file: ReviewFile, item: Item, edit: Edit, threadId: string | null, origin: 'ai' | 'reload', aiPostId?: string) {
   const slot = file.slots.find(s => s.id === edit.slotId);
   if (!slot || !item.slotIds.includes(edit.slotId) || slot.translation !== edit.before) throw new Error(`翻訳単位・変更前の英訳が一致しません: ${edit.slotId}`);
-  if(slot.kind!=='database_csv' && /[\r\n]/.test(edit.after)) throw new Error('CSV文字列以外はエンコードされた改行を使用してください');
+  if((slot.kind!=='database_csv'||/^CSV_D\d+_NAME$/.test(slot.key)) && /[\r\n]/.test(edit.after)) throw new Error('引用符付きCSV設定値以外はエンコードされた改行を使用してください');
   if (edit.before === edit.after) return;
   if (item.changes.some(c => c.slotId === edit.slotId && c.status === 'pending')) throw new Error(`既に保留中の変更があります: ${edit.slotId}`);
   if (slot.kind === 'command_string' && /(?<!\\)"/.test(edit.after)) throw new Error('コマンド内の引用符は <dqrt> を使用してください');
@@ -150,9 +150,11 @@ export function mergeFiles(workspace: Workspace, incoming: ReviewFile[]): Worksp
       const file = structuredClone(candidate), map = new Map<string, string>();
       const sameSource = file.sourceVersion === old.sourceVersion;
       for (const slot of file.slots) {
-        const options = old.slots.filter(s => s.fingerprint === slot.fingerprint && (slot.sourceMissing
-          ? (old.version === file.version ? s.id === slot.id : s.translation === slot.translation)
-          : !sameSource || s.id === slot.id));
+        const options = old.slots.filter(s => slot.kind==='database_csv' && sameSource && !slot.sourceMissing
+          ? s.kind==='database_csv' && !s.sourceMissing && s.start===slot.start && s.end===slot.end && s.source===slot.source
+          : s.fingerprint === slot.fingerprint && (slot.sourceMissing
+            ? (old.version === file.version ? s.id === slot.id : s.translation === slot.translation)
+            : !sameSource || s.id === slot.id));
         if (options.length === 1) map.set(slot.id, options[0].id);
       }
       if (old.slots.some(s=>s.sourceOverride !== undefined && ![...map.values()].includes(s.id))) throw new Error('補完した原文を一意に対応付けできません');
@@ -178,7 +180,9 @@ export function mergeFiles(workspace: Workspace, incoming: ReviewFile[]): Worksp
         const newValues = item.slotIds.map(id => file.slots.find(s => s.id === id)!);
         if (prior) {
           const edits = newValues.map(s => ({slotId: rename.get(s.id)!, before: old.slots.find(oldSlot => oldSlot.id === rename.get(s.id))!.translation, after: s.translation}));
+          const title=item.title;
           Object.assign(item, structuredClone(prior));
+          if(newValues[0]?.kind==='database_csv') item.title=title;
           for (let index = 0; index < edits.length; index++) {
             const edit = edits[index], existing = item.changes.find(c => c.slotId === edit.slotId && c.status === 'pending');
             newValues[index].translation = edit.before;
