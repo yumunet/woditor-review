@@ -863,6 +863,19 @@ test('database CSV multiline strings round trip through AI approval, ZIP and Eng
   await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'ファイルを読み込む',exact:true}).click();await page.locator('input[name=en]').setInputFiles({name:'csv-reviewed.zip',mimeType:'application/zip',buffer:zip});await page.getByRole('button',{name:'読み込む',exact:true}).click();await expect(page.locator('.busy')).toHaveCount(0);if(await page.getByRole('dialog').count()) await closeReviewSheet(page);await expect(page.locator('.translation')).toHaveText(after);await expect(page.locator('.translation-after')).toHaveCount(0);
 });
 
+test('empty original database data cells are omitted from review while English-only contents survive export',async({page})=>{
+  const path='BasicData/DataBase/00.txt';
+  const ja='TYPE_ID=0\nITEM_NUM=1\nITEMNAME0=説明\n<<--CSV_START-->>\n"説明",\n"名前","",\n"","本文",\n<<--CSV_END-->>\n';
+  const en=ja.replace('ITEMNAME0=説明','ITEMNAME0=Description').replace('"名前",""','"Name","Keep this English"').replace('"","本文"','"Keep this name","Text"');
+  await page.goto('/');await expect(page.locator('.busy')).toHaveCount(0);await page.getByRole('button',{name:'ファイルを読み込む',exact:true}).click();
+  for(const [name,text] of [['ja',ja],['en',en]]) await page.locator(`input[name=${name}]`).setInputFiles({name:name+'.zip',mimeType:'application/zip',buffer:Buffer.from(zipSync({[path]:Buffer.from(text)}))});
+  await page.getByRole('button',{name:'読み込む',exact:true}).click();await expect(page.locator('.busy')).toHaveCount(0,{timeout:90000});if(await page.getByRole('dialog').count()) await closeReviewSheet(page);
+  await openTreeFile(page,path);await page.locator('.entry-open').click();await expect(page.locator('.pick-row')).toHaveCount(3);
+  await expect(page.locator('.pick-title',{hasText:/^データ 0 \/ 項目 0$/})).toHaveCount(0);await expect(page.locator('.pick-title',{hasText:/^データ名 1$/})).toHaveCount(0);await closeReviewSheet(page);
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'英訳TXTを出力',exact:true}).click();const download=page.waitForEvent('download');await page.getByRole('button',{name:'英訳TXTを出力',exact:true}).click();
+  const zip=unzipSync(readFileSync((await(await download).path())!));expect(Buffer.from(zip[`en-US/texts/${path}`]).toString('utf8')).toBe(en);
+});
+
 test('import results separate automatic corrections from warnings and keep errors as the default',async({page})=>{
   await page.goto('/');await expect(page.locator('.busy')).toHaveCount(0);await page.getByRole('button',{name:'ファイルを読み込む',exact:true}).click();
   const path='BasicData/DataBase/00.txt';

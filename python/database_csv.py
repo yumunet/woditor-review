@@ -97,6 +97,8 @@ def pair_cells(ja, en, warning_for):
     non_text = 0
     for key, target in b['fields'].items():
         source = a['fields'].get(key)
+        if source and source['quoted'] and source['value'] == '':
+            continue
         if not target['quoted']:
             if source and not source['quoted'] and source['value'] != target['value']:
                 non_text += 1
@@ -118,7 +120,7 @@ def pair_cells(ja, en, warning_for):
                       'fingerprint': hashlib.sha256((key + '\0' + source_value).encode()).hexdigest(),
                       **({'sourceMissing': True} if missing else {})})
     for key, source in a['fields'].items():
-        if source['quoted'] and key not in b['fields']:
+        if source['quoted'] and source['value'] != '' and key not in b['fields']:
             errors.append(f'行 {source["line"]}: CSV文字列が英語版にありません（{key}）')
     if non_text:
         warnings.append(f'CSVの数値・非文字列設定の差を保持: {non_text}件')

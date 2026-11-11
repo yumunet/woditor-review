@@ -28,7 +28,7 @@ class DatabaseCsvTests(unittest.TestCase):
 
     def test_only_quoted_cells_are_reviewed_with_zero_based_data_and_field_indices(self):
         data=self.pair();cells=[s for s in data['slots'] if s['kind']=='database_csv']
-        self.assertEqual([s['key'] for s in cells],['CSV_D0_NAME','CSV_D0_ITEM0','CSV_D1_NAME','CSV_D1_ITEM0'])
+        self.assertEqual([s['key'] for s in cells],['CSV_D0_NAME','CSV_D0_ITEM0','CSV_D1_NAME'])
         self.assertEqual(cells[0]['title'],'データ名 0');self.assertEqual(cells[1]['csv']['item'],0)
         self.assertEqual(cells[1]['translation'],'First, "quoted"\r\nSecond')
         self.assertEqual(cells[1]['source'],'最初の行\r\n二行目');self.assertFalse(data['errors'])
@@ -43,8 +43,18 @@ class DatabaseCsvTests(unittest.TestCase):
         self.assertEqual(masked_csv(data['enText'],catalog(data['enText'])),masked_csv(result['text'],catalog(result['text'])))
         self.assertEqual(render_file(result['text'],data['slots'])['text'],result['text'])
         with self.assertRaises(ValueError):render_file(data['enText'],[{**slot,'key':'CSV_D0_ITEM1'}])
-        empty=next(s for s in data['slots'] if s['key']=='CSV_D1_ITEM0')
-        with self.assertRaises(ValueError):render_file(data['enText'],[empty,empty])
+        cell=next(s for s in data['slots'] if s['key']=='CSV_D1_NAME')
+        with self.assertRaises(ValueError):render_file(data['enText'],[cell,cell])
+
+    def test_empty_original_cells_are_not_reviewed_and_their_english_values_are_preserved(self):
+        ja=fixture().replace('"次","",5,','"","",5,')
+        en=fixture('Name','English').replace('"次","",5,','"English-only name","English-only value",5,')
+        data=pair_file('db.txt',ja.encode(),en.encode())
+        self.assertFalse(data['errors'])
+        self.assertFalse(any(s['csv']['row']==1 for s in data['slots'] if s['kind']=='database_csv'))
+        self.assertEqual(render_file(en,data['slots'])['text'],en)
+        spaced=pair_file('db.txt',ja.replace('"","",5,','" ","",5,').encode(),en.encode())
+        self.assertTrue(any(s['key']=='CSV_D1_NAME' for s in spaced['slots']))
 
     def test_shared_name_fields_and_independent_name_columns_keep_their_actual_field_number(self):
         text='TYPE_ID=0\nITEM_NUM=2\n<<--CSV_START-->>\n"名前","説明",\n"技能","説明文",\n<<--CSV_END-->>\n'
@@ -80,5 +90,6 @@ class DatabaseCsvTests(unittest.TestCase):
             data=pair_file(str(path),ja,en)
             with self.subTest(path=str(path)):
                 self.assertFalse(data['errors']);self.assertEqual(render_file(data['enText'],data['slots'])['text'],data['enText'])
+                self.assertTrue(all(s['source'] or s.get('sourceMissing') for s in data['slots'] if s['kind']=='database_csv'))
                 count+=sum(s['kind']=='database_csv' for s in data['slots'])
-        self.assertGreater(count,1000)
+        self.assertGreater(count,500)
