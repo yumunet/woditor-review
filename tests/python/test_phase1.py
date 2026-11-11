@@ -15,6 +15,11 @@ class MetadataTitleTests(unittest.TestCase):
         self.assertEqual(metadata_title('ITEMNAME0'), '項目名 0')
         self.assertEqual(metadata_title('ITEMNAME37'), '項目名 37')
 
+    def test_database_choice_field_numbers_start_at_zero_while_choices_keep_their_ordinals(self):
+        self.assertEqual(metadata_title('CHOICE_NAME_0_0'), '選択肢名 0-1')
+        self.assertEqual(metadata_title('CHOICE_NAME_12_2'), '選択肢名 12-3')
+        self.assertEqual(metadata_title('CHOICE_STR_0_0'), '選択肢 1-1')
+
 
 @unittest.skipUnless(ROOT.exists(), 'Private reference corpus is not installed')
 class SourceCorpusTests(unittest.TestCase):

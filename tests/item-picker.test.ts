@@ -14,6 +14,14 @@ test('database field names use the stored zero-based key even in older reviews',
   const file={type:'database',slots:[{id:'s',key:'ITEMNAME0'}]} as ReviewFile;
   assert.equal(itemTitle(file,item),'項目名 0');assert.equal(item.title,'項目名 1');assert.equal(item.id,'stable');
 });
+
+test('database choice labels use zero-based fields without renumbering choice ordinals or mutating saved titles',()=>{
+  const item={id:'stable-choice',title:'選択肢名 1-1',slotIds:['s']} as Item;
+  const file={type:'database',slots:[{id:'s',key:'CHOICE_NAME_0_0',source:'選択肢'}]} as ReviewFile;
+  assert.equal(itemTitle(file,item),'選択肢名 0-1');
+  assert.equal(item.title,'選択肢名 1-1');assert.equal(item.id,'stable-choice');
+  file.slots[0].key='CHOICE_NAME_12_2';assert.equal(itemTitle(file,item),'選択肢名 12-3');
+});
 test('one-line previews show an ellipsis when later source lines are hidden',()=>{
   const item={id:'a',title:'Comment',slotIds:['s'],approved:false,threads:[],changes:[]} as unknown as Item;
   const file={slots:[{id:'s',key:'S1',source:'First line\nHidden second line'}]} as ReviewFile;

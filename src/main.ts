@@ -11,6 +11,8 @@ import { backupFileName, backupJson, download, loadWorkspace, restoreJson, saveW
 import { chatInstructions, createRequest, importResponse, mergeFiles, reviewFileNames, sourceZip } from './exchange';
 import { characterDiff } from './diff';
 import {displaySlotText} from './display-text';
+import {databaseContextView} from './database-context';
+import {choicesContextView} from './choices-context';
 import { strToU8, zipSync } from 'fflate';
 import { registerPwa } from './pwa';
 import { canMerge, canSplit, mergeGroup, splitGroup } from './grouping';
@@ -19,6 +21,7 @@ import { threadView } from './comments';
 import { updateManualSources } from './source-edit';
 import {newlineWarning,slotWarnings} from './translation-warnings';
 import {itemRows} from './item-picker';
+import {orderedItems} from './item-order';
 import {createTextView,paintTextView,targetLine,textLineHeight,textViewMarkup,type TextView,type TextLanguage} from './text-viewer';
 import {navigationQuestion,navigationTarget} from './navigation';
 import {DriveController} from './drive-controller';
@@ -105,7 +108,7 @@ const drive = new DriveController({getWorkspace: () => workspace,
 });
 const currentFile = () => workspace.files.find(f => f.path === path);
 const currentItem = () => currentFile()?.items.find(i => i.id === currentId);
-const targets = () => currentFile()?.items.filter(i => matches(i, itemFilter)) ?? [];
+const targets = () => {const file=currentFile();return file?orderedItems(file).filter(i=>matches(i,itemFilter)):[];};
 function toastMarkup() {return notice ? `<div class="toast" role="status">${e(notice)}${noticeInstructions ? '<button data-action="preview-instructions">指示文を確認</button>' : ''}</div>` : '';}
 function toast(message: string, instructions: string | null = null) {notice = message; noticeInstructions = instructions; clearTimeout(toastTimer); root.querySelector('.toast')?.remove(); if (!menu) root.querySelector('.menu')?.remove(); root.insertAdjacentHTML('beforeend', toastMarkup()); screenHistory?.sync(historyScreen()); toastTimer = setTimeout(() => {notice = ''; noticeInstructions = null; root.querySelector('.toast')?.remove();}, instructions ? 10000 : 5000);}
 function closeInstructions() {instructionsPreview = null; render(); root.querySelector<HTMLElement>('[data-action="preview-instructions"], [data-action="copy-instructions"]')?.focus();}
@@ -181,7 +184,7 @@ function treeRows(node: TreeNode, depth = 0): string {
     return `<button class="file-row ${c.file ? '' : 'folder'}" style="--depth:${depth}" data-action="${c.file ? 'file' : 'folder'}" data-value="${e(c.path)}" ${c.file ? '' : `aria-expanded="${isOpen}"`} title="${e(c.path)}"><span class="angle">${c.file ? '' : folderTriangle()}</span><span class="glyph">${icon(c.file ? 'file' : 'folder')}</span><span class="row-name">${e(c.name)}</span><span class="bar"><span class="fill" style="display:block;width:${p ?? 0}%"></span></span><span class="pct">${p === null ? '—' : p + '%'}</span><span class="count" aria-label="${c.total}項目">${compact(c.total)}</span></button>${!c.file && isOpen ? treeRows(c, depth + 1) : ''}`;
   }).join('');
 }
-function context(file:ReviewFile,item:Item) {return contextView(file,item,preferences,{usageIndex,before,after,menu:contextMenu});}
+function context(file:ReviewFile,item:Item) {return databaseContextView(file,item,preferences.databaseContextOpen)+choicesContextView(file,item,preferences.choicesContextOpen)+contextView(file,item,preferences,{usageIndex,before,after,menu:contextMenu});}
 function review(file: ReviewFile) {
   const item = currentItem(), preview=item && latestComment(item), list = targets(), index = list.findIndex(i => i.id === currentId);
   const previous=navigationTarget(workspace.files,file.path,currentId,itemFilter,homeFilter,-1);
@@ -296,6 +299,8 @@ root.addEventListener('click', event => {
   else if (action === 'prev') {move(-1); return;}
   else if (action === 'next') {move(1); return;}
   else if(action==='context') {contextMenu=null;setPreferences({contextOpen:!preferences.contextOpen});}
+  else if(action==='database-context') setPreferences({databaseContextOpen:!preferences.databaseContextOpen});
+  else if(action==='choices-context') setPreferences({choicesContextOpen:!preferences.choicesContextOpen});
   else if(action==='context-menu') contextMenu=contextMenu===value?null:value as ContextMenu;
   else if(action==='context-radius') {const radius=Number(value);if(radius>=3 && radius<=10) {setPreferences({contextRadius:radius});before=after=radius;}contextMenu=null;}
   else if(action==='context-language') {if(value==='ja'||value==='en') setPreferences({contextLanguage:value});contextMenu=null;}
@@ -304,7 +309,7 @@ root.addEventListener('click', event => {
   else if (action === 'usage') {usageIndex += Number(value); before = after = preferences.contextRadius;}
   else if (action === 'approve') {
     const item = currentItem(), file = currentFile(); if (!item || !file) return;
-    const approve = () => {approveItem(item, file.slots, true); if(itemFilter!=='comment') selectItem(nextAfterApproval(file.items, item.id, i => matches(i, itemFilter))); persist(file.path); render();};
+    const approve = () => {approveItem(item, file.slots, true); if(itemFilter!=='comment') selectItem(nextAfterApproval(orderedItems(file), item.id, i => matches(i, itemFilter))); persist(file.path); render();};
     if (isDone(item)) {ask('確認済みを未確認に戻しますか？', () => {undoApproval(item); persist(file.path);}); return;}
     if (unresolved(item).length) {ask('未解決コメントを解決にしますか？', approve); return;}
     try {approve();} catch(error) {toast(String(error));} return;

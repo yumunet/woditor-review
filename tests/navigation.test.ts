@@ -24,3 +24,21 @@ test('retained filtered-out items move from their original position without skip
   assert.equal(navigationTarget(files,'A/0.txt','current','comment','comment',-1)!.item.id,'before');
   assert.equal(navigationTarget(files,'A/0.txt',null,'comment','comment',1),undefined);
 });
+
+test('database navigation follows name-first review order within rows and across file boundaries',()=>{
+  const db=(path:string)=>({...file(path,[item('field0'),item('field1'),item('name')]),type:'database',slots:[
+    {id:'field0',kind:'database_csv',key:'CSV_D0_ITEM0'},
+    {id:'field1',kind:'database_csv',key:'CSV_D0_ITEM1'},
+    {id:'name',kind:'database_csv',key:'CSV_D0_NAME'}
+  ]} as ReviewFile);
+  const first=db('A/0.txt'),second=db('A/1.txt');
+  for(const entry of [...first.items,...second.items]) entry.slotIds=[entry.id];
+  const files=[first,second];
+  assert.equal(navigationTarget(files,first.path,'name','all','all',1)!.item.id,'field0');
+  assert.equal(navigationTarget(files,first.path,'field0','all','all',-1)!.item.id,'name');
+  const next=navigationTarget(files,first.path,'field1','all','all',1)!;
+  assert.equal(next.file,second);assert.equal(next.item.id,'name');assert.equal(next.crossesFile,true);
+  assert.equal(navigationTarget(files,second.path,'name','all','all',-1)!.item.id,'field1');
+  second.items[2].approved=true;
+  assert.equal(navigationTarget(files,first.path,'field1','all','pending',1)!.item.id,'field0');
+});

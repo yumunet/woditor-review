@@ -62,6 +62,8 @@ export function itemTitle(file:ReviewFile,item:Item):string {
   const slot=item.slotIds.length===1 ? file.slots.find(s=>s.id===item.slotIds[0]) : undefined;
   const index=slot && /^CSELF_NAME_(\d+)$/.exec(slot.key)?.[1];
   if(index!==undefined) return `セルフ変数名 ${Number(index)}`;
+  const choice=file.type==='database' && slot ? /^CHOICE_NAME_(\d+)_(\d+)$/.exec(slot.key) : null;
+  if(choice) return `選択肢名 ${Number(choice[1])}-${Number(choice[2])+1}`;
   const field=file.type==='database' && slot ? /^ITEMNAME(\d+)$/.exec(slot.key)?.[1] : undefined;
   return field!==undefined ? `項目名 ${Number(field)}` : item.title;
 }
