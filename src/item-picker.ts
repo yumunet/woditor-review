@@ -10,7 +10,8 @@ export function searchedItems(file:ReviewFile,items:Item[],query:string):Item[] 
 }
 export function itemRows(file:ReviewFile,items:Item[],currentId:string|null,query:string) {
   return searchedItems(file,items,query).map(item=>{
-    const source=item.slotIds.map(id=>sourceText(file.slots.find(s=>s.id===id)!)).join('\n').split(/\r\n|\r|\n/,1)[0];
+    const lines=item.slotIds.map(id=>sourceText(file.slots.find(s=>s.id===id)!)).join('\n').split(/\r\n|\r|\n/);
+    const source=lines[0]+(lines.length>1?'...':'');
     return `<button class="pick-row ${item.id===currentId?'active':''}" data-action="pick" data-value="${escape(item.id)}"><span class="dot ${isDone(item)?'done':unresolved(item).length?'comment':''}"></span><span class="pick-text"><span class="pick-title">${escape(itemTitle(file,item))}</span><span class="pick-source">${escape(source)}</span></span><span class="pick-meta">${isDone(item)?'確認済み':'未確認'}</span></button>`;
   }).join('') || `<div class="empty">${query?'検索に一致する項目はありません':'対象の項目はありません'}</div>`;
 }
