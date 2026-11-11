@@ -515,11 +515,11 @@ test('diagnostic text viewer opens errors at the source line and switches langua
 });
 
 test('warning locations open both the removed setting and its English count field',async({page})=>{
-  test.skip(!corpus,'Private reference files not available');await loadReal(page,'BasicData/CDataBase/04.txt');
+  test.skip(!corpus,'Private reference files not available');await loadReal(page,'BasicData/CommonEvent/014.txt');
   await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:/^読み込み結果/}).click();
   await page.getByRole('tab',{name:/^警告/}).click();await page.locator('.diagnostic.warning').filter({hasText:'使用対象外になった翻訳項目'}).first().click();
-  await expect(page.locator('.focus-line code')).toContainText('CHOICE_NAME_0_0=');
-  await page.getByRole('tab',{name:'英語',exact:true}).click();await expect(page.locator('.focus-line code')).toHaveText('CHOICE_NAME_0_NUM=0');
+  await expect(page.locator('.focus-line code')).toContainText('CHOICE_STR_1_0=');
+  await page.getByRole('tab',{name:'英語',exact:true}).click();await expect(page.locator('.focus-line code')).toHaveText('CHOICE_STR_1_NUM=0');
 });
 
 test('rejected files remain viewable in both languages after restart',async({page})=>{
@@ -769,7 +769,7 @@ test('context controls retain all options and full view marks every variable usa
 });
 
 test('diagnostic errors and warnings open translation items and Back restores the results tab',async({page},info)=>{
-  test.skip(!corpus,'Private reference files not available');await loadReal(page,'BasicData/CDataBase/04.txt');
+  test.skip(!corpus,'Private reference files not available');await loadReal(page,'BasicData/CommonEvent/014.txt');
   await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:/^読み込み結果/}).click();await page.getByRole('tab',{name:/^警告/}).click();
   const row=page.locator('.diagnostic-row').filter({has:page.locator('[data-action=diagnostic-item]')}).first(),text=row.locator('.diagnostic-open'),item=row.locator('.diagnostic-item');
   const alignment=async()=>{const a=await text.boundingBox(),b=await item.boundingBox(),r=await row.boundingBox();expect(b!.x).toBeGreaterThanOrEqual(a!.x+a!.width);expect(Math.abs(b!.x+b!.width-r!.x-r!.width+8)).toBeLessThan(1);expect(Math.abs(b!.y+b!.height/2-r!.y-r!.height/2)).toBeLessThan(1);};
@@ -918,7 +918,7 @@ test('empty original database data cells are omitted from review while English-o
 
 test('database field originals appear below English for choices and CSV values with persistent collapse',async({page},info)=>{
   const path='BasicData/DataBase/00.txt';
-  const ja='TYPE_ID=0\nDATANAME_LOAD_TYPE=0\nITEM_NUM=2\nITEMNAME0=日本語の説明\nITEMNAME1=ASCII original label\nCHOICE_NAME_0_NUM=1\nCHOICE_NAME_0_0=選択肢\n<<--CSV_START-->>\n"日本語の説明","ASCII original label",\n"最初の値","次の値",<<!--DATANAME--!>>データ名,\n<<--CSV_END-->>\n';
+  const ja='TYPE_ID=0\nDATANAME_LOAD_TYPE=0\nITEM_NUM=2\nITEMNAME0=日本語の説明\nITEMNAME1=ASCII original label\nITEM_LOADTYPE_0=3\nITEM_LOADTYPE_1=0\nCHOICE_NAME_0_NUM=1\nCHOICE_NAME_0_0=選択肢\n<<--CSV_START-->>\n"日本語の説明","ASCII original label",\n"最初の値","次の値",<<!--DATANAME--!>>データ名,\n<<--CSV_END-->>\n';
   const en=ja.replaceAll('日本語の説明','Description').replaceAll('ASCII original label','English field label').replace('選択肢','Choice').replace('最初の値','First value').replace('次の値','Second value').replace('>>データ名,','>>Data name,');
   await page.goto('/');await expect(page.locator('.busy')).toHaveCount(0);await page.getByRole('button',{name:'ファイルを読み込む',exact:true}).click();
   for(const [name,text] of [['ja',ja],['en',en]]) await page.locator(`input[name=${name}]`).setInputFiles({name:name+'.zip',mimeType:'application/zip',buffer:Buffer.from(zipSync({[path]:Buffer.from(text)}))});

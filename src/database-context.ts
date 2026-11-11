@@ -1,15 +1,22 @@
 import type {ReviewFile,Item} from './model';
 import {escape,icon} from './ui';
-import {metadataContextText} from './metadata-text';
+import {metadataHeader,metadataContextText} from './metadata-text';
+import {databaseChoicesEnabled} from './database-choice-policy';
 
 type ContextField={index:number;source:string|null;translation:string|null};
 
 export function databaseFieldOriginal(file:ReviewFile,item:Item):ContextField|null {
   if(file.type!=='database') return null;
   const slot=file.slots.find(slot=>slot.id===item.slotIds[0]);if(!slot) return null;
-  const index=/^CHOICE_NAME_(\d+)_\d+$/.exec(slot.key)?.[1]??(slot.kind==='database_csv'?/^CSV_D\d+_ITEM(\d+)$/.exec(slot.key)?.[1]:undefined);
+  const choice=/^CHOICE_NAME_(\d+)_\d+$/.exec(slot.key);
+  const index=choice?.[1]??(slot.kind==='database_csv'?/^CSV_D\d+_ITEM(\d+)$/.exec(slot.key)?.[1]:undefined);
   if(index===undefined) return null;
-  return {index:Number(index),...metadataContextText(file,`ITEMNAME${Number(index)}`)};
+  const field=Number(index),text=metadataContextText(file,`ITEMNAME${field}`);
+  if(!choice) return {index:field,...text};
+  const sourceEnabled=databaseChoicesEnabled(metadataHeader(file.jaText,file.type),field);
+  const translationEnabled=databaseChoicesEnabled(metadataHeader(file.enText,file.type),field);
+  if(!sourceEnabled && !translationEnabled) return null;
+  return {index:field,source:sourceEnabled?text.source:null,translation:translationEnabled?text.translation:null};
 }
 
 export function commonArgumentOriginal(file:ReviewFile,item:Item):ContextField|null {

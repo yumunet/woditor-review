@@ -5,7 +5,7 @@ import {metadataHeader,metadataContextText} from '../src/metadata-text';
 import type {ReviewFile,Item} from '../src/model';
 
 const item={id:'a',slotIds:['s']} as Item;
-const file=(key:string,kind='metadata')=>({type:'database',jaText:'TYPE_ID=0\r\nITEMNAME0=日本語の説明\r\nITEMNAME1=ASCII source\r\nITEMNAME2=\r\n<<--CSV_START-->>\r\n"複数行\r\nITEMNAME3=セル内の文字列\r\n"\r\n',enText:'TYPE_ID=0\r\nITEMNAME0=Description\r\nITEMNAME1=ASCII translation\r\nITEMNAME2=\r\n<<--CSV_START-->>\r\n"Multiple lines\r\nITEMNAME3=Not a header\r\n"\r\n',slots:[{id:'s',key,kind}]} as ReviewFile);
+const file=(key:string,kind='metadata')=>({type:'database',jaText:'TYPE_ID=0\r\nITEM_LOADTYPE_0=3\r\nITEMNAME0=日本語の説明\r\nITEMNAME1=ASCII source\r\nITEMNAME2=\r\n<<--CSV_START-->>\r\n"複数行\r\nITEMNAME3=セル内の文字列\r\n"\r\n',enText:'TYPE_ID=0\r\nITEM_LOADTYPE_0=3\r\nITEMNAME0=Description\r\nITEMNAME1=ASCII translation\r\nITEMNAME2=\r\n<<--CSV_START-->>\r\n"Multiple lines\r\nITEMNAME3=Not a header\r\n"\r\n',slots:[{id:'s',key,kind}]} as ReviewFile);
 test('choices and CSV settings identify their zero-based field and use original header names',()=>{
   assert.deepEqual(databaseFieldOriginal(file('CHOICE_NAME_0_17'),item),{index:0,source:'日本語の説明',translation:'Description'});
   assert.deepEqual(databaseFieldOriginal(file('CSV_D10_ITEM1','database_csv'),item),{index:1,source:'ASCII source',translation:'ASCII translation'});
@@ -69,4 +69,21 @@ test('metadata header extraction respects every supported command boundary in bo
     assert.equal(metadataHeader(prefix+boundary+'\nVALINPUT_NAME_1=Not a header\n',type),prefix);
   }
   assert.equal(metadataHeader('ITEMNAME0=Header\n<<--CSV_START-->>\nITEMNAME1=CSV data\n','database'),'ITEMNAME0=Header\n');
+});
+
+test('saved database choice slots have no parent context when both languages use folders or inactive modes',()=>{
+  for(const mode of [undefined,'0','1','4','-1','invalid']) {
+    const data=file('CHOICE_NAME_0_0');
+    const header=(mode===undefined?'':`ITEM_LOADTYPE_0=${mode}\n`)+'ITEMNAME0=Folder setting\nCHOICE_NAME_0_0=Folder/path\nCHOICE_NAME_0_1=Other/path\n';
+    data.jaText=data.enText=header;assert.equal(databaseFieldOriginal(data,item),null);assert.equal(databaseContextView(data,item,true),'');
+  }
+});
+
+test('choice parent context respects each language mode while CSV field context remains available',()=>{
+  const data=file('CHOICE_NAME_0_0');data.jaText=data.jaText.replace('ITEM_LOADTYPE_0=3','ITEM_LOADTYPE_0=1');
+  assert.deepEqual(databaseFieldOriginal(data,item),{index:0,source:null,translation:'Description'});
+  data.jaText=data.jaText.replace('ITEM_LOADTYPE_0=1','ITEM_LOADTYPE_0=2');data.enText=data.enText.replace('ITEM_LOADTYPE_0=3','ITEM_LOADTYPE_0=0');
+  assert.deepEqual(databaseFieldOriginal(data,item),{index:0,source:'日本語の説明',translation:null});
+  data.slots[0].key='CSV_D0_ITEM0';data.slots[0].kind='database_csv';data.jaText=data.jaText.replace('ITEM_LOADTYPE_0=2','ITEM_LOADTYPE_0=1');
+  assert.deepEqual(databaseFieldOriginal(data,item),{index:0,source:'日本語の説明',translation:'Description'});
 });

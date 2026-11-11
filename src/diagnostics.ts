@@ -1,10 +1,12 @@
 import type { Diagnostic, DiagnosticDocument, ReviewFile, Workspace } from './model';
 import { escape,icon } from './ui';
+import {metadataHeader} from './metadata-text';
+import {databaseChoiceMode} from './database-choice-policy';
 export type DiagnosticTab=Diagnostic['severity']|'automatic';
 const tabs: [DiagnosticTab, string][] = [['error', 'エラー'], ['warning', '警告'], ['automatic','自動補正'],['skip', '対象外']];
 export function diagnosticTabFor(diagnostic:Diagnostic):DiagnosticTab {
   if(diagnostic.severity!=='warning') return diagnostic.severity;
-  return /^(?:原文部分の行数差を自動補正|設定キーによる行ずれ補正|コマンド列による行ずれ補正|旧形式の文字列操作の引数形式の違いを吸収)/.test(diagnostic.message)?'automatic':'warning';
+  return /^(?:原文部分の行数差を自動補正|設定キーによる行ずれ補正|コマンド列による行ずれ補正|旧形式の文字列操作の引数形式の違いを吸収|直接入力の項目に残る選択肢名を無視)/.test(diagnostic.message)?'automatic':'warning';
 }
 export function diagnosticsView(diagnostics: Diagnostic[], active: DiagnosticTab,workspace?:Workspace) {
   const selected = diagnostics.map((diagnostic,index)=>({diagnostic,index})).filter(({diagnostic}) => diagnosticTabFor(diagnostic) === active);
@@ -38,6 +40,29 @@ export function diagnosticLocation(file:ReviewFile,message:string):Pick<Diagnost
   if(message.includes('英語版だけのコメント') || message.includes('英語版だけのコマンド')) {
     const index=file.commands.findIndex(c=>c.line<0 && (!message.includes('コメント') || c.code===103));
     if(index>=0) {enLine=file.commands[index].enLine??undefined;line=[...file.commands.slice(0,index)].reverse().find(c=>c.line>0)?.line;}
+  }
+  if(file.type==='database' && /直接入力の項目に残る選択肢名を無視|ファイル読み込みの既定フォルダパスが日英で異なります/.test(message)) {
+    const ja=metadataHeader(file.jaText,'database'),en=metadataHeader(file.enText,'database');
+    const ignored=message.startsWith('直接入力'),mode=ignored?0:1;
+    const setting=[...ja.matchAll(/^CHOICE_NAME_(\d+)_(\d+)=([^\r\n]*)/gm),...en.matchAll(/^CHOICE_NAME_(\d+)_(\d+)=([^\r\n]*)/gm)].find(match=>{
+      const field=Number(match[1]),key=`CHOICE_NAME_${field}_${match[2]}`;
+      const value=(text:string)=>new RegExp(`^${key}=([^\\r\\n]*)`,'m').exec(text)?.[1];
+      return ignored?(databaseChoiceMode(ja,field)===mode && value(ja)!==undefined || databaseChoiceMode(en,field)===mode && value(en)!==undefined)
+        :databaseChoiceMode(ja,field)===mode && databaseChoiceMode(en,field)===mode && value(ja)!==value(en);
+    });
+    if(setting) {
+      const key=`CHOICE_NAME_${setting[1]}_${setting[2]}`,fallback=`ITEM_LOADTYPE_${setting[1]}`;
+      const locate=(text:string)=>{const lines=text.split(/\r\n|\r|\n/);const index=lines.findIndex(line=>line.startsWith(key+'=')),backup=lines.findIndex(line=>line.startsWith(fallback+'='));return index>=0?index+1:backup>=0?backup+1:undefined;};
+      line=locate(ja);enLine=locate(en);
+    }
+  }
+  if(file.type==='database' && /^(?:日本語|英語)のファイル読み込み設定に既定フォルダパスが複数/.test(message) && rawLine) {
+    const ja=metadataHeader(file.jaText,'database').split(/\r\n|\r|\n/),en=metadataHeader(file.enText,'database').split(/\r\n|\r|\n/);
+    const english=message.startsWith('英語'),actual=Number(rawLine),key=(english?en:ja)[actual-1]?.split('=')[0],field=/項目 (\d+)/.exec(message)?.[1];
+    const counterpart=(english?ja:en).findIndex(text=>key?text.startsWith(key+'='):false);
+    const fallback=(english?ja:en).findIndex(text=>field!==undefined && text.startsWith(`ITEM_LOADTYPE_${field}=`));
+    const other=counterpart>=0?counterpart+1:fallback>=0?fallback+1:undefined;
+    line=english?other:actual;enLine=english?actual:other;
   }
   if(line && !enLine) {
     const nearest=file.commands.filter(c=>c.line>0 && c.enLine).sort((a,b)=>Math.abs(a.line-line!)-Math.abs(b.line-line!))[0];

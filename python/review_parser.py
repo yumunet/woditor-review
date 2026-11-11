@@ -9,7 +9,7 @@ import hashlib
 import re
 from collections import Counter
 from dataclasses import asdict
-from review_alignment import align,reviewable_metadata
+from review_alignment import align,reviewable_metadata,metadata_values,database_choice_key,database_choice_mode
 from database_csv import catalog, pair_cells,masked_csv,replace_spans,text_cell
 
 from woditor_translation_tool import (
@@ -100,6 +100,7 @@ def metadata_title(key: str) -> str:
 
 def extract_source(text: str) -> dict:
     ftype = file_type(text)
+    meta = metadata_values(text)
     slots, unhandled = analyze(text, ftype)
     lines = text.splitlines()
     infos, parents = {}, {}
@@ -120,8 +121,12 @@ def extract_source(text: str) -> dict:
     for s in slots:
         entry = asdict(s)
         entry['key'] = s.id.split(':', 1)[1]
-        if s.kind == 'metadata' and not reviewable_metadata(ftype, entry['key']):
-            excluded.append({**entry, 'reason': 'データ名の参照先設定'})
+        if s.kind == 'metadata' and not reviewable_metadata(ftype, entry['key'], meta):
+            choice = database_choice_key(entry['key']) if ftype == 'database' else None
+            reason = 'データ名の参照先設定'
+            if choice:
+                reason = '直接入力の項目に残る選択肢名' if database_choice_mode(meta, choice[1]) == 0 else 'ファイル読み込みの既定フォルダパス'
+            excluded.append({**entry, 'reason': reason})
             continue
         info = infos.get(s.line)
         entry['command'] = info
@@ -149,7 +154,8 @@ def pair_file(path: str, ja_raw: bytes, en_raw: bytes) -> dict:
     a, b = source_lines(ja), source_lines(en)
     alignment = align(ja, en, data['type'], command_info, Counter(s['line'] for s in data['slots']))
     warnings = alignment['warnings']
-    errors = []
+    errors = list(alignment['errors'])
+    en_meta = metadata_values(en)
     # Newlines belong to each input version and are never normalized in storage.
     endings = lambda s: [re.search(r'(\r\n|\r|\n)$', l)[0] if re.search(r'(\r\n|\r|\n)$', l) else ''
                          for l in s.splitlines(keepends=True)]
@@ -188,7 +194,7 @@ def pair_file(path: str, ja_raw: bytes, en_raw: bytes) -> dict:
         raw = b[en_line - 1]
         if match := META.fullmatch(raw):
             key, value = match.groups()
-            values = [(key, value, None, 'metadata')] if reviewable_metadata(data['type'], key) else []
+            values = [(key, value, None, 'metadata')] if reviewable_metadata(data['type'], key, en_meta) else []
         else:
             info = alignment['enCommands'][en_line]
             values = [(f'S{index}', value, index, 'command_string')

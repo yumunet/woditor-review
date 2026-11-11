@@ -1,5 +1,6 @@
 import type {ReviewFile,Item} from './model';
 import {metadataHeader,metadataContextText} from './metadata-text';
+import {databaseChoicesEnabled} from './database-choice-policy';
 import {escape,icon} from './ui';
 
 function headerKeys(header:string,prefix:string):Map<number,string> {
@@ -18,6 +19,9 @@ function choiceRows(file:ReviewFile,item:Item) {
   if(group===undefined) return [];
   const prefix=`${file.type==='database'?'CHOICE_NAME':'CHOICE_STR'}_${Number(group)}_`;
   const ja=metadataHeader(file.jaText,file.type),en=metadataHeader(file.enText,file.type);
+  const sourceEnabled=file.type!=='database'||databaseChoicesEnabled(ja,Number(group));
+  const translationEnabled=file.type!=='database'||databaseChoicesEnabled(en,Number(group));
+  if(!sourceEnabled && !translationEnabled) return [];
   const sources=headerKeys(ja,prefix),translations=headerKeys(en,prefix);
   const count=(header:string)=>{
     const value=new RegExp(`^${prefix}NUM=([^\\r\\n]*)`,'m').exec(header)?.[1];
@@ -26,8 +30,8 @@ function choiceRows(file:ReviewFile,item:Item) {
   };
   const jaCount=count(ja),enCount=count(en);
   return [...new Set([...sources.keys(),...translations.keys()])].sort((a,b)=>a-b).flatMap(index=>{
-    const sourceActive=jaCount===undefined?sources.has(index):index<jaCount;
-    const translationActive=enCount===undefined?translations.has(index):index<enCount;
+    const sourceActive=sourceEnabled && (jaCount===undefined?sources.has(index):index<jaCount);
+    const translationActive=translationEnabled && (enCount===undefined?translations.has(index):index<enCount);
     if(!sourceActive && !translationActive) return [];
     const sourceKey=sources.get(index)??translations.get(index)!;
     const translationKey=translations.get(index)??sources.get(index)!;

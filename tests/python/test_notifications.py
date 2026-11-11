@@ -14,9 +14,9 @@ class NotificationTests(unittest.TestCase):
         return data
 
     def test_missing_metadata_counts_translation_items_and_settings_separately(self):
-        ja=('TYPE_ID=0\nITEM_NUM=1\nITEMNAME0=項目\nCHOICE_NAME_0_NUM=3\n'
+        ja=('TYPE_ID=0\nITEM_NUM=1\nITEMNAME0=項目\nITEM_LOADTYPE_0=3\nCHOICE_NAME_0_NUM=3\n'
             'CHOICE_NAME_0_0=選択肢\nCHOICE_NAME_0_1=別の選択肢\nCHOICE_NAME_0_2=\nMEMO=メモ\nEXTRA_SETTING=7\n')
-        en='TYPE_ID=0\nITEM_NUM=1\nITEMNAME0=Item\nCHOICE_NAME_0_NUM=0\n'
+        en='TYPE_ID=0\nITEM_NUM=1\nITEMNAME0=Item\nITEM_LOADTYPE_0=3\nCHOICE_NAME_0_NUM=0\n'
         data=self.pair(ja,en);self.assertFalse(data['errors'])
         for message in ['英語版で使用対象外になった翻訳項目: 2件','英語版で使用対象外になった設定: 1件',
                         '英語版に対応する翻訳項目がありません: 1件','英語版に対応する設定がありません: 1件',

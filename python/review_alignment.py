@@ -11,8 +11,75 @@ import re
 from woditor_translation_tool import COMMAND, META, source_lines, metadata_allowed
 
 
-def reviewable_metadata(kind, key):
-    return metadata_allowed(kind, key) and not (kind == 'database' and key == 'DATANAME_LOAD_NAME')
+def metadata_values(text):
+    return {match[1]: match[2] for line in source_lines(text) if (match := META.fullmatch(line))}
+
+
+def database_choice_key(key):
+    match = re.fullmatch(r'CHOICE_(NAME|VAL)_(\d+)_(NUM|\d+)', key)
+    return (match[1], int(match[2]), match[3]) if match else None
+
+
+def database_choice_mode(meta, group):
+    value = meta.get(f'ITEM_LOADTYPE_{group}', '0')
+    mode = int(value) if re.fullmatch(r'\d+', value) else 0
+    return mode if mode in (0, 1, 2, 3) else 0
+
+
+def reviewable_metadata(kind, key, meta=None):
+    if not metadata_allowed(kind, key) or kind == 'database' and key == 'DATANAME_LOAD_NAME':
+        return False
+    choice = database_choice_key(key) if kind == 'database' else None
+    return not choice or database_choice_mode(meta or {}, choice[1]) in (2, 3)
+
+
+def database_choice_notices(am, bm, ja_meta, en_meta):
+    summary, errors = Counter(), []
+    ignored = {record['key'] for records, meta in ((am, ja_meta), (bm, en_meta))
+               for record in records if (choice := database_choice_key(record['key']))
+               and choice[0] == 'NAME' and choice[2] != 'NUM' and database_choice_mode(meta, choice[1]) == 0}
+    if ignored:
+        summary['直接入力の項目に残る選択肢名を無視'] = len(ignored)
+    folder_paths, invalid = [], set()
+    for language, records, meta in (('日本語', am, ja_meta), ('英語', bm, en_meta)):
+        paths, declared = defaultdict(list), defaultdict(list)
+        for record in records:
+            choice = database_choice_key(record['key'])
+            if not choice or choice[0] != 'NAME' or database_choice_mode(meta, choice[1]) != 1:
+                continue
+            if choice[2] == 'NUM':
+                declared[choice[1]].append(record)
+            else:
+                paths[choice[1]].append(record)
+        groups = set(paths) | set(declared)
+        for group in sorted(groups):
+            counts = [int(record['value']) for record in declared[group] if re.fullmatch(r'\d+', record['value'])]
+            if len(paths[group]) > 1 or any(count > 1 for count in counts):
+                first = (paths[group] or declared[group])[0]
+                errors.append(f'{language}のファイル読み込み設定に既定フォルダパスが複数あります（項目 {group}、行 {first["line"]}）')
+                invalid.add(group)
+        folder_paths.append(paths)
+    a_paths, b_paths = folder_paths
+    for group in sorted(set(a_paths) | set(b_paths)):
+        if group in invalid or database_choice_mode(ja_meta, group) != 1 or database_choice_mode(en_meta, group) != 1:
+            continue
+        a = a_paths[group][0]['value'] if a_paths[group] else ''
+        b = b_paths[group][0]['value'] if b_paths[group] else ''
+        if a != b:
+            summary['ファイル読み込みの既定フォルダパスが日英で異なります'] += 1
+    return summary, errors
+
+
+def aligned_metadata_record(kind, record, meta, other_meta):
+    choice = database_choice_key(record['key']) if kind == 'database' else None
+    if not choice:
+        return True
+    if database_choice_mode(meta, choice[1]) in (0, 1):
+        return False
+    # Counts and choice values have no active counterpart when the other
+    # language uses direct input or a folder setting. Name entries alone can
+    # still produce an accurate missing/added translation notice.
+    return choice[0] == 'NAME' and choice[2] != 'NUM' or database_choice_mode(other_meta, choice[1]) not in (0, 1)
 
 
 def records(text, parse):
@@ -167,14 +234,17 @@ def align(ja, en, kind, parse, translation_lines):
     bi = [m['value'] for m in bm if m['key'] == identity]
     if len(ai) != 1 or ai != bi:
         raise ValueError(f'{identity}が一致しないため関連付けできません')
+    ja_meta = {m['key']: m['value'] for m in am if m['scope'] is None}
+    en_meta = {m['key']: m['value'] for m in bm if m['scope'] is None}
     amap, bmap = defaultdict(list), defaultdict(list)
     for record in am:
-        amap[record['scope'], record['key']].append(record)
+        if aligned_metadata_record(kind, record, ja_meta, en_meta):
+            amap[record['scope'], record['key']].append(record)
     for record in bm:
-        bmap[record['scope'], record['key']].append(record)
-    en_meta = {m['key']: m['value'] for m in bm if m['scope'] is None}
+        if aligned_metadata_record(kind, record, en_meta, ja_meta):
+            bmap[record['scope'], record['key']].append(record)
     line_map, excluded, uncertain, uncertain_en = {}, {}, set(), set()
-    summary = Counter()
+    summary, errors = database_choice_notices(am, bm, ja_meta, en_meta) if kind == 'database' else (Counter(), [])
     for key, source in amap.items():
         target = bmap.get(key, [])
         if len(source) == len(target) == 1:
@@ -182,11 +252,14 @@ def align(ja, en, kind, parse, translation_lines):
             line_map[a['line']] = b['line']
             if a['line'] != b['line']:
                 summary['設定キーによる行ずれ補正'] += 1
-            if a['value'] != b['value'] and not reviewable_metadata(kind, a['key']):
+            if a['value'] != b['value'] and not reviewable_metadata(kind, a['key'], ja_meta):
                 summary['翻訳対象外の設定値が日英で異なります'] += 1
         elif not target:
             for record in source:
                 unused = inactive(record['key'], en_meta)
+                choice = database_choice_key(record['key']) if kind == 'database' else None
+                if choice and database_choice_mode(en_meta, choice[1]) in (0, 1):
+                    unused = True
                 translated = bool(translation_lines.get(record['line']))
                 subject = '翻訳項目' if translated else '設定'
                 excluded[record['line']] = f'英語版で使用対象外になった{subject}' if unused else f'英語版に対応する{subject}がありません'
@@ -198,7 +271,7 @@ def align(ja, en, kind, parse, translation_lines):
         if key in amap:
             continue
         for record in bmap[key]:
-            subject = '翻訳項目' if reviewable_metadata(kind, record['key']) and record['value'] else '設定'
+            subject = '翻訳項目' if reviewable_metadata(kind, record['key'], en_meta) and record['value'] else '設定'
             summary[f'英語版だけの{subject}があります'] += 1
     pairs, removed, ambiguous, ambiguous_en = align_commands(ac, bc)
     for i, j in pairs.items():
@@ -233,4 +306,4 @@ def align(ja, en, kind, parse, translation_lines):
     if len(source_lines(ja)) != len(source_lines(en)):
         warnings.insert(0, f'原文部分の行数差を自動補正しました（日本語 {len(source_lines(ja))} / 英語 {len(source_lines(en))}）')
     return {'lines': line_map, 'excluded': excluded, 'ambiguous': uncertain, 'ambiguousEn': uncertain_en,
-            'warnings': warnings, 'commands': display_pairs, 'enCommands': {c['line']: c for c in bc}}
+            'warnings': warnings, 'errors': errors, 'commands': display_pairs, 'enCommands': {c['line']: c for c in bc}}
