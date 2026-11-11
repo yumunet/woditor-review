@@ -409,7 +409,7 @@ test('corrected English positions survive JSON export, revised TXT and approved 
   await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'AIレビュー結果を読み込む',exact:true}).click();
   await page.locator('input[name=answer]').setInputFiles({name:'response.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(response))});
   await page.locator('input[name=revised]').setInputFiles({name:'revised.zip',mimeType:'application/zip',buffer:Buffer.from(zipSync({[`en-US/texts/${path}`]:Buffer.from(revised)}))});
-  await page.getByRole('button',{name:'回答を読み込む',exact:true}).click();await expect(page.locator('.translation-after')).toHaveText(after);
+  await page.getByRole('button',{name:'回答を読み込む',exact:true}).click();await expect(page.locator('.translation-after')).toHaveText(after.split(String.raw`<\n>`).join('\n').split('<dqrt>').join('"'));
   await page.getByRole('button',{name:/コメント/}).first().click();await page.getByRole('button',{name:'解決',exact:true}).click();await page.getByRole('button',{name:'閉じる',exact:true}).click();
   await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'英訳TXTを出力',exact:true}).click();
   event=page.waitForEvent('download');await page.getByRole('button',{name:'英訳TXTを出力',exact:true}).click();
@@ -861,6 +861,19 @@ test('database CSV multiline strings round trip through AI approval, ZIP and Eng
   await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'英訳TXTを出力',exact:true}).click();const event=page.waitForEvent('download');await page.getByRole('button',{name:'英訳TXTを出力',exact:true}).click();const zip=readFileSync((await(await event).path())!);const output=Buffer.from(unzipSync(zip)[`en-US/texts/${path}`]).toString('utf8');
   const original=readFileSync(`.reference/en-US/texts/${path}`,'utf8');expect(output).toBe(original.replace('"'+slot.translation.replaceAll('"','""')+'"','"'+after.replaceAll('"','""')+'"'));await closeReviewSheet(page);
   await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'ファイルを読み込む',exact:true}).click();await page.locator('input[name=en]').setInputFiles({name:'csv-reviewed.zip',mimeType:'application/zip',buffer:zip});await page.getByRole('button',{name:'読み込む',exact:true}).click();await expect(page.locator('.busy')).toHaveCount(0);if(await page.getByRole('dialog').count()) await closeReviewSheet(page);await expect(page.locator('.translation')).toHaveText(after);await expect(page.locator('.translation-after')).toHaveCount(0);
+});
+
+test('message line breaks and message and comment quotes are readable while TXT remains encoded',async({page})=>{
+  const path='BasicData/CommonEvent/000.txt';
+  const fixture=(text:string,comment:string)=>`COMMON_ID=0\nWoditorEvCOMMAND_START\n[101][0,1]<0>()("${text}")\n[103][0,1]<0>()("${comment}")\nWoditorEvCOMMAND_END\n[COMMAND_TEXT_START]\n■Show Message:${text}\n▼ ${comment}\n[COMMAND_TEXT_END]\n`;
+  const ja=fixture(String.raw`一行目<\n><dqrt>二行目<dqrt>`,'<dqrt>注記<dqrt>'),en=fixture(String.raw`First<\n><dqrt>Second<dqrt>`,'<dqrt>Note<dqrt>');
+  await page.goto('/');await expect(page.locator('.busy')).toHaveCount(0);await page.getByRole('button',{name:'ファイルを読み込む',exact:true}).click();
+  for(const [name,text] of [['ja',ja],['en',en]]) await page.locator(`input[name=${name}]`).setInputFiles({name:name+'.zip',mimeType:'application/zip',buffer:Buffer.from(zipSync({[path]:Buffer.from(text)}))});
+  await page.getByRole('button',{name:'読み込む',exact:true}).click();await expect(page.locator('.busy')).toHaveCount(0,{timeout:90000});if(await page.getByRole('dialog').count()) await closeReviewSheet(page);await openTreeFile(page,path);
+  await expect(page.locator('.source')).toHaveText('一行目\n"二行目"');await expect(page.locator('.translation')).toHaveText('First\n"Second"');
+  await page.locator('.entry-open').click();await expect(page.locator('.pick-source').first()).toHaveText('一行目...');await page.locator('.pick-row').filter({has:page.locator('.pick-title',{hasText:/^コメント/})}).click();await expect(page.locator('.source')).toHaveText('"注記"');await expect(page.locator('.translation')).toHaveText('"Note"');
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'英訳TXTを出力',exact:true}).click();const download=page.waitForEvent('download');await page.getByRole('button',{name:'英訳TXTを出力',exact:true}).click();
+  const zip=unzipSync(readFileSync((await(await download).path())!));expect(Buffer.from(zip[`en-US/texts/${path}`]).toString('utf8')).toBe(en);
 });
 
 test('database CSV columns start at item zero and only mode zero exposes explicit names through AI and ZIP',async({page})=>{
