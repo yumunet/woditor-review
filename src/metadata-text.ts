@@ -11,3 +11,8 @@ export function metadataContextText(file:ReviewFile,key:string):{source:string|n
   const slot=file.slots.find(slot=>slot.kind==='metadata' && slot.key===key);
   return {source:slot?.sourceOverride??value(file.jaText),translation:slot?.translation??value(file.enText)};
 }
+
+export function metadataItem(file:ReviewFile,key:string) {
+  const slot=file.slots.find(slot=>slot.kind==='metadata' && slot.key===key);
+  return slot && file.items.find(item=>item.slotIds.includes(slot.id));
+}

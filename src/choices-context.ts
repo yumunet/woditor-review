@@ -1,5 +1,5 @@
 import type {ReviewFile,Item} from './model';
-import {metadataHeader,metadataContextText} from './metadata-text';
+import {metadataHeader,metadataContextText,metadataItem} from './metadata-text';
 import {databaseChoicesEnabled} from './database-choice-policy';
 import {escape,icon} from './ui';
 
@@ -35,7 +35,7 @@ function choiceRows(file:ReviewFile,item:Item) {
     if(!sourceActive && !translationActive) return [];
     const sourceKey=sources.get(index)??translations.get(index)!;
     const translationKey=translations.get(index)??sources.get(index)!;
-    return [{source:sourceActive?metadataContextText(file,sourceKey).source:null,
+    return [{target:metadataItem(file,sourceKey),source:sourceActive?metadataContextText(file,sourceKey).source:null,
       translation:translationActive?metadataContextText(file,translationKey).translation:null}];
   });
 }
@@ -43,5 +43,5 @@ function choiceRows(file:ReviewFile,item:Item) {
 export function choicesContextView(file:ReviewFile,item:Item,open:boolean):string {
   const choices=choiceRows(file,item);if(!choices.length) return '';
   const cell=(value:string|null)=>value===null?'<span class="choices-empty">（対応なし）</span>':value===''?'<span class="choices-empty">（未設定）</span>':escape(value);
-  return `<section class="choices-context" aria-label="選択肢一覧"><button class="context-title" data-action="choices-context" aria-expanded="${open}" aria-controls="choices-context-body">選択肢一覧<span class="chevron ${open?'open':''}">${open?'閉じる':'開く'}${icon('down')}</span></button>${open?`<div class="choices-context-body" id="choices-context-body"><table class="choices-table"><thead><tr><th scope="col">原文</th><th scope="col">英訳</th></tr></thead><tbody>${choices.map(choice=>`<tr class="choice-row"><td class="choice-source">${cell(choice.source)}</td><td class="choice-translation">${cell(choice.translation)}</td></tr>`).join('')}</tbody></table></div>`:''}</section>`;
+  return `<section class="choices-context" aria-label="選択肢一覧"><button class="context-title" data-action="choices-context" aria-expanded="${open}" aria-controls="choices-context-body">選択肢一覧<span class="chevron ${open?'open':''}">${open?'閉じる':'開く'}${icon('down')}</span></button>${open?`<div class="choices-context-body" id="choices-context-body"><table class="choices-table"><thead><tr><th scope="col">原文</th><th scope="col">英訳</th><th scope="col" class="choice-action" aria-label="移動"></th></tr></thead><tbody>${choices.map(choice=>`<tr class="choice-row"><td class="choice-source">${cell(choice.source)}</td><td class="choice-translation">${cell(choice.translation)}</td><td class="choice-action"><button class="icon" data-action="context-item" data-value="${escape(choice.target?.id??'')}" aria-label="翻訳項目を開く" data-tooltip="${choice.target?'翻訳項目を開く':'対応する翻訳項目がありません'}" ${choice.target?'':'disabled'}>${icon('item-jump')}</button></td></tr>`).join('')}</tbody></table></div>`:''}</section>`;
 }

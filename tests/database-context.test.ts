@@ -1,11 +1,11 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {databaseFieldOriginal,commonArgumentOriginal,databaseContextView} from '../src/database-context';
-import {metadataHeader,metadataContextText} from '../src/metadata-text';
+import {metadataHeader,metadataContextText,metadataItem} from '../src/metadata-text';
 import type {ReviewFile,Item} from '../src/model';
 
 const item={id:'a',slotIds:['s']} as Item;
-const file=(key:string,kind='metadata')=>({type:'database',jaText:'TYPE_ID=0\r\nITEM_LOADTYPE_0=3\r\nITEMNAME0=日本語の説明\r\nITEMNAME1=ASCII source\r\nITEMNAME2=\r\n<<--CSV_START-->>\r\n"複数行\r\nITEMNAME3=セル内の文字列\r\n"\r\n',enText:'TYPE_ID=0\r\nITEM_LOADTYPE_0=3\r\nITEMNAME0=Description\r\nITEMNAME1=ASCII translation\r\nITEMNAME2=\r\n<<--CSV_START-->>\r\n"Multiple lines\r\nITEMNAME3=Not a header\r\n"\r\n',slots:[{id:'s',key,kind}]} as ReviewFile);
+const file=(key:string,kind='metadata')=>({type:'database',jaText:'TYPE_ID=0\r\nITEM_LOADTYPE_0=3\r\nITEMNAME0=日本語の説明\r\nITEMNAME1=ASCII source\r\nITEMNAME2=\r\n<<--CSV_START-->>\r\n"複数行\r\nITEMNAME3=セル内の文字列\r\n"\r\n',enText:'TYPE_ID=0\r\nITEM_LOADTYPE_0=3\r\nITEMNAME0=Description\r\nITEMNAME1=ASCII translation\r\nITEMNAME2=\r\n<<--CSV_START-->>\r\n"Multiple lines\r\nITEMNAME3=Not a header\r\n"\r\n',items:[] as Item[],slots:[{id:'s',key,kind}]} as ReviewFile);
 test('choices and CSV settings identify their zero-based field and use original header names',()=>{
   assert.deepEqual(databaseFieldOriginal(file('CHOICE_NAME_0_17'),item),{index:0,source:'日本語の説明',translation:'Description'});
   assert.deepEqual(databaseFieldOriginal(file('CSV_D10_ITEM1','database_csv'),item),{index:1,source:'ASCII source',translation:'ASCII translation'});
@@ -27,7 +27,7 @@ test('the collapsible field original is escaped and distinguishes missing and em
   assert.ok(html.includes('class="label">原文</div>'));assert.ok(html.includes('class="label">英訳</div>'));assert.ok(html.includes('database-translation'));
 });
 
-const common=(key:string)=>({type:'common',jaText:'COMMON_ID=0\r\nVALINPUT_NAME_0=呼び出すメニュー\r\nVALINPUT_NAME_1=\r\nVALINPUT_NAME_5=ASCII argument\r\nSTRINPUT_NAME_0=別の文字列引数\r\nWoditorEvCOMMAND_START\r\nVALINPUT_NAME_2=本文中の偽設定\r\n',enText:'COMMON_ID=0\r\nVALINPUT_NAME_0=Menu to open\r\nVALINPUT_NAME_1=\r\nVALINPUT_NAME_5=ASCII translation\r\nWoditorEvCOMMAND_START\r\nVALINPUT_NAME_2=Not a header\r\n',slots:[{id:'s',key,kind:'metadata'}]} as ReviewFile);
+const common=(key:string)=>({type:'common',jaText:'COMMON_ID=0\r\nVALINPUT_NAME_0=呼び出すメニュー\r\nVALINPUT_NAME_1=\r\nVALINPUT_NAME_5=ASCII argument\r\nSTRINPUT_NAME_0=別の文字列引数\r\nWoditorEvCOMMAND_START\r\nVALINPUT_NAME_2=本文中の偽設定\r\n',enText:'COMMON_ID=0\r\nVALINPUT_NAME_0=Menu to open\r\nVALINPUT_NAME_1=\r\nVALINPUT_NAME_5=ASCII translation\r\nWoditorEvCOMMAND_START\r\nVALINPUT_NAME_2=Not a header\r\n',items:[] as Item[],slots:[{id:'s',key,kind:'metadata'}]} as ReviewFile);
 
 test('common argument choices use the numeric argument group and original header, including ASCII names',()=>{
   assert.deepEqual(commonArgumentOriginal(common('CHOICE_STR_0_8'),item),{index:0,source:'呼び出すメニュー',translation:'Menu to open'});
@@ -61,6 +61,14 @@ test('metadata context uses confirmed slots before stale TXT while preserving ma
   assert.deepEqual(metadataContextText(data,'ITEMNAME0'),{source:'',translation:''});
   assert.deepEqual(metadataContextText(data,'ITEMNAME2'),{source:'',translation:''});
   assert.deepEqual(metadataContextText(data,'ITEMNAME3'),{source:null,translation:null});
+});
+
+test('context links resolve the item owning the exact metadata slot and leave header-only names unavailable',()=>{
+  const data=file('CHOICE_NAME_0_0');
+  data.slots.push({id:'field',kind:'metadata',key:'ITEMNAME0'} as ReviewFile['slots'][number]);
+  const target={id:'field-item',slotIds:['field']} as Item;data.items=[target];
+  assert.equal(metadataItem(data,'ITEMNAME0'),target);assert.equal(metadataItem(data,'ITEMNAME1'),undefined);
+  assert.ok(databaseContextView(data,item,true).includes('data-value="field-item"'));
 });
 
 test('metadata header extraction respects every supported command boundary in both event formats',()=>{

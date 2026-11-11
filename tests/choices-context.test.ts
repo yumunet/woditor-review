@@ -6,7 +6,7 @@ import type {ReviewFile,Item,Slot} from '../src/model';
 
 const item={id:'item',slotIds:['field']} as Item;
 function fixture(type:ReviewFile['type']='database',key='ITEMNAME0',ja='',en=''):ReviewFile {
-  return {type,jaText:ja,enText:en,slots:[{id:'field',key,kind:'metadata',command:null}]} as ReviewFile;
+  return {type,jaText:ja,enText:en,items:[] as Item[],slots:[{id:'field',key,kind:'metadata',command:null}]} as ReviewFile;
 }
 const rows=(html:string)=>[...html.matchAll(/<tr class="choice-row">([\s\S]*?)<\/tr>/g)].map(match=>match[1]);
 
@@ -16,12 +16,12 @@ test('database mode lookup distinguishes folder and choice modes and defaults mi
   assert.equal(databaseChoiceMode('ITEM_LOADTYPE_0=3\n',7),0);
 });
 
-test('database field choice tables keep numeric order while showing only source and English columns',()=>{
+test('database field choice tables keep numeric order with bilingual text and a navigation column',()=>{
   const file=fixture('database','ITEMNAME3','TYPE_ID=0\nITEM_LOADTYPE_3=3\nCHOICE_NAME_3_10=十一番目\nCHOICE_NAME_3_1=二番目\nCHOICE_NAME_2_0=別の項目\n','TYPE_ID=0\nITEM_LOADTYPE_3=3\nCHOICE_NAME_3_2=English only\nCHOICE_NAME_3_1=Second\n');
   const html=choicesContextView(file,item,true),lines=rows(html);
   assert.equal(lines.length,3);assert.ok(lines[0].includes('二番目'));assert.ok(lines[1].includes('English only'));assert.ok(lines[2].includes('十一番目'));assert.ok(!html.includes('choice-index'));
   assert.ok(lines[0].includes('二番目'));assert.ok(lines[0].includes('Second'));assert.ok(lines[1].includes('（対応なし）'));assert.ok(lines[2].includes('十一番目'));assert.ok(!html.includes('別の項目'));
-  assert.ok(html.includes('<th scope="col">原文</th><th scope="col">英訳</th>'));assert.equal((html.match(/<th scope="col">/g)??[]).length,2);
+  assert.ok(html.includes('<th scope="col">原文</th><th scope="col">英訳</th>'));assert.equal((html.match(/<th scope="col"[ >]/g)??[]).length,3);
 });
 
 test('common numeric arguments use CHOICE_STR, preserve empty values and prefer confirmed translations',()=>{

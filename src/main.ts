@@ -295,6 +295,11 @@ root.addEventListener('click', event => {
   else if (action === 'file') {path = value!; itemFilter = homeFilter; itemQuery=''; selectItem(targets()[0]?.id ?? '');}
   else if (action === 'filter') {if (scope === 'home') homeFilter = value as Filter; else {const retaining=itemFilter==='comment' && value==='comment' && !!currentItem();itemFilter = value as Filter; if (!retaining && !targets().some(i => i.id === currentId)) currentId = targets()[0]?.id ?? null;}}
   else if (action === 'pick') {selectItem(value!); closeSheet(); return;}
+  else if(action==='context-item') {
+    const target=currentFile()?.items.find(item=>item.id===value);if(!target) return;
+    preservePreviousScreen=true;if(!matches(target,itemFilter)) itemFilter='all';itemQuery='';selectItem(target.id);
+    render();root.querySelector('.review')?.scrollTo(0,0);return;
+  }
   else if (action === 'close') {closeSheet(); return;}
   else if (action === 'prev') {move(-1); return;}
   else if (action === 'next') {move(1); return;}

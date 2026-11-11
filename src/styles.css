@@ -100,10 +100,13 @@ body{position:fixed;inset:0}
 .database-context-body{margin:0 16px 16px}
 .database-original,.database-translation{background:#f2f4f6}
 .context-translations{display:grid;gap:10px}
+.context-item-jump{margin-top:10px}
 .choices-context-body{margin:0 16px 16px;overflow:hidden;border:1px solid #dce2e8;border-radius:11px;background:#f2f4f6}
 .choices-table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:14px;line-height:1.8;text-align:left}
 .choices-table th,.choices-table td{padding:8px 10px;border-bottom:1px solid #dce2e8;border-right:1px solid #dce2e8;vertical-align:top;white-space:pre-wrap;overflow-wrap:anywhere}
 .choices-table thead{background:#e9edf1;color:#607185}
+.choices-table .choice-action{width:50px;padding:4px 3px;vertical-align:middle;text-align:center}
+.choice-action .icon{color:var(--accent)}
 .choices-empty{color:var(--muted)}
 .choices-table th:last-child,.choices-table td:last-child{border-right:0}
 .choices-table tbody tr:last-child th,.choices-table tbody tr:last-child td{border-bottom:0}

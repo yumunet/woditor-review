@@ -925,13 +925,15 @@ test('database field originals appear below English for choices and CSV values w
   for(const [name,text] of [['ja',ja],['en',en]]) await page.locator(`input[name=${name}]`).setInputFiles({name:name+'.zip',mimeType:'application/zip',buffer:Buffer.from(zipSync({[path]:Buffer.from(text)}))});
   await page.getByRole('button',{name:'読み込む',exact:true}).click();await expect(page.locator('.busy')).toHaveCount(0,{timeout:90000});if(await page.getByRole('dialog').count()) await closeReviewSheet(page);await openTreeFile(page,path);
   const pick=async(title:RegExp)=>{await page.locator('.entry-open').click();await page.locator('.pick-row').filter({has:page.locator('.pick-title',{hasText:title})}).click();};
-  await pick(/^選択肢名/);await expect(page.locator('.entry-title')).toHaveText('選択肢名 0-1');const section=page.locator('.database-context'),toggle=section.getByRole('button'),original=page.locator('.database-original');
+  await pick(/^選択肢名/);await expect(page.locator('.entry-title')).toHaveText('選択肢名 0-1');const section=page.locator('.database-context'),toggle=section.locator('.context-title'),original=page.locator('.database-original');
   await expect(original).toHaveText('日本語の説明');await expect(section.locator('.context-field-label')).toHaveCount(0);await expect(toggle).toHaveCSS('font-weight','700');await expect(page.locator('.database-translation')).toHaveText('Description');
   await expect(original).toHaveCSS('background-color','rgb(242, 244, 246)');await expect(page.locator('.source')).toHaveCSS('background-color','rgb(255, 255, 255)');
   const translationBox=await page.locator('.translation').boundingBox(),originalBox=await original.boundingBox();expect(originalBox!.y).toBeGreaterThan(translationBox!.y+translationBox!.height);expect(Math.abs(originalBox!.x-translationBox!.x)).toBeLessThan(1);
   await captureUi(page,info,'database-context','.database-context');
   await toggle.click();await expect(toggle).toHaveAttribute('aria-expanded','false');await expect(original).toHaveCount(0);
-  await pick(/^データ 0 \/ 項目 1$/);await expect(toggle).toHaveAttribute('aria-expanded','false');await toggle.click();await expect(original).toHaveText('ASCII original label');await expect(page.locator('.database-translation')).toHaveText('English field label');
+  await pick(/^データ 0 \/ 項目 0$/);await toggle.click();await section.getByRole('button',{name:'翻訳項目を開く',exact:true}).click();await expect(page.locator('.entry-title')).toHaveText('項目名 0');
+  await page.goBack();await expect(page.locator('.entry-title')).toHaveText('データ 0 / 項目 0');await toggle.click();
+  await pick(/^データ 0 \/ 項目 1$/);await expect(toggle).toHaveAttribute('aria-expanded','false');await toggle.click();await expect(original).toHaveText('ASCII original label');await expect(page.locator('.database-translation')).toHaveText('English field label');await expect(section.getByRole('button',{name:'翻訳項目を開く',exact:true})).toBeDisabled();
   await toggle.click();await page.reload();await openTreeFile(page,path);await pick(/^選択肢名/);await expect(toggle).toHaveAttribute('aria-expanded','false');await toggle.click();await expect(original).toHaveText('日本語の説明');
   await pick(/^データ名 0$/);await expect(section).toHaveCount(0);await pick(/^項目名 0$/);await expect(section).toHaveCount(0);
 });
@@ -944,7 +946,7 @@ test('common argument choices show their original argument names with the shared
   for(const [name,text] of [['ja',ja],['en',en]]) await page.locator(`input[name=${name}]`).setInputFiles({name:name+'.zip',mimeType:'application/zip',buffer:Buffer.from(zipSync({[path]:Buffer.from(text)}))});
   await page.getByRole('button',{name:'読み込む',exact:true}).click();await expect(page.locator('.busy')).toHaveCount(0,{timeout:90000});if(await page.getByRole('dialog').count()) await closeReviewSheet(page);await openTreeFile(page,path);
   const pick=async(title:string)=>{await page.locator('.entry-open').click();await page.locator('.pick-row').filter({has:page.locator('.pick-title',{hasText:new RegExp(`^${title}$`)})}).click();};
-  await pick('選択肢 1-1');const section=page.locator('.database-context'),original=page.locator('.database-original'),toggle=section.getByRole('button');
+  await pick('選択肢 1-1');const section=page.locator('.database-context'),original=page.locator('.database-original'),toggle=section.locator('.context-title');
   await expect(section).toHaveAttribute('aria-label','対応する引数');await expect(original).toHaveText('対象の種類');await expect(section.locator('.context-field-label')).toHaveCount(0);await expect(original).toHaveCSS('background-color','rgb(242, 244, 246)');await expect(page.locator('.database-translation')).toHaveText('Target kind');
   await captureUi(page,info,'argument-context','.database-context');await toggle.click();await expect(original).toHaveCount(0);
   await pick('選択肢 2-1');await expect(toggle).toHaveAttribute('aria-expanded','false');await toggle.click();await expect(original).toHaveText('ASCII argument name');await expect(page.locator('.database-translation')).toHaveText('Translated argument name');

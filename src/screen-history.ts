@@ -25,7 +25,7 @@ export class ScreenHistory<T> {
   sync(screen:Screen<T>) {
     if(this.pending) {this.pending.screen=screen;return;}
     const current=this.entries[this.index];
-    if(same(current,screen)) {current.value=screen.value;return;}
+    if(same(current,screen) && !screen.preservePrevious) {current.value=screen.value;return;}
     let target=-1;
     // Closing a panel (or returning home) consumes its history entries. A new
     // file first closes any overlay, so Back never reopens a stale confirmation.

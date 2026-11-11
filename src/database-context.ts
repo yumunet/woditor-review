@@ -1,6 +1,6 @@
 import type {ReviewFile,Item} from './model';
 import {escape,icon} from './ui';
-import {metadataHeader,metadataContextText} from './metadata-text';
+import {metadataHeader,metadataContextText,metadataItem} from './metadata-text';
 import {databaseChoicesEnabled} from './database-choice-policy';
 
 type ContextField={index:number;source:string|null;translation:string|null};
@@ -29,9 +29,11 @@ export function commonArgumentOriginal(file:ReviewFile,item:Item):ContextField|n
 export function databaseContextView(file:ReviewFile,item:Item,open:boolean):string {
   const common=file.type==='common',field=common?commonArgumentOriginal(file,item):databaseFieldOriginal(file,item);if(!field) return '';
   const heading=common?'対応する引数':'対応する項目',subject=common?'引数名':'項目名';
+  const target=metadataItem(file,common?`VALINPUT_NAME_${field.index}`:`ITEMNAME${field.index}`);
+  const jump=`<button class="text-act context-item-jump" data-action="context-item" data-value="${escape(target?.id??'')}" ${target?'':'disabled'}>${icon('item-jump')}翻訳項目を開く</button>`;
   const language=(name:string,value:string|null,className:string)=>{
     const empty=value===null?`（${name==='原文'?'対応する': '英訳の'}${subject}がありません）`:`（${name==='原文'?'':'英訳の'}${subject}は未設定）`;
     return `<div class="context-language"><div class="label">${name}</div><div class="text-box ${className} ${value?'':'database-original-empty'}">${escape(value||empty)}</div></div>`;
   };
-  return `<section class="database-context" aria-label="${heading}"><button class="context-title" data-action="database-context" aria-expanded="${open}" aria-controls="database-field-original">${heading}<span class="chevron ${open?'open':''}">${open?'閉じる':'開く'}${icon('down')}</span></button>${open?`<div class="database-context-body" id="database-field-original"><div class="context-translations">${language('原文',field.source,'database-original')}${language('英訳',field.translation,'database-translation')}</div></div>`:''}</section>`;
+  return `<section class="database-context" aria-label="${heading}"><button class="context-title" data-action="database-context" aria-expanded="${open}" aria-controls="database-field-original">${heading}<span class="chevron ${open?'open':''}">${open?'閉じる':'開く'}${icon('down')}</span></button>${open?`<div class="database-context-body" id="database-field-original"><div class="context-translations">${language('原文',field.source,'database-original')}${language('英訳',field.translation,'database-translation')}</div>${jump}</div>`:''}</section>`;
 }
