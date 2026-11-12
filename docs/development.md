@@ -153,13 +153,15 @@ Python実行ファイルは `PYTHON` 環境変数で指定できます。Windows
 
 通常のテストはスクリーンショットを更新しません。UIを変更した画面だけを撮り直す場合は、`UPDATE_SCREENSHOTS` に画面名（`review`、`comments`、`comment-scroll`、`items`、`diagnostic`、`export`、`instructions`、`drive-conflict`）をカンマ区切りで指定し、対象のテストを実行してください。日時・IDだけの画像差分は採用しません。
 
-実データの再検査：
+通常テストはGit管理された最小データ・生成データで完結し、`.reference` は不要です。構成・検証分担・サブパスの確認手順と整理理由は [testing.md](testing.md) を参照してください。
+
+実データを別途用意した場合の手動調査（通常テストには含めません）：
 
 ```powershell
 python scripts/corpus-report.py
 ```
 
-参考ファイルは `.reference/` に置き、Git管理しません。参考データがない環境では実データ依存のテストはスキップされます。本実装の検証ではすべて参考データを使って実行しています。
+参考ファイルは `.reference/` に置き、Git管理しません。当時の全件調査結果は [validation.md](validation.md) に履歴として残しています。
 
 ## 構成
 
@@ -197,7 +199,7 @@ src/parser.worker.ts    ZIP処理とPyodideのWorker
 python/                 共通パーサー・翻訳CLI・レビューCLI・アプリ用アダプター
 python/schemas/         JSONスキーマの仕様参照用コピー
 scripts/                ランタイム同梱・PWA生成・実データレポート
-tests/python/           解析・実データ・Python補助ツールのテスト
+tests/python/           解析・対応付け・Python補助ツールのテスト
 tests/browser/          実ZIP・保存・AI差分・PWA・操作テスト
 public/                 アイコンとManifest
 dist/                   静的配信用ビルド（生成物）
