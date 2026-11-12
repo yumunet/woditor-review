@@ -192,14 +192,14 @@ test('discarding a proposal after exporting a request invalidates the stale answ
   const stale=createRequest(first,[file.path]);first.requests.push(stale);discardRejectedChanges(item);
   assert.throws(()=>importResponse(first,{...reject,requestId:stale.requestId}),/破棄/);
 });
-test('reload keeps unchanged approval and comments; changes await re-review', {skip: !corpus}, () => {
+test('reload directly replaces translations and preserves approval by default', {skip: !corpus}, () => {
   const {workspace, file, item} = setup();
   item.threads = []; approveItem(item, file.slots); approveItem(file.items[1], file.slots);
   const incoming = structuredClone(file); incoming.slots[0].translation += ' new';
   const next = mergeFiles(workspace, [incoming]), f = next.files[0];
-  assert.equal(f.items[0].approved, false); assert.equal(f.items[1].approved, true);
-  assert.equal(f.slots[0].translation, file.slots[0].translation); assert.equal(f.items[0].changes[0].status, 'pending');
-  approveItem(f.items[0], f.slots); assert.equal(f.slots[0].translation, incoming.slots[0].translation);
+  assert.equal(f.items[0].approved, true); assert.equal(f.items[1].approved, true);
+  assert.equal(f.slots[0].translation, incoming.slots[0].translation); assert.equal(f.items[0].changes[0].status, 'committed');
+  assert.equal(mergeFiles(workspace,[incoming],{resetChangedApproval:true}).files[0].items[0].approved,false);
 });
 test('line shifts preserve unique review IDs; ambiguous source changes retain prior file', {skip: !corpus}, () => {
   const {workspace, file, item, thread} = setup(), incoming = structuredClone(file);
@@ -225,6 +225,7 @@ test('manual comment split/merge keeps Slots, reload grouping, backup and histor
   assert.equal(canMerge(file, file.items.find(i => i.id === first)!), true);
   const reloaded = mergeFiles(workspace, [structuredClone(reference!)]);
   assert.deepEqual(reloaded.files[0].manualGroups, file.manualGroups);
+  assert.deepEqual(reloaded.files[0].items.map(item=>item.title),file.items.map(item=>item.title));
   assert.equal(reloaded.files[0].items.length, file.items.length);
   const restored = restoreJson(backupJson(reloaded)), rf = restored.files[0];
   mergeGroup(rf, first);

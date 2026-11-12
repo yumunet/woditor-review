@@ -8,7 +8,8 @@ import {updateCommentScroll} from './comment-scroll';
 import { parseArchives, renderTranslations } from './parser-client';
 import { addComment, approveItem, deleteComment, discardRejectedChanges, editComment, latestComment, nextAfterApproval, setResolved, undoApproval } from './review-state';
 import { backupFileName, backupJson, download, loadWorkspace, restoreJson, saveWorkspace } from './storage';
-import { chatInstructions, createRequest, importResponse, mergeFiles, reviewFileNames, sourceZip } from './exchange';
+import { chatInstructions, createRequest, importResponse, prepareFileImport, reviewFileNames, sourceZip, type FileImportSummary } from './exchange';
+import {importConfirmationView} from './import-confirmation';
 import { characterDiff } from './diff';
 import {displaySlotText} from './display-text';
 import {databaseContextView} from './database-context';
@@ -58,7 +59,7 @@ let diagnosticScrollRevision=0;
 let editTarget: {threadId: string; postId: string} | null = null;
 let commentDraft='',commentDraftItem='';
 let commentAnchor:string|null=null;
-let confirmation: {question: string; run: () => void | Promise<void>} | null = null;
+let confirmation: {question: string; run: (resetChangedApproval?:boolean) => void | Promise<void>; fileImport?:{summary:FileImportSummary;resetChangedApproval:boolean}} | null = null;
 let exportSelection = new Set<string>(), preparedRequest: ReviewRequest | null = null;
 const exportCollapsed=new Set<string>();
 let reviewMode: ReviewMode = 'comments';
@@ -258,7 +259,7 @@ function render() {
   const comments=root.querySelector('.comments-list');if(comments) commentResize.observe(comments);
   updateCommentScroll(root);
   root.classList.toggle('has-comments', !!currentItem() && unresolved(currentItem()!).length > 0);
-  if (confirmation) root.insertAdjacentHTML('beforeend', `<div class="dialog-overlay"><section class="dialog" role="alertdialog" aria-modal="true" aria-label="確認"><p>${e(confirmation.question)}</p><div class="dialog-actions"><button data-action="confirm-cancel">キャンセル</button><button class="primary" data-action="confirm-ok">確定</button></div></section></div>`);
+  if (confirmation) root.insertAdjacentHTML('beforeend', `<div class="dialog-overlay"><section class="dialog ${confirmation.fileImport?'import-confirmation':''}" role="alertdialog" aria-modal="true" aria-label="${confirmation.fileImport?'英訳の上書き':'確認'}"><p>${e(confirmation.question)}</p>${confirmation.fileImport?importConfirmationView(confirmation.fileImport.summary,confirmation.fileImport.resetChangedApproval):''}<div class="dialog-actions"><button data-action="confirm-cancel">キャンセル</button><button class="primary" data-action="confirm-ok">${confirmation.fileImport?'上書きする':'確定'}</button></div></section></div>`);
   screenHistory?.sync(historyScreen());
   preservePreviousScreen=false;
 }
@@ -275,7 +276,7 @@ root.addEventListener('click', event => {
   if (instructionsPreview !== null) return;
   if (action === 'preview-instructions' && noticeInstructions) {instructionsPreview = noticeInstructions; render(); root.querySelector<HTMLElement>('[data-action="close-instructions"]')?.focus(); return;}
   if (action === 'confirm-cancel') {confirmation = null; render(); return;}
-  if (action === 'confirm-ok') {const fn = confirmation?.run; confirmation = null; try {void Promise.resolve(fn?.()).catch(error => toast(String(error)));} catch (error) {toast(String(error));} render(); return;}
+  if (action === 'confirm-ok') {const pending=confirmation; confirmation = null; try {void Promise.resolve(pending?.run(pending.fileImport?.resetChangedApproval)).catch(error => toast(String(error)));} catch (error) {toast(String(error));} render(); return;}
   if (confirmation) return;
   if (action === 'menu') {menu = !menu; render(); return;}
   menu = false;
@@ -377,7 +378,7 @@ root.addEventListener('scroll',event=>{
   if(sheet==='text' && textView && element.matches('.text-scroll')) paintTextView(textView,element);
   if(element.matches('.comments-list')) updateCommentScroll(root);
 },true);
-root.addEventListener('change', event => {const el = event.target as HTMLInputElement; if (el.name === 'review-mode') {reviewMode = el.value as ReviewMode; setPreferences({reviewMode}); resetExportSelection(); render(); return;} if (el.id === 'drive-auto') {void drive.setAutomatic(el.checked).catch(error => toast(String(error))); return;} if (el.id === 'export-all') {exportSelection = new Set(el.checked ? exportFiles().map(f => f.path) : []); preparedRequest = null; render(); return;}});
+root.addEventListener('change', event => {const el = event.target as HTMLInputElement; if(el.id==='reset-import-approval' && confirmation?.fileImport) {confirmation={...confirmation,fileImport:{...confirmation.fileImport,resetChangedApproval:el.checked}};screenHistory?.sync(historyScreen());return;} if (el.name === 'review-mode') {reviewMode = el.value as ReviewMode; setPreferences({reviewMode}); resetExportSelection(); render(); return;} if (el.id === 'drive-auto') {void drive.setAutomatic(el.checked).catch(error => toast(String(error))); return;} if (el.id === 'export-all') {exportSelection = new Set(el.checked ? exportFiles().map(f => f.path) : []); preparedRequest = null; render(); return;}});
 root.addEventListener('submit', async event => {
   const form = event.target as HTMLFormElement;
   if (form.id === 'drive-config-form') {
@@ -434,17 +435,34 @@ root.addEventListener('submit', async event => {
     const result = await parseArchives(original, await en.arrayBuffer(), updateBusy, englishOnly);
     diagnosticTab = 'error';
     const documents=replaceDiagnosticDocuments(workspace.diagnosticDocuments,result.diagnosticDocuments,[...result.files.map(f=>f.path),...result.diagnostics.map(d=>d.path)]);
-    if (!result.files.length) {workspace.diagnostics = result.diagnostics;workspace.diagnosticDocuments=documents;await saveWorkspace(workspace);sheet = 'diagnostics'; busy = ''; render(); return;}
-    if (workspace.files.length) {
-      const attempted = [...result.files.map(f => f.path), ...result.diagnostics.map(d => d.path)];
-      workspace = mergeFiles({...workspace, diagnostics: withoutReplacedDiagnostics(workspace.diagnostics, attempted)}, result.files);
-      workspace.diagnostics.push(...result.diagnostics);
-    } else workspace = {...emptyWorkspace(), ...result};
-    workspace.diagnosticDocuments=documents;
-    workspaceRevision++;
-    if (englishOnly) reconcileCurrent(); else path = currentId = null;
-    await saveWorkspace(workspace);
-    if (result.diagnostics.length) sheet = 'diagnostics';
+    const attempted = [...result.files.map(f => f.path), ...result.diagnostics.map(d => d.path)];
+    const base={...workspace,diagnostics:withoutReplacedDiagnostics(workspace.diagnostics,attempted)};
+    const prepared=prepareFileImport(base,result.files);
+    const showDiagnostics=result.diagnostics.length>0 || prepared.workspace.diagnostics.length>base.diagnostics.length;
+    prepared.workspace.diagnostics.push(...result.diagnostics);
+    prepared.workspace.diagnosticDocuments=documents;
+    const revision=workspaceRevision;
+    const baselineHash=await workspaceHash(workspace);
+    const apply=async(resetChangedApproval=false)=>{
+      busy='保存中…';render();
+      try {
+        if(revision!==workspaceRevision || await workspaceHash(workspace)!==baselineHash) throw new Error('読み込み中にデータが変更されました。もう一度読み込んでください');
+        const next=resetChangedApproval?structuredClone(prepared.workspace):prepared.workspace;
+        if(resetChangedApproval) {
+          const changed=new Set(prepared.changedItems);
+          prepared.workspace.files.forEach((file,i)=>file.items.forEach((item,j)=>{if(changed.has(item)) next.files[i].items[j].approved=false;}));
+        }
+        await saveWorkspace(next);
+        workspace=next;workspaceRevision++;preparedRequest=null;
+        if(englishOnly || !result.files.length) reconcileCurrent();else path=currentId=null;
+        sheet=showDiagnostics?'diagnostics':null;
+      } finally {busy='';render();}
+    };
+    if(prepared.summary.overwrittenFiles) {
+      busy='';confirmation={question:'既存ファイルの英訳を上書きしますか？',run:apply,fileImport:{summary:prepared.summary,resetChangedApproval:false}};
+      render();root.querySelector<HTMLElement>('[data-action=confirm-cancel]')?.focus();return;
+    }
+    await apply();
   } catch (error) {notice = String(error);}
   busy = ''; render();
 });

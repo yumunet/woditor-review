@@ -141,13 +141,17 @@ export function sourceZip(workspace: Workspace) {
   return zipSync(Object.fromEntries(workspace.files.map(f => [`ja-JP/texts/${f.path}`, strToU8((f.jaBom ? '\uFEFF' : '') + f.jaText)])));
 }
 
-export function mergeFiles(workspace: Workspace, incoming: ReviewFile[]): Workspace {
+export interface FileImportOptions {resetChangedApproval?: boolean}
+export interface FileImportSummary {overwrittenFiles: number; changedItems: number; discardedPending: number}
+export function prepareFileImport(workspace: Workspace, incoming: ReviewFile[], options: FileImportOptions = {}) {
   const next = structuredClone(workspace);
+  const summary:FileImportSummary={overwrittenFiles:0,changedItems:0,discardedPending:0},changedItems:Item[]=[];
   for (const candidate of incoming) {
     const old = next.files.find(f => f.path === candidate.path);
-    if (!old) {next.files.push(structuredClone(candidate)); continue;}
+    if (!old) {const file=structuredClone(candidate);for(const item of file.items) item.approved=false;next.files.push(file);continue;}
     try {
       const file = structuredClone(candidate), map = new Map<string, string>();
+      const changed:Item[]=[];let discarded=0;
       const sameSource = file.sourceVersion === old.sourceVersion;
       for (const slot of file.slots) {
         const options = old.slots.filter(s => slot.kind==='database_csv' && sameSource && !slot.sourceMissing
@@ -157,6 +161,7 @@ export function mergeFiles(workspace: Workspace, incoming: ReviewFile[]): Worksp
             : !sameSource || s.id === slot.id));
         if (options.length === 1) map.set(slot.id, options[0].id);
       }
+      if(new Set(map.values()).size!==map.size) throw new Error('既存レビューを一意に対応付けできません');
       if (old.slots.some(s=>s.sourceOverride !== undefined && ![...map.values()].includes(s.id))) throw new Error('補完した原文を一意に対応付けできません');
       preserveGroups(file, old, map);
       const matched = new Set<string>();
@@ -168,8 +173,6 @@ export function mergeFiles(workspace: Workspace, incoming: ReviewFile[]): Worksp
         for (const id of item.slotIds) {
           const target = file.slots.find(s => s.id === id)!, source = old.slots.find(s => s.id === map.get(id))!;
           if (source.sourceOverride !== undefined) target.sourceOverride=source.sourceOverride;
-          const existing = prior.changes.find(c => c.slotId === source.id && c.status === 'pending');
-          if (existing && target.translation !== existing.after && target.translation !== source.translation) throw new Error('保留中の変更と異なる新訳があります');
         }
       }
       if (old.items.some(i => (i.approved || i.threads.length || i.changes.length) && !matched.has(i.id))) throw new Error('原文・構造が変わり、既存レビューを一意に対応付けできません');
@@ -180,21 +183,29 @@ export function mergeFiles(workspace: Workspace, incoming: ReviewFile[]): Worksp
         const newValues = item.slotIds.map(id => file.slots.find(s => s.id === id)!);
         if (prior) {
           const edits = newValues.map(s => ({slotId: rename.get(s.id)!, before: old.slots.find(oldSlot => oldSlot.id === rename.get(s.id))!.translation, after: s.translation}));
-          const title=item.title;
-          Object.assign(item, structuredClone(prior));
-          if(newValues[0]?.kind==='database_csv') item.title=title;
-          for (let index = 0; index < edits.length; index++) {
-            const edit = edits[index], existing = item.changes.find(c => c.slotId === edit.slotId && c.status === 'pending');
-            newValues[index].translation = edit.before;
-            if (!existing && edit.before !== edit.after) {item.changes.push({id: uid(), ...edit, origin: 'reload', threadId: null, status: 'pending', createdAt: now()}); item.approved = false;}
+          const {id,approved,threads,changes,slotIds}=structuredClone(prior);
+          Object.assign(item,{id,approved,threads,changes,slotIds,title:newValues[0]?.kind==='database_csv'?item.title:prior.title});
+          item.lastLine=newValues.at(-1)!.line;
+          const changedSlots=new Set(edits.filter(edit=>edit.before!==edit.after).map(edit=>edit.slotId));
+          for(const change of item.changes) {
+            if(change.status==='pending' && (change.origin==='reload'||changedSlots.has(change.slotId))) {change.status='discarded';discarded++;}
           }
-        } else {item.slotIds = item.slotIds.map(id => rename.get(id)!); item.id = 'N:' + uid();}
+          for(const edit of edits) {
+            if(edit.before!==edit.after) item.changes.push({id:uid(),...edit,origin:'reload',threadId:null,status:'committed',createdAt:now()});
+          }
+          if(changedSlots.size) {changed.push(item);if(options.resetChangedApproval) item.approved=false;}
+        } else {item.slotIds = item.slotIds.map(id => rename.get(id)!); item.id = 'N:' + uid();item.approved=false;}
       }
       for (const slot of file.slots) slot.id = rename.get(slot.id)!;
       file.usages = Object.fromEntries(Object.entries(file.usages).map(([id, hits]) => [rename.get(id)!, hits]));
       if (old.manualGroups) file.manualGroups = file.items.filter(i => i.code === 103).map(i => [...i.slotIds]);
       next.files[next.files.indexOf(old)] = file;
+      summary.overwrittenFiles++;summary.changedItems+=changed.length;summary.discardedPending+=discarded;changedItems.push(...changed);
     } catch (error) {next.diagnostics.push({path: candidate.path, severity: 'error', message: `再読み込みを適用しませんでした: ${String(error)}`});}
   }
-  next.updatedAt = now(); return next;
+  next.updatedAt = now(); return {workspace:next,summary,changedItems};
+}
+
+export function mergeFiles(workspace: Workspace, incoming: ReviewFile[], options: FileImportOptions = {}): Workspace {
+  return prepareFileImport(workspace,incoming,options).workspace;
 }

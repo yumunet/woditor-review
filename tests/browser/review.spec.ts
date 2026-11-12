@@ -17,6 +17,7 @@ export async function loadReal(page: Page, importPath = sourcePath) {
   }
   await page.getByRole('button', {name: '読み込む', exact: true}).click();
   await expect(page.locator('.busy')).toHaveCount(0, {timeout: 90_000});
+  if(await page.getByRole('alertdialog',{name:'英訳の上書き',exact:true}).count()) {await page.getByRole('button',{name:'上書きする',exact:true}).click();await expect(page.locator('.busy')).toHaveCount(0);}
   if (await page.getByRole('dialog').count()) await page.getByRole('button', {name: '閉じる', exact: true}).click();
   for (const name of importPath.split('/')) await page.locator('.file-row').filter({has: page.locator('.row-name', {hasText: name})}).click();
   if (importPath === sourcePath) await expect(page.locator('.source')).toContainText('夕一');
@@ -51,7 +52,6 @@ test('unified import accepts English alone and preserves comments and other file
   await page.goto('/');await page.getByRole('button',{name:'ファイルを読み込む',exact:true}).click();
   await expect(page.locator('input[name=ja]')).toHaveAttribute('required');await closeReviewSheet(page);
   await loadNavigationFiles(page);await openTreeFile(page,navigationPaths[0]);await postReviewComment(page,'Keep this comment');
-  const oldText=await page.locator('.translation').textContent();
   await page.getByRole('button',{name:'メニュー',exact:true}).click();
   await expect(page.getByRole('button',{name:'英訳TXTを再読み込み',exact:true})).toHaveCount(0);
   await page.getByRole('button',{name:'ファイルを読み込む',exact:true}).click();
@@ -60,8 +60,8 @@ test('unified import accepts English alone and preserves comments and other file
   expect(text).toContain('COMMON_NAME=Updated name');
   await page.locator('input[name=en]').setInputFiles({name:'revised.zip',mimeType:'application/zip',buffer:Buffer.from(zipSync({[`en-US/texts/${navigationPaths[0]}`]:Buffer.from(text)}))});
   await page.getByRole('button',{name:'読み込む',exact:true}).click();await expect(page.locator('.busy')).toHaveCount(0,{timeout:90_000});
-  if(await page.getByRole('dialog').count()) await closeReviewSheet(page);
-  await expect(page.locator('h1')).toHaveText('000.txt');await expect(page.locator('.translation')).toHaveText(oldText!);await expect(page.locator('.translation-after')).toHaveText('Updated name');
+  await page.getByRole('button',{name:'上書きする',exact:true}).click();await expect(page.locator('.busy')).toHaveCount(0);if(await page.getByRole('dialog').count()) await closeReviewSheet(page);
+  await expect(page.locator('h1')).toHaveText('000.txt');await expect(page.locator('.translation')).toHaveText('Updated name');await expect(page.locator('.translation-after')).toHaveCount(0);
   await page.locator('.comment-trigger').click();await expect(page.locator('.post-text')).toHaveText('Keep this comment');await closeReviewSheet(page);
   await openTreeFile(page,navigationPaths[1]);await expect(page.locator('.source')).toBeVisible();
 });
@@ -861,7 +861,7 @@ test('database CSV multiline strings round trip through AI approval, ZIP and Eng
   await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'AIレビュー結果を読み込む',exact:true}).click();await page.locator('input[name=answer]').setInputFiles({name:'csv-response.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(response))});await page.getByRole('button',{name:'回答を読み込む',exact:true}).click();await expect(page.locator('.translation-after')).toHaveText(after);await resolveCurrentComment(page);await expect(page.locator('.translation')).toHaveText(after);
   await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'英訳TXTを出力',exact:true}).click();const event=page.waitForEvent('download');await page.getByRole('button',{name:'英訳TXTを出力',exact:true}).click();const zip=readFileSync((await(await event).path())!);const output=Buffer.from(unzipSync(zip)[`en-US/texts/${path}`]).toString('utf8');
   const original=readFileSync(`.reference/en-US/texts/${path}`,'utf8');expect(output).toBe(original.replace('"'+slot.translation.replaceAll('"','""')+'"','"'+after.replaceAll('"','""')+'"'));await closeReviewSheet(page);
-  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'ファイルを読み込む',exact:true}).click();await page.locator('input[name=en]').setInputFiles({name:'csv-reviewed.zip',mimeType:'application/zip',buffer:zip});await page.getByRole('button',{name:'読み込む',exact:true}).click();await expect(page.locator('.busy')).toHaveCount(0);if(await page.getByRole('dialog').count()) await closeReviewSheet(page);await expect(page.locator('.translation')).toHaveText(after);await expect(page.locator('.translation-after')).toHaveCount(0);
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'ファイルを読み込む',exact:true}).click();await page.locator('input[name=en]').setInputFiles({name:'csv-reviewed.zip',mimeType:'application/zip',buffer:zip});await page.getByRole('button',{name:'読み込む',exact:true}).click();await expect(page.locator('.busy')).toHaveCount(0);await page.getByRole('button',{name:'上書きする',exact:true}).click();await expect(page.locator('.busy')).toHaveCount(0);if(await page.getByRole('dialog').count()) await closeReviewSheet(page);await expect(page.locator('.translation')).toHaveText(after);await expect(page.locator('.translation-after')).toHaveCount(0);
 });
 
 test('message line breaks and message and comment quotes are readable while TXT remains encoded',async({page})=>{

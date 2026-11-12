@@ -39,7 +39,10 @@ export function setResolved(item: Item, slots: Slot[], threadId: string, resolve
   const thread = item.threads.find(t => t.id === threadId);
   if (!thread) throw new Error('コメントが見つかりません');
   // Validate the entire transition before changing any field.
-  const changes = item.changes.filter(c => c.threadId === threadId && c.status !== 'discarded');
+  // An external overwrite establishes a new baseline for this slot. Older
+  // comment history remains readable but cannot undo that imported text.
+  const changes = item.changes.filter((c,index) => c.threadId === threadId && c.status !== 'discarded'
+    && !item.changes.slice(index+1).some(next=>next.slotId===c.slotId && next.origin==='reload' && next.status==='committed'));
   if (resolved && changes.some(c => c.status === 'pending' && c.rejectedBy)) throw new Error('再審で不採用になった変更を破棄してから解決してください');
   for (const c of changes) if (!slots.some(s => s.id === c.slotId)) throw new Error('翻訳単位が見つかりません');
   for (const c of changes) {
