@@ -623,6 +623,8 @@ def inspect_choices(text):
     settings are errors and are never guessed or deleted by cleanup.
     """
     kind=file_type(text);records=choice_records(text);meta={r['key']:r['value'] for r in records}
+    argument_count=meta.get('VALINPUT_NUM','')
+    argument_limit=int(argument_count) if re.fullmatch(r'\d+',argument_count) else None
     diagnostics=[];unused=[];changes=[];groups={}
     def issue(severity, message, record, group):
         diagnostics.append(dict(severity=severity,message=f'{message}（{"数値引数" if kind=="common" else "項目"} {group}、行 {record["line"]}）',line=record['line'],key=record['key'],group=group))
@@ -642,6 +644,11 @@ def inspect_choices(text):
         if mode is None:
             issue('error','選択肢の入力形式が不正です',anchor,group);continue
         if mode==0:
+            reset_modes=[]
+            if kind=='common' and group<5 and argument_limit is not None and group>=argument_limit:
+                reset_modes=[r for r in records if r['key']==f'LOADTYPE{group}' and r['value']!='0']
+                for record in reset_modes:
+                    changes.append((record['valueStart'],record['valueEnd'],'0'))
             numbers={};ignored=[]
             for (family,_,index),record in entries:
                 if index=='NUM':
@@ -653,8 +660,10 @@ def inspect_choices(text):
                 else:
                     ignored.append(record);unused.append({**record,'family':family,'reason':'使用対象外の引数・項目または直接入力'})
                     changes.append((record['start'],record['end'],''))
-            if ignored or any(r['value']!='0' for r in numbers.values()) or len(numbers)!=sum(index=='NUM' for (family,_,index),record in entries):
-                issue('automatic',f'未使用の選択肢設定を無視しました（ラベル {sum(r["key"].startswith("CHOICE_"+label+"_") for r in ignored)}件・内部値 {sum(r["key"].startswith("CHOICE_VAL_") for r in ignored)}件）',anchor,group)
+            if len(changes)>change_start:
+                details=f'ラベル {sum(r["key"].startswith("CHOICE_"+label+"_") for r in ignored)}件・内部値 {sum(r["key"].startswith("CHOICE_VAL_") for r in ignored)}件'
+                if reset_modes: details+='・入力形式を0へ補正'
+                issue('automatic',f'未使用の選択肢設定を無視しました（{details}）',anchor if ignored or not reset_modes else reset_modes[0],group)
             continue
         counts={};active={};family_records={}
         for family in (label,'VAL'):

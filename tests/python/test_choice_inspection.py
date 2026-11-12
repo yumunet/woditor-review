@@ -22,6 +22,59 @@ def fixture(kind='common',mode=2,names=('選択A','選択B'),values=('0','1'),gr
 
 
 class ChoiceInspectionTests(unittest.TestCase):
+    def test_zero_arguments_reset_the_unused_reference_mode_with_its_choice_values(self):
+        source='COMMON_ID=0\nVALINPUT_NUM=0\nLOADTYPE0=1\nCHOICE_VAL_0_NUM=3\nCHOICE_VAL_0_0=1\nCHOICE_VAL_0_1=4\nCHOICE_VAL_0_2=0\n'
+        expected='COMMON_ID=0\nVALINPUT_NUM=0\nLOADTYPE0=0\nCHOICE_VAL_0_NUM=0\n'
+        report=inspect_choices(source)
+        self.assertEqual(report['counts'],dict(error=0,warning=0,automatic=1))
+        self.assertEqual(len(report['unused']),3)
+        self.assertIn('入力形式を0へ補正',report['diagnostics'][0]['message'])
+        revised,_=clean_unused_choices(source);self.assertEqual(revised,expected)
+        self.assertEqual(inspect_choices(revised)['changes'],[])
+        self.assertEqual(inspect_choices(revised)['counts']['automatic'],0)
+
+    def test_only_unused_numeric_argument_modes_reset_even_without_choice_entries(self):
+        active=fixture(mode=1,names=(),values=('1','4','0')).replace('VALINPUT_NUM=5','VALINPUT_NUM=1')
+        source=active.replace('LOADTYPE0=1\n','LOADTYPE0=1\nLOADTYPE1=1\nLOADTYPE2=2\nLOADTYPE4=1\nLOADTYPE5=1\nLOADTYPE9=2\n')
+        expected=source.replace('LOADTYPE1=1','LOADTYPE1=0').replace('LOADTYPE2=2','LOADTYPE2=0').replace('LOADTYPE4=1','LOADTYPE4=0')
+        revised,report=clean_unused_choices(source);self.assertEqual(revised,expected)
+        self.assertEqual(report['counts'],dict(error=0,warning=0,automatic=3))
+        self.assertEqual(report['unused'],[])
+        self.assertEqual({d['key'] for d in report['diagnostics']},{'LOADTYPE1','LOADTYPE2','LOADTYPE4'})
+        self.assertEqual(inspect_choices(revised)['changes'],[])
+        for count in ('5','invalid','-1',None):
+            with self.subTest(count=count):
+                text=fixture(group=4)
+                if count is None: text=text.replace('VALINPUT_NUM=5\n','')
+                else: text=text.replace('VALINPUT_NUM=5',f'VALINPUT_NUM={count}')
+                self.assertEqual(clean_unused_choices(text)[0],text)
+
+    def test_unused_argument_modes_and_both_choice_families_are_cleaned_together(self):
+        for mode in (1,2):
+            with self.subTest(mode=mode):
+                source=fixture(mode=mode,group=1).replace('VALINPUT_NUM=5','VALINPUT_NUM=1')
+                revised,_=clean_unused_choices(source)
+                self.assertIn('LOADTYPE1=0\n',revised)
+                self.assertIn('CHOICE_STR_1_NUM=0\n',revised);self.assertIn('CHOICE_VAL_1_NUM=0\n',revised)
+                self.assertNotIn('CHOICE_STR_1_0=',revised);self.assertNotIn('CHOICE_VAL_1_0=',revised)
+                boundary='WoditorEvCOMMAND_START';self.assertEqual(source[source.index(boundary):],revised[revised.index(boundary):])
+
+    def test_cli_reset_preserves_bom_crlf_and_the_original_file(self):
+        cli=str(Path('python/woditor_translation_tool.py').resolve())
+        source='COMMON_ID=0\r\nVALINPUT_NUM=0\r\nLOADTYPE0=1\r\nCHOICE_VAL_0_NUM=3\r\nCHOICE_VAL_0_0=1\r\nCHOICE_VAL_0_1=4\r\nCHOICE_VAL_0_2=0\r\n'
+        expected='COMMON_ID=0\r\nVALINPUT_NUM=0\r\nLOADTYPE0=0\r\nCHOICE_VAL_0_NUM=0\r\n'
+        with TemporaryDirectory() as directory:
+            root=Path(directory);raw=b'\xef\xbb\xbf'+source.encode();(root/'input.txt').write_bytes(raw)
+            def run(*args):
+                result=subprocess.run([sys.executable,cli,*args],cwd=root,capture_output=True,text=True,encoding='utf-8')
+                self.assertEqual(result.returncode,0,result.stderr);return result
+            report=json.loads(run('inspect-choices','input.txt').stdout)
+            self.assertEqual(report['counts'],dict(error=0,warning=0,automatic=1))
+            self.assertIn('adjusted 2 count/mode settings',run('clean-choices','input.txt','--out','cleaned.txt').stdout)
+            self.assertEqual((root/'cleaned.txt').read_bytes(),b'\xef\xbb\xbf'+expected.encode())
+            self.assertEqual((root/'input.txt').read_bytes(),raw)
+            self.assertEqual(json.loads(run('inspect-choices','cleaned.txt').stdout)['counts']['automatic'],0)
+
     def test_all_supported_active_shapes_and_database_folder_name_are_valid(self):
         for kind,mode,names,values in [('common',0,(),()),('common',1,(),('1','2','3')),('common',1,('なし','不明','未設定'),('1','2','3')),('common',2,('選択A','選択B'),('5','8')),('database',1,('CharaChip',),('0',)),('database',2,(),('1','2','3')),('database',2,('なし','不明','未設定'),('1','2','3')),('database',3,('選択A','選択B'),('5','8'))]:
             with self.subTest(kind=kind,mode=mode,names=names):

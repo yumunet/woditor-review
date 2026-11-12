@@ -163,7 +163,7 @@ def clean_choice_file(a: argparse.Namespace) -> None:
     with destination.open('xb') as stream:
         stream.write(raw)
     if destination.read_bytes()!=raw: raise ValueError('Read-back verification failed')
-    print(f'Wrote {destination}; removed {len(report["unused"])} unused choice entries; preserved encoding, BOM and line endings')
+    print(f'Wrote {destination}; removed {len(report["unused"])} unused choice entries; adjusted {len(report["changes"])-len(report["unused"])} count/mode settings; preserved encoding, BOM and line endings')
 
 
 def main() -> None:
