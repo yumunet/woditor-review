@@ -29,7 +29,7 @@ class ReviewToolLayoutTests(unittest.TestCase):
                 (work / "request.json").write_text(json.dumps(request), encoding="utf-8")
                 (work / "decisions.json").write_text('{"responses":[]}', encoding="utf-8")
 
-                def run(*arguments):
+                def run(*arguments, tools=tools, work=work):
                     return subprocess.run(
                         [sys.executable, str(tools / "woditor_review_tool.py"), *arguments],
                         cwd=work,

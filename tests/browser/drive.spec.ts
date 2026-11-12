@@ -2,7 +2,7 @@ import { captureUi } from './screenshots';
 import { test, expect, type Page, type BrowserContext } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { loadFixture, sourcePath } from './helpers';
-import { zipSync, gzipSync, gunzipSync } from 'fflate';
+import { gzipSync, gunzipSync } from 'fflate';
 const path = sourcePath;
 const clientId = '123-test.apps.googleusercontent.com';
 interface StoredFile {
@@ -60,7 +60,9 @@ class MockDrive {
       }
       if (url.pathname === '/drive/v3/files' && req.method() === 'GET') {
         expect(url.searchParams.get('spaces')).toBe('appDataFolder');
-        await json({ files: this.files.map(({ raw, ...metadata }) => metadata) });
+        await json({
+          files: this.files.map(({ raw, ...metadata }) => metadata),
+        });
         return;
       }
       if (url.pathname.startsWith('/drive/v3/files/') && req.method() === 'GET') {

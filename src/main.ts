@@ -153,7 +153,6 @@ function setPreferences(next: Partial<Preferences>) {
     toast(`設定を保存できません：${String(error)}`),
   );
 }
-let screenHistory: ScreenHistory<ReturnType<typeof screenState>> | undefined;
 function screenState() {
   return {
     workspaceRevision,
@@ -1462,7 +1461,7 @@ root.addEventListener('touchend', (event) => {
   else swipe.target.style.transform = '';
   swipe = null;
 });
-screenHistory = new ScreenHistory(historyScreen(), restoreScreen);
+const screenHistory = new ScreenHistory(historyScreen(), restoreScreen);
 installViewport(root, () => {
   positionContextMenu(root);
   updateCommentScroll(root);

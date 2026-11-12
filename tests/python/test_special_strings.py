@@ -4,7 +4,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from review_adapter import pair_file, special_strings, translation_warnings
-from woditor_review_tool import build, apply_files
+from woditor_review_tool import apply_files, build
 
 
 class SpecialStringTests(unittest.TestCase):

@@ -3,9 +3,9 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from review_adapter import pair_file
-from woditor_review_tool import build, validate, apply_files
 from fixtures import csv_fixture
+from review_adapter import pair_file
+from woditor_review_tool import apply_files, build, validate
 
 
 class InitialReviewEditTests(unittest.TestCase):

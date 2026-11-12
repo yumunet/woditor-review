@@ -5,23 +5,25 @@ Requires only woditor_parser.py alongside this script. Python 3.10+, stdlib.
 """
 
 from __future__ import annotations
+
 import argparse
 import json
 import re
 import sys
 from pathlib import Path
+
 from woditor_parser import (
     Slot,
+    clean_unused_choices,
+    command_display_pairs,
     file_read,
     file_type,
-    translation_slots,
+    inspect_choices,
     normalize_translation,
-    special_strings,
     render_file,
     source_lines,
-    command_display_pairs,
-    inspect_choices,
-    clean_unused_choices,
+    special_strings,
+    translation_slots,
 )
 
 
@@ -71,7 +73,7 @@ def apply(a: argparse.Namespace) -> None:
     if not isinstance(entries, list) or len(entries) != len(slots):
         raise ValueError("Translation entry count does not match extracted entries")
     changes: list[tuple[Slot, str]] = []
-    for s, obj in zip(slots, entries):
+    for s, obj in zip(slots, entries, strict=True):
         if not isinstance(obj, dict):
             raise ValueError(f"Entry {s.id} is not an object")
         for key, expected in (("id", s.id), ("source", s.source)):
@@ -128,7 +130,6 @@ def show_command_context(
 
 def context(a: argparse.Namespace) -> None:
     text, _, _, _ = file_read(Path(a.source), a.encoding)
-    ftype = file_type(text)
     slots, _ = translation_slots(text)
     by_id = {s.id: s for s in slots}
     if a.id not in by_id:

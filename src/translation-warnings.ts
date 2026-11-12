@@ -22,7 +22,7 @@ export function specialStrings(value: string): string[] {
     if (value[i] === '[') stack.push(i);
     else if (value[i] === ']' && stack.length) ends.set(stack.pop()!, i + 1);
   }
-  const name = /[\p{L}\p{N}_+\-]+/uy;
+  const name = /[\p{L}\p{N}_+-]+/uy;
   for (let i = 0; i < value.length;) {
     if (value[i] === '\\') {
       name.lastIndex = i + 1;

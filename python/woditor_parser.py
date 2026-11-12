@@ -5,6 +5,7 @@ Offsets are Unicode code-point positions in the untouched decoded text.
 """
 
 from __future__ import annotations
+
 import hashlib
 import re
 from dataclasses import dataclass
@@ -241,7 +242,7 @@ def validate_text(old: str, new: str, edited: set[int]) -> None:
     after = new.splitlines(keepends=True)
     if len(before) != len(after):
         raise ValueError("Line count changed")
-    for n, (b, c) in enumerate(zip(before, after), 1):
+    for n, (b, c) in enumerate(zip(before, after, strict=True), 1):
         ending = (
             "\r\n"
             if b.endswith("\r\n")
@@ -261,7 +262,7 @@ def validate_text(old: str, new: str, edited: set[int]) -> None:
             continue
         b = b.removesuffix(ending) if ending else b
         c = c.removesuffix(ending) if ending else c
-        bm, cm = COMMAND.fullmatch(b), COMMAND.fullmatch(c)
+        bm = COMMAND.fullmatch(b)
         if bm:
             if command_mask(b) != command_mask(c):
                 raise ValueError(f"Event command structure changed at line {n}")
@@ -321,7 +322,7 @@ def command_display_pairs(text: str) -> list[tuple[int, int, str]]:
             raise ValueError(f"Unexpected event command format at line {line_number}")
     return [
         (line_number, display_line_number, display)
-        for (line_number, _), (display_line_number, display) in zip(encoded, readable)
+        for (line_number, _), (display_line_number, display) in zip(encoded, readable, strict=True)
     ]
 
 

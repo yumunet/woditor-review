@@ -1,12 +1,12 @@
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+
+from fixtures import PAIRS, text
+from fixtures import csv_fixture as fixture
 from review_adapter import pair_file, render_file
 from woditor_parser import catalog, cell_for_key, masked_csv
-from woditor_review_tool import build, apply_files
-
-
-from fixtures import csv_fixture as fixture, PAIRS, text
+from woditor_review_tool import apply_files, build
 
 
 class DatabaseMemoTests(unittest.TestCase):

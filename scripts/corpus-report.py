@@ -1,17 +1,18 @@
 """Reproduce corpus counts and every refusal without changing reference files."""
 
+import hashlib
 import json
 import sys
-import hashlib
-from pathlib import Path
 from collections import Counter
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from time import perf_counter
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "python"))
-from review_adapter import decode, extract_source, pair_file
-from woditor_parser import file_type
+# The standalone script locates the sibling source modules before importing them.
+from review_adapter import decode, extract_source, pair_file  # noqa: E402
+from woditor_parser import file_type  # noqa: E402
 
 
 def main():

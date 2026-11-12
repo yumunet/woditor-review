@@ -2,9 +2,10 @@ import copy
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from review_adapter import pair_file, render_file, digest
-from woditor_review_tool import build, validate, apply_files
+
 from fixtures import PAIRS, text
+from review_adapter import digest, pair_file, render_file
+from woditor_review_tool import apply_files, build, validate
 
 
 class ReviewToolTests(unittest.TestCase):

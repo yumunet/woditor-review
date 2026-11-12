@@ -6,21 +6,23 @@ checks IDs/versions and applies explicit edits. Python 3.10+, stdlib only.
 """
 
 from __future__ import annotations
+
 import argparse
 import json
 import re
-from uuid import uuid4
 from pathlib import Path, PurePosixPath
+from uuid import uuid4
+
 from woditor_parser import (
-    decode,
-    digest,
-    render_file,
-    special_strings,
-    catalog,
-    cell_for_key,
     COMMAND,
     META,
+    catalog,
+    cell_for_key,
+    decode,
+    digest,
     fields,
+    render_file,
+    special_strings,
 )
 
 _SCHEMAS = json.loads(r"""

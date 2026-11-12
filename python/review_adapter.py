@@ -5,39 +5,49 @@ source/translation pairs to the app's review model.
 """
 
 from __future__ import annotations
+
 import re
 from array import array
 from bisect import bisect_left
 from collections import Counter, defaultdict
 from dataclasses import asdict
+
 from woditor_parser import (
     COMMAND,
     META,
-    JP,
     analyze,
-    fields,
-    file_type,
-    command_mask,
-    command_display_pairs,
-    metadata_allowed,
-    source_lines,
-    decode,
-    digest,
-    special_strings,
-    translation_warnings,
-    command_info,
-    slot_policy,
-    render_file,
     catalog,
-    text_cell,
-    metadata_values,
-    reviewable_metadata,
+    choice_count,
     choice_key,
     choice_mode,
     choice_record_active,
-    choice_count,
-    inspect_choices,
+    command_display_pairs,
+    command_info,
     command_infos,
+    command_mask,
+    decode,
+    digest,
+    fields,
+    file_type,
+    inspect_choices,
+    metadata_values,
+    reviewable_metadata,
+    slot_policy,
+    source_lines,
+    text_cell,
+    translation_warnings,
+)
+from woditor_parser import (
+    JP as JP,
+)
+from woditor_parser import (
+    metadata_allowed as metadata_allowed,
+)
+from woditor_parser import (
+    render_file as render_file,
+)
+from woditor_parser import (
+    special_strings as special_strings,
 )
 
 SCHEMA_VERSION = 1
@@ -518,7 +528,7 @@ def extract_source(text: str) -> dict:
         "type": ftype,
         "slots": included,
         "excluded": excluded,
-        "unhandled": [{"line": n, "text": l} for n, l in unhandled],
+        "unhandled": [{"line": n, "text": line} for n, line in unhandled],
         "commands": infos,
     }
 
@@ -535,11 +545,14 @@ def pair_file(path: str, ja_raw: bytes, en_raw: bytes) -> dict:
     warnings = alignment["warnings"]
     errors = list(alignment["errors"])
     en_meta = metadata_values(en)
+
     # Newlines belong to each input version and are never normalized in storage.
-    endings = lambda s: [
-        re.search(r"(\r\n|\r|\n)$", l)[0] if re.search(r"(\r\n|\r|\n)$", l) else ""
-        for l in s.splitlines(keepends=True)
-    ]
+    def endings(text):
+        return [
+            re.search(r"(\r\n|\r|\n)$", line)[0] if re.search(r"(\r\n|\r|\n)$", line) else ""
+            for line in text.splitlines(keepends=True)
+        ]
+
     ja_endings, en_endings = endings(ja), endings(en)
     if any(ja_endings[n - 1] != en_endings[e - 1] for n, e in alignment["lines"].items()):
         warnings.append("日本語と英語の改行形式が異なります（読み込み時の形式を保持）")

@@ -182,7 +182,7 @@ export function importResponse(
     throw new Error('回答IDの欠落・件数不一致があります');
   const next = structuredClone(workspace);
   const touched = new Set<string>();
-  const apply = (a: Answer | Suggestion, threadId: string, postId: string, source: string) => {
+  const apply = (a: Answer | Suggestion, threadId: string, postId: string) => {
     const file = next.files.find((f) => f.path === a.path),
       item = file?.items.find((i) => i.id === a.itemId);
     if (!file || !item || file.version !== a.fileVersion)
@@ -227,7 +227,7 @@ export function importResponse(
       if (a.changes.some((edit) => edit.slotId === change.slotId)) change.status = 'discarded';
       else if (a.decision === 'rejected') change.rejectedBy = postId;
     }
-    apply(a, a.commentId, postId, 'response');
+    apply(a, a.commentId, postId);
     thread.posts.push({
       id: postId,
       author: 'ai',
@@ -252,7 +252,7 @@ export function importResponse(
       throw new Error('改善提案IDが重複しています');
     seen.add('suggestion:' + a.id);
     const postId = uid(),
-      { item } = apply(a, a.id, postId, 'suggestion');
+      { item } = apply(a, a.id, postId);
     item.threads.push({
       id: a.id,
       resolved: false,

@@ -15,7 +15,8 @@ export async function renderTranslations(
     const message = ({ data }: MessageEvent) => {
       if (data.id !== id) return;
       cleanup();
-      data.error ? reject(new Error(data.error)) : resolve(data.result);
+      if (data.error) reject(new Error(data.error));
+      else resolve(data.result);
     };
     const error = (event: ErrorEvent) => {
       cleanup();

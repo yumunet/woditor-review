@@ -26,9 +26,20 @@ export default [
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unused-vars': ['error', { ignoreRestSiblings: true }],
       '@typescript-eslint/no-floating-promises': 'error',
       // DOM listeners may return a Promise; their bodies must still handle failures.
       '@typescript-eslint/no-misused-promises': ['error', { checksVoidReturn: false }],
+    },
+  },
+  {
+    files: ['tests/*.test.ts'],
+    rules: {
+      // node:test owns test execution and reports rejected test callbacks itself.
+      '@typescript-eslint/no-floating-promises': [
+        'error',
+        { allowForKnownSafeCalls: [{ from: 'package', package: 'node', name: 'test' }] },
+      ],
     },
   },
   prettier,

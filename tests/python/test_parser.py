@@ -1,9 +1,8 @@
 import unittest
 
-from review_adapter import decode, extract_source, command_info, slot_policy, metadata_title
+from fixtures import event, text
+from review_adapter import command_info, decode, extract_source, metadata_title, slot_policy
 from woditor_parser import analyze, file_type
-
-from fixtures import text, event
 
 
 class MetadataTitleTests(unittest.TestCase):
