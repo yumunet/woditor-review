@@ -3,14 +3,27 @@
 
 Requires only woditor_parser.py alongside this script. Python 3.10+, stdlib.
 """
+
 from __future__ import annotations
 import argparse
 import json
 import re
 import sys
 from pathlib import Path
-from woditor_parser import (Slot, file_read, file_type, translation_slots, normalize_translation,
-    special_strings, render_file, source_lines, command_display_pairs, inspect_choices, clean_unused_choices)
+from woditor_parser import (
+    Slot,
+    file_read,
+    file_type,
+    translation_slots,
+    normalize_translation,
+    special_strings,
+    render_file,
+    source_lines,
+    command_display_pairs,
+    inspect_choices,
+    clean_unused_choices,
+)
+
 
 def as_entry(s: Slot) -> dict:
     # Only fields needed by the translator. The original source determines all
@@ -28,7 +41,9 @@ def extract(a: argparse.Namespace) -> None:
     if dest.exists():
         raise ValueError(f"Output already exists: {dest}")
     dest.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(f"Extracted {len(slots)} Japanese entries ({ftype}); unrecognized lines: {len(unhandled)}")
+    print(
+        f"Extracted {len(slots)} Japanese entries ({ftype}); unrecognized lines: {len(unhandled)}"
+    )
     print(f"Saved template: {dest}")
     if unhandled:
         for n, line in unhandled[:12]:
@@ -46,7 +61,9 @@ def apply(a: argparse.Namespace) -> None:
     ftype = file_type(text)
     slots, unhandled = translation_slots(text)
     if unhandled:
-        raise ValueError(f"{len(unhandled)} Japanese lines were not recognized (first at line {unhandled[0][0]})")
+        raise ValueError(
+            f"{len(unhandled)} Japanese lines were not recognized (first at line {unhandled[0][0]})"
+        )
     data = json.loads(Path(a.translations).read_text(encoding="utf-8-sig"))
     if not isinstance(data, dict):
         raise ValueError("Translation JSON must be an object")
@@ -64,35 +81,47 @@ def apply(a: argparse.Namespace) -> None:
             raise ValueError(f"Entry {s.id} has no translation")
         val = normalize_translation(obj["translation"], s.kind)
         if special_strings(s.source) != special_strings(val):
-            raise ValueError(f"Entry {s.id}: protected characters differ:\n  source={special_strings(s.source)}\n  output={special_strings(val)}")
+            raise ValueError(
+                f"Entry {s.id}: protected characters differ:\n  source={special_strings(s.source)}\n  output={special_strings(val)}"
+            )
         changes.append((s, val))
-    edits=[]
-    for s,val in changes:
-        key=s.id.split(':',1)[1]
-        edits.append(dict(line=s.line,key=key,kind=s.kind,translation=val,
-                          position=int(key[1:]) if s.kind=='command_string' else None))
-    result = render_file(text,edits)['text']
+    edits = []
+    for s, val in changes:
+        key = s.id.split(":", 1)[1]
+        edits.append(
+            dict(
+                line=s.line,
+                key=key,
+                kind=s.kind,
+                translation=val,
+                position=int(key[1:]) if s.kind == "command_string" else None,
+            )
+        )
+    result = render_file(text, edits)["text"]
     output_bytes = bom + result.encode(enc)
     dst.parent.mkdir(parents=True, exist_ok=True)
     dst.write_bytes(output_bytes)
     if dst.read_bytes() != output_bytes:
         raise ValueError("Read-back verification failed")
     print(f"Wrote {dst} | {ftype} | translated {len(changes)}")
-    print("Verified: metadata and command structure, special strings, other lines, newlines, CSV structure/display sections")
+    print(
+        "Verified: metadata and command structure, special strings, other lines, newlines, CSV structure/display sections"
+    )
 
 
 def show_context(lines: list[str], n: int, before: int, after: int) -> None:
-    lo, hi = max(1, n-before), min(len(lines), n+after)
-    for i in range(lo, hi+1):
-        print(f"{i:5d} {'>>' if i == n else '  '} {lines[i-1]}")
+    lo, hi = max(1, n - before), min(len(lines), n + after)
+    for i in range(lo, hi + 1):
+        print(f"{i:5d} {'>>' if i == n else '  '} {lines[i - 1]}")
 
 
-def show_command_context(pairs: list[tuple[int, int, str]], raw_line: int,
-                         before: int, after: int) -> None:
+def show_command_context(
+    pairs: list[tuple[int, int, str]], raw_line: int, before: int, after: int
+) -> None:
     index = next((i for i, (n, _, _) in enumerate(pairs) if n == raw_line), None)
     if index is None:
         raise ValueError(f"No displayed command matches source line {raw_line}")
-    for i in range(max(0, index-before), min(len(pairs), index+after+1)):
+    for i in range(max(0, index - before), min(len(pairs), index + after + 1)):
         _, display_line, display = pairs[i]
         print(f"{display_line:5d} {'>>' if i == index else '  '} {display}")
 
@@ -109,7 +138,12 @@ def context(a: argparse.Namespace) -> None:
         show_command_context(command_display_pairs(text), slot.line, a.before, a.after)
     else:
         # Header names and memo fields aren't individual event commands.
-        show_context(text.splitlines() if slot.kind=='database_csv' else source_lines(text), slot.line, a.before, a.after)
+        show_context(
+            text.splitlines() if slot.kind == "database_csv" else source_lines(text),
+            slot.line,
+            a.before,
+            a.after,
+        )
 
 
 def usage(a: argparse.Namespace) -> None:
@@ -123,47 +157,57 @@ def usage(a: argparse.Namespace) -> None:
     lines = text.splitlines()
     # Identify usage with encoded numeric operands to avoid ambiguities in
     # displayed labels. Show the matching human-readable commands instead.
-    num = re.compile(rf'(?<!\d){1600000+index}(?!\d)')
-    special = re.compile(rf'\\cself\[{index}\]', re.I)
-    hits = [raw_line for raw_line, _, _ in pairs
-            if num.search(lines[raw_line-1]) or special.search(lines[raw_line-1])]
+    num = re.compile(rf"(?<!\d){1600000 + index}(?!\d)")
+    special = re.compile(rf"\\cself\[{index}\]", re.I)
+    hits = [
+        raw_line
+        for raw_line, _, _ in pairs
+        if num.search(lines[raw_line - 1]) or special.search(lines[raw_line - 1])
+    ]
     print(f"CSelf{index}: {len(hits)} matching commands")
-    for line_number in hits[:a.limit]:
+    for line_number in hits[: a.limit]:
         print(f"\n--- usage from source line {line_number} (displayed command text) ---")
         show_command_context(pairs, line_number, a.before, a.after)
     if len(hits) > a.limit:
-        print(f"\n... {len(hits)-a.limit} other occurrences; adjust --limit to see more")
+        print(f"\n... {len(hits) - a.limit} other occurrences; adjust --limit to see more")
     if not hits:
         print("No direct numeric or \\cself[n] matches; indirect references cannot be ruled out.")
 
 
 def inspect_choice_file(a: argparse.Namespace) -> None:
-    text, _, _, _ = file_read(Path(a.source),a.encoding)
-    report=inspect_choices(text)
-    report.pop('changes')  # Internal character-offset edits are not part of the CLI report.
-    output=json.dumps(report,ensure_ascii=False,indent=2)+'\n'
+    text, _, _, _ = file_read(Path(a.source), a.encoding)
+    report = inspect_choices(text)
+    report.pop("changes")  # Internal character-offset edits are not part of the CLI report.
+    output = json.dumps(report, ensure_ascii=False, indent=2) + "\n"
     if a.out:
-        destination=Path(a.out)
-        if destination.exists(): raise ValueError('Output already exists')
-        with destination.open('x',encoding='utf-8') as stream:
+        destination = Path(a.out)
+        if destination.exists():
+            raise ValueError("Output already exists")
+        with destination.open("x", encoding="utf-8") as stream:
             stream.write(output)
     else:
-        print(output,end='')
-    if report['counts']['error']: raise SystemExit(2)
+        print(output, end="")
+    if report["counts"]["error"]:
+        raise SystemExit(2)
 
 
 def clean_choice_file(a: argparse.Namespace) -> None:
-    source,destination=Path(a.source),Path(a.out)
-    if source.resolve()==destination.resolve() or destination.exists():
-        raise ValueError('Choose a new output file; the input and existing files are never overwritten')
-    text,encoding,bom,_=file_read(source,a.encoding)
-    revised,report=clean_unused_choices(text)
-    raw=bom+revised.encode(encoding)
-    destination.parent.mkdir(parents=True,exist_ok=True)
-    with destination.open('xb') as stream:
+    source, destination = Path(a.source), Path(a.out)
+    if source.resolve() == destination.resolve() or destination.exists():
+        raise ValueError(
+            "Choose a new output file; the input and existing files are never overwritten"
+        )
+    text, encoding, bom, _ = file_read(source, a.encoding)
+    revised, report = clean_unused_choices(text)
+    raw = bom + revised.encode(encoding)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with destination.open("xb") as stream:
         stream.write(raw)
-    if destination.read_bytes()!=raw: raise ValueError('Read-back verification failed')
-    print(f'Wrote {destination}; removed {len(report["unused"])} unused choice entries; adjusted {len(report["changes"])-len(report["unused"])} count/mode settings; preserved encoding, BOM and line endings')
+    if destination.read_bytes() != raw:
+        raise ValueError("Read-back verification failed")
+    print(
+        f"Wrote {destination}; removed {len(report['unused'])} unused choice entries; adjusted {len(report['changes']) - len(report['unused'])} count/mode settings; preserved encoding, BOM and line endings"
+    )
 
 
 def main() -> None:
@@ -175,8 +219,8 @@ def main() -> None:
         sub.add_argument("--encoding", default="auto")
         if name == "extract":
             sub.add_argument("--out", required=True)
-        elif name in ('inspect-choices','clean-choices'):
-            sub.add_argument('--out',required=name=='clean-choices')
+        elif name in ("inspect-choices", "clean-choices"):
+            sub.add_argument("--out", required=name == "clean-choices")
         elif name == "apply":
             sub.add_argument("translations")
             sub.add_argument("--out", required=True)
@@ -194,11 +238,17 @@ def main() -> None:
     if any(getattr(a, x, 0) < 0 for x in ("before", "after", "limit")):
         p.error("Context sizes and limits must not be negative")
     try:
-        {"extract": extract, "apply": apply, "context": context, "usage": usage,
-         'inspect-choices':inspect_choice_file,'clean-choices':clean_choice_file}[a.action](a)
+        {
+            "extract": extract,
+            "apply": apply,
+            "context": context,
+            "usage": usage,
+            "inspect-choices": inspect_choice_file,
+            "clean-choices": clean_choice_file,
+        }[a.action](a)
     except (ValueError, KeyError, TypeError, OSError, UnicodeError, json.JSONDecodeError) as e:
         p.exit(1, f"ERROR: {e}\n")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

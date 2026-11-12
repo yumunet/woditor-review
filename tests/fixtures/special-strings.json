@@ -2,55 +2,27 @@
   {
     "name": "argument names and modifiers",
     "text": "\\v1[2] \\f+[14] \\-[3] \\_name9[4] \\名前[5]",
-    "tokens": [
-      "\\v1[2]",
-      "\\f+[14]",
-      "\\-[3]",
-      "\\_name9[4]",
-      "\\名前[5]"
-    ]
+    "tokens": ["\\v1[2]", "\\f+[14]", "\\-[3]", "\\_name9[4]", "\\名前[5]"]
   },
   {
     "name": "nested arguments form a single complete token",
     "text": "値\\udb[3:\\v[4]:\\self[1]]末尾\\v[9]",
-    "tokens": [
-      "\\udb[3:\\v[4]:\\self[1]]",
-      "\\v[9]"
-    ]
+    "tokens": ["\\udb[3:\\v[4]:\\self[1]]", "\\v[9]"]
   },
   {
     "name": "bare commands",
     "text": "\\\\ \\! \\. \\^ \\> \\< \\E \\N \\A+ \\A-",
-    "tokens": [
-      "\\\\",
-      "\\!",
-      "\\.",
-      "\\^",
-      "\\>",
-      "\\<",
-      "\\E",
-      "\\N",
-      "\\A+",
-      "\\A-"
-    ]
+    "tokens": ["\\\\", "\\!", "\\.", "\\^", "\\>", "\\<", "\\E", "\\N", "\\A+", "\\A-"]
   },
   {
     "name": "escaped slash does not introduce an argument command",
     "text": "\\\\v[1]",
-    "tokens": [
-      "\\\\"
-    ]
+    "tokens": ["\\\\"]
   },
   {
     "name": "standalone alignment and numeric notation",
     "text": "<L>left<C>center<R>right @0 @123 @-3 @name",
-    "tokens": [
-      "<L>",
-      "<C>",
-      "<R>",
-      "@0",
-      "@123"
-    ]
+    "tokens": ["<L>", "<C>", "<R>", "@0", "@123"]
   },
   {
     "name": "ordinary brackets and percent formatting are not tokens",
@@ -65,10 +37,7 @@
   {
     "name": "ruby does not swallow following controls",
     "text": "\\r[漢字,よみ]\\v1[2]\\r[x,y]\\!",
-    "tokens": [
-      "\\v1[2]",
-      "\\!"
-    ]
+    "tokens": ["\\v1[2]", "\\!"]
   },
   {
     "name": "unknown bare names are not controls",
@@ -78,18 +47,12 @@
   {
     "name": "argument commands take precedence over bare forms",
     "text": "\\E[2] \\A+[4] \\-[]",
-    "tokens": [
-      "\\E[2]",
-      "\\A+[4]",
-      "\\-[]"
-    ]
+    "tokens": ["\\E[2]", "\\A+[4]", "\\-[]"]
   },
   {
     "name": "nested non-command brackets are balanced",
     "text": "\\name[a[b[c]]d]",
-    "tokens": [
-      "\\name[a[b[c]]d]"
-    ]
+    "tokens": ["\\name[a[b[c]]d]"]
   },
   {
     "name": "malformed bracketed argument is not a complete token",

@@ -2,12 +2,12 @@
 
 Python 3.10以降、標準ライブラリだけで実行できます。各CLIと `woditor_parser.py` を同じフォルダに置いてください。アプリ用の `review_adapter.py` はCLIには不要です。
 
-| ファイル | 役割 |
-| --- | --- |
-| `woditor_parser.py` | TXT・CSV解析、文字列抽出、対象判定、位置情報、特殊文字列検査、安全な書き換え、選択肢検査 |
-| `woditor_translation_tool.py` | 新規翻訳の `extract`・`apply`、確認用の `context`・`usage`、選択肢の検査・削除 |
-| `woditor_review_tool.py` | レビューJSONの `build`・`validate`・`apply`。JSONスキーマを内包 |
-| `review_adapter.py` | 日英の対応付け、アプリ用の項目・警告・周辺情報への変換 |
+| ファイル                      | 役割                                                                                     |
+| ----------------------------- | ---------------------------------------------------------------------------------------- |
+| `woditor_parser.py`           | TXT・CSV解析、文字列抽出、対象判定、位置情報、特殊文字列検査、安全な書き換え、選択肢検査 |
+| `woditor_translation_tool.py` | 新規翻訳の `extract`・`apply`、確認用の `context`・`usage`、選択肢の検査・削除           |
+| `woditor_review_tool.py`      | レビューJSONの `build`・`validate`・`apply`。JSONスキーマを内包                          |
+| `review_adapter.py`           | 日英の対応付け、アプリ用の項目・警告・周辺情報への変換                                   |
 
 以下はリポジトリからの実行例です。持ち出した場合はスクリプトのパスを置き換えます。
 
@@ -24,15 +24,15 @@ python python/woditor_translation_tool.py inspect-choices source.txt --out repor
 
 件数はラベル側の `CHOICE_STR_*_NUM`／`CHOICE_NAME_*_NUM` と、内部値側の `CHOICE_VAL_*_NUM` を別々に検証します。`*` は0始まりの引数・項目番号です。
 
-| 対象 | 種類 | ラベル | 内部値 |
-| --- | --- | --- | --- |
-| コモン数値引数0～4 | `LOADTYPE*=0` 直接入力 | 0件 | 0件 |
-| コモン数値引数0～4 | `LOADTYPE*=1` DB参照 | 0件または3件 | 3件 |
-| コモン数値引数0～4 | `LOADTYPE*=2` 選択肢作成 | 内部値と同数 | ラベルと同数 |
-| DB項目 | `ITEM_LOADTYPE_*=0` 直接入力 | 0件 | 0件 |
-| DB項目 | `ITEM_LOADTYPE_*=1` ファイル選択 | 既定フォルダパス1件 | 1件 |
-| DB項目 | `ITEM_LOADTYPE_*=2` DB参照 | 0件または3件 | 3件 |
-| DB項目 | `ITEM_LOADTYPE_*=3` 選択肢作成 | 内部値と同数 | ラベルと同数 |
+| 対象               | 種類                             | ラベル              | 内部値       |
+| ------------------ | -------------------------------- | ------------------- | ------------ |
+| コモン数値引数0～4 | `LOADTYPE*=0` 直接入力           | 0件                 | 0件          |
+| コモン数値引数0～4 | `LOADTYPE*=1` DB参照             | 0件または3件        | 3件          |
+| コモン数値引数0～4 | `LOADTYPE*=2` 選択肢作成         | 内部値と同数        | ラベルと同数 |
+| DB項目             | `ITEM_LOADTYPE_*=0` 直接入力     | 0件                 | 0件          |
+| DB項目             | `ITEM_LOADTYPE_*=1` ファイル選択 | 既定フォルダパス1件 | 1件          |
+| DB項目             | `ITEM_LOADTYPE_*=2` DB参照       | 0件または3件        | 3件          |
+| DB項目             | `ITEM_LOADTYPE_*=3` 選択肢作成   | 内部値と同数        | ラベルと同数 |
 
 DBのフォルダパスは既存どおり `CHOICE_NAME_*_0` に格納し、翻訳対象にはしません。コモンにはファイル選択はありません。
 

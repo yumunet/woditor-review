@@ -2,12 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "woditor-review/request/v1",
   "type": "object",
-  "required": [
-    "schemaVersion",
-    "requestId",
-    "createdAt",
-    "entries"
-  ],
+  "required": ["schemaVersion", "requestId", "createdAt", "entries"],
   "additionalProperties": false,
   "properties": {
     "schemaVersion": {
@@ -61,14 +56,7 @@
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": [
-                "id",
-                "source",
-                "translation",
-                "line",
-                "key",
-                "kind"
-              ],
+              "required": ["id", "source", "translation", "line", "key", "kind"],
               "properties": {
                 "id": {
                   "type": "string"
@@ -87,11 +75,7 @@
                   "type": "string"
                 },
                 "kind": {
-                  "enum": [
-                    "metadata",
-                    "command_string",
-                    "database_csv"
-                  ]
+                  "enum": ["metadata", "command_string", "database_csv"]
                 },
                 "position": {
                   "type": "integer",
@@ -105,12 +89,7 @@
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": [
-                "id",
-                "slotId",
-                "before",
-                "after"
-              ],
+              "required": ["id", "slotId", "before", "after"],
               "properties": {
                 "id": {
                   "type": "string"
@@ -131,21 +110,13 @@
             "type": "array",
             "items": {
               "type": "object",
-              "required": [
-                "id",
-                "author",
-                "text",
-                "createdAt"
-              ],
+              "required": ["id", "author", "text", "createdAt"],
               "properties": {
                 "id": {
                   "type": "string"
                 },
                 "author": {
-                  "enum": [
-                    "user",
-                    "ai"
-                  ]
+                  "enum": ["user", "ai"]
                 },
                 "text": {
                   "type": "string"
@@ -154,12 +125,7 @@
                   "type": "string"
                 },
                 "decision": {
-                  "enum": [
-                    "accepted",
-                    "rejected",
-                    "partial",
-                    "needs_review"
-                  ]
+                  "enum": ["accepted", "rejected", "partial", "needs_review"]
                 },
                 "requestId": {
                   "type": "string"
@@ -177,10 +143,7 @@
       }
     },
     "mode": {
-      "enum": [
-        "comments",
-        "initial"
-      ]
+      "enum": ["comments", "initial"]
     },
     "targets": {
       "type": "array",
@@ -221,14 +184,7 @@
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": [
-                "id",
-                "source",
-                "translation",
-                "line",
-                "key",
-                "kind"
-              ],
+              "required": ["id", "source", "translation", "line", "key", "kind"],
               "properties": {
                 "id": {
                   "type": "string"
@@ -247,11 +203,7 @@
                   "type": "string"
                 },
                 "kind": {
-                  "enum": [
-                    "metadata",
-                    "command_string",
-                    "database_csv"
-                  ]
+                  "enum": ["metadata", "command_string", "database_csv"]
                 },
                 "position": {
                   "type": "integer",
@@ -265,12 +217,7 @@
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": [
-                "id",
-                "slotId",
-                "before",
-                "after"
-              ],
+              "required": ["id", "slotId", "before", "after"],
               "properties": {
                 "id": {
                   "type": "string"

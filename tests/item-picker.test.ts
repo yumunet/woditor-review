@@ -1,51 +1,93 @@
-import {test} from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {itemRows,searchedItems} from '../src/item-picker';
-import type {Item,ReviewFile} from '../src/model';
-import {itemTitle} from '../src/model';
-test('saved self-variable labels use their key without changing saved IDs or titles',()=>{
-  const item={id:'stable',title:'セルフ変数名 1',slotIds:['s']} as Item;
-  const file={slots:[{id:'s',key:'CSELF_NAME_0'}]} as ReviewFile;
-  assert.equal(itemTitle(file,item),'セルフ変数名 0');
-  assert.equal(item.title,'セルフ変数名 1');assert.equal(item.id,'stable');
+import { itemRows, searchedItems } from '../src/item-picker';
+import type { Item, ReviewFile } from '../src/model';
+import { itemTitle } from '../src/model';
+test('saved self-variable labels use their key without changing saved IDs or titles', () => {
+  const item = { id: 'stable', title: 'セルフ変数名 1', slotIds: ['s'] } as Item;
+  const file = { slots: [{ id: 's', key: 'CSELF_NAME_0' }] } as ReviewFile;
+  assert.equal(itemTitle(file, item), 'セルフ変数名 0');
+  assert.equal(item.title, 'セルフ変数名 1');
+  assert.equal(item.id, 'stable');
 });
-test('database field names use the stored zero-based key even in older reviews',()=>{
-  const item={id:'stable',title:'項目名 1',slotIds:['s']} as Item;
-  const file={type:'database',slots:[{id:'s',key:'ITEMNAME0'}]} as ReviewFile;
-  assert.equal(itemTitle(file,item),'項目名 0');assert.equal(item.title,'項目名 1');assert.equal(item.id,'stable');
+test('database field names use the stored zero-based key even in older reviews', () => {
+  const item = { id: 'stable', title: '項目名 1', slotIds: ['s'] } as Item;
+  const file = { type: 'database', slots: [{ id: 's', key: 'ITEMNAME0' }] } as ReviewFile;
+  assert.equal(itemTitle(file, item), '項目名 0');
+  assert.equal(item.title, '項目名 1');
+  assert.equal(item.id, 'stable');
 });
 
-test('database choice labels use zero-based fields without renumbering choice ordinals or mutating saved titles',()=>{
-  const item={id:'stable-choice',title:'選択肢名 1-1',slotIds:['s']} as Item;
-  const file={type:'database',slots:[{id:'s',key:'CHOICE_NAME_0_0',source:'選択肢'}]} as ReviewFile;
-  assert.equal(itemTitle(file,item),'選択肢名 0-1');
-  assert.equal(item.title,'選択肢名 1-1');assert.equal(item.id,'stable-choice');
-  file.slots[0].key='CHOICE_NAME_12_2';assert.equal(itemTitle(file,item),'選択肢名 12-3');
+test('database choice labels use zero-based fields without renumbering choice ordinals or mutating saved titles', () => {
+  const item = { id: 'stable-choice', title: '選択肢名 1-1', slotIds: ['s'] } as Item;
+  const file = {
+    type: 'database',
+    slots: [{ id: 's', key: 'CHOICE_NAME_0_0', source: '選択肢' }],
+  } as ReviewFile;
+  assert.equal(itemTitle(file, item), '選択肢名 0-1');
+  assert.equal(item.title, '選択肢名 1-1');
+  assert.equal(item.id, 'stable-choice');
+  file.slots[0].key = 'CHOICE_NAME_12_2';
+  assert.equal(itemTitle(file, item), '選択肢名 12-3');
 });
-test('one-line previews show an ellipsis when later source lines are hidden',()=>{
-  const item={id:'a',title:'Comment',slotIds:['s'],approved:false,threads:[],changes:[]} as unknown as Item;
-  const file={slots:[{id:'s',key:'S1',source:'First line\nHidden second line'}]} as ReviewFile;
-  for(const newline of ['\n','\r\n','\r']) {
-    file.slots[0].source=`First line${newline}Hidden second line`;
-    const html=itemRows(file,[item],item.id,'');assert.ok(html.includes('First line...</span>'));assert.ok(!html.includes('Hidden second line'));
+test('one-line previews show an ellipsis when later source lines are hidden', () => {
+  const item = {
+    id: 'a',
+    title: 'Comment',
+    slotIds: ['s'],
+    approved: false,
+    threads: [],
+    changes: [],
+  } as unknown as Item;
+  const file = {
+    slots: [{ id: 's', key: 'S1', source: 'First line\nHidden second line' }],
+  } as ReviewFile;
+  for (const newline of ['\n', '\r\n', '\r']) {
+    file.slots[0].source = `First line${newline}Hidden second line`;
+    const html = itemRows(file, [item], item.id, '');
+    assert.ok(html.includes('First line...</span>'));
+    assert.ok(!html.includes('Hidden second line'));
   }
-  file.slots[0].source='Single line';assert.ok(itemRows(file,[item],item.id,'').includes('Single line</span>'));
+  file.slots[0].source = 'Single line';
+  assert.ok(itemRows(file, [item], item.id, '').includes('Single line</span>'));
 });
-test('search matches originals, manual sources, translations and pending translations without changing target counts',()=>{
-  const items=[{id:'a',title:'文章の表示 1',slotIds:['1'],changes:[]},{id:'b',title:'コメント 2',slotIds:['2'],changes:[{status:'pending',after:'New English'}]}] as Item[];
-  const file={slots:[{id:'1',source:'日本語',translation:'Original English'},{id:'2',source:'',sourceOverride:'補完した原文',translation:'Other'}]} as ReviewFile;
-  assert.deepEqual(searchedItems(file,items,'日本語'),[items[0]]);
-  assert.deepEqual(searchedItems(file,items,'ORIGINAL ENGLISH'),[items[0]]);
-  assert.deepEqual(searchedItems(file,items,'補完'),[items[1]]);
-  assert.deepEqual(searchedItems(file,items,'New English'),[items[1]]);
-  assert.deepEqual(searchedItems(file,items,'文章の表示'),[items[0]]);
-  assert.deepEqual(searchedItems(file,items,'コメント 2'),[items[1]]);
-  assert.deepEqual(searchedItems(file,items,'absent'),[]);
-  assert.equal(items.length,2);
+test('search matches originals, manual sources, translations and pending translations without changing target counts', () => {
+  const items = [
+    { id: 'a', title: '文章の表示 1', slotIds: ['1'], changes: [] },
+    {
+      id: 'b',
+      title: 'コメント 2',
+      slotIds: ['2'],
+      changes: [{ status: 'pending', after: 'New English' }],
+    },
+  ] as Item[];
+  const file = {
+    slots: [
+      { id: '1', source: '日本語', translation: 'Original English' },
+      { id: '2', source: '', sourceOverride: '補完した原文', translation: 'Other' },
+    ],
+  } as ReviewFile;
+  assert.deepEqual(searchedItems(file, items, '日本語'), [items[0]]);
+  assert.deepEqual(searchedItems(file, items, 'ORIGINAL ENGLISH'), [items[0]]);
+  assert.deepEqual(searchedItems(file, items, '補完'), [items[1]]);
+  assert.deepEqual(searchedItems(file, items, 'New English'), [items[1]]);
+  assert.deepEqual(searchedItems(file, items, '文章の表示'), [items[0]]);
+  assert.deepEqual(searchedItems(file, items, 'コメント 2'), [items[1]]);
+  assert.deepEqual(searchedItems(file, items, 'absent'), []);
+  assert.equal(items.length, 2);
 });
 
-test('search uses corrected displayed item names rather than stale saved labels',()=>{
-  const item={id:'stable',title:'選択肢名 1-1',slotIds:['s'],changes:[]} as unknown as Item;
-  const file={type:'database',slots:[{id:'s',key:'CHOICE_NAME_0_0',source:'原文',translation:'English'}]} as ReviewFile;
-  assert.deepEqual(searchedItems(file,[item],'選択肢名 0-1'),[item]);assert.deepEqual(searchedItems(file,[item],'選択肢名 1-1'),[]);
+test('search uses corrected displayed item names rather than stale saved labels', () => {
+  const item = {
+    id: 'stable',
+    title: '選択肢名 1-1',
+    slotIds: ['s'],
+    changes: [],
+  } as unknown as Item;
+  const file = {
+    type: 'database',
+    slots: [{ id: 's', key: 'CHOICE_NAME_0_0', source: '原文', translation: 'English' }],
+  } as ReviewFile;
+  assert.deepEqual(searchedItems(file, [item], '選択肢名 0-1'), [item]);
+  assert.deepEqual(searchedItems(file, [item], '選択肢名 1-1'), []);
 });
