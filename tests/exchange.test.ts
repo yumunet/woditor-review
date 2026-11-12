@@ -92,6 +92,8 @@ test('each request names its response uniquely and gives concise portable review
   const shortId=first.requestId.replace(/-/g,'').slice(0,12);
   assert.equal(reviewFileNames(first).response,`review_response_${shortId}.json`);
   assert.equal(reviewFileNames(first).request,`review_request_${shortId}.json`);
+  assert.equal(reviewFileNames(first).english,`en-US_${shortId}.zip`);
+  assert.notEqual(reviewFileNames(first).english,reviewFileNames(second).english);
   assert.ok(reviewFileNames(first).request.length<=32);
   assert.ok(chatInstructions(first).includes(first.requestId));
   const prompt=chatInstructions(first);

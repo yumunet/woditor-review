@@ -25,7 +25,7 @@ export function createRequest(workspace: Workspace, selected: string[], mode: Re
 
 export const reviewFileNames = (request: Pick<ReviewRequest, 'requestId'>) => {
   const id = request.requestId.replace(/-/g, '').slice(0, 12);
-  return {request: `review_request_${id}.json`, response: `review_response_${id}.json`};
+  return {request: `review_request_${id}.json`, response: `review_response_${id}.json`, english: `en-US_${id}.zip`};
 };
 
 export const chatInstructions = (request: ReviewRequest) => request.mode === 'initial' ? initialInstructions(request, reviewFileNames(request).response) : `添付の依頼JSON（requestId: ${request.requestId}）と英訳TXTを、コメント履歴・pendingChanges（未確定の前回案）を踏まえてレビューしてください。

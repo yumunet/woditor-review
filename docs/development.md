@@ -138,6 +138,8 @@ python python/woditor_review_tool.py apply --request review_request_ID.json --re
 
 指示文には実行時の作業場所を固定せず `woditor_review_tool.py` とだけ記載する。
 
+AIレビュー依頼画面の英訳ZIPは、初回チェック・コメントへの回答や修正のどちらも `en-US_<12文字の依頼ID>.zip` とする。ZIPをJSONや指示文より先に出力した場合も、その依頼を準備・保存し、同じ画面の各出力でIDを共有する。依頼内容・選択対象の変更時は依頼を作り直す。通常の英訳TXT出力は依頼を作らず、`en-US.zip` とする。
+
 ## 検証
 
 ```powershell

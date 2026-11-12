@@ -467,16 +467,17 @@ root.addEventListener('submit', async event => {
   busy = ''; render();
 });
 async function exportReview(action: string) {
+  const forRequest=sheet==='export';
   busy = '出力を準備中…'; render();
   try {
     const files = workspace.files.filter(f => exportSelection.has(f.path));
     const rendered = await renderTranslations(files);
     for (const r of rendered) {const file = files.find(f => f.path === r.path)!; file.enText = r.text; file.version = r.version;for(const slot of file.slots) {const line=r.csvLines?.[slot.key];if(line!==undefined) {slot.enLine=line;if(slot.sourceMissing) slot.line=-line;}}}
-    if (action === 'english-zip') download('en-US-reviewed.zip', zipSync(Object.fromEntries(files.map(f => [`en-US/texts/${f.path}`, strToU8((f.enBom ? '\uFEFF' : '') + f.enText)]))), 'application/zip');
+    if((forRequest || action!=='english-zip') && !preparedRequest) {preparedRequest=createRequest(workspace,files.map(file=>file.path),reviewMode);workspace.requests.push(preparedRequest);}
+    if (action === 'english-zip') download(forRequest && preparedRequest?reviewFileNames(preparedRequest).english:'en-US.zip', zipSync(Object.fromEntries(files.map(f => [`en-US/texts/${f.path}`, strToU8((f.enBom ? '\uFEFF' : '') + f.enText)]))), 'application/zip');
     else {
-      if (!preparedRequest) {preparedRequest = createRequest(workspace, [...exportSelection], reviewMode); workspace.requests.push(preparedRequest);}
-      if (action === 'export-request') download(reviewFileNames(preparedRequest).request, JSON.stringify(preparedRequest, null, 2));
-      else {await navigator.clipboard.writeText(chatInstructions(preparedRequest));}
+      if (action === 'export-request') download(reviewFileNames(preparedRequest!).request, JSON.stringify(preparedRequest, null, 2));
+      else {await navigator.clipboard.writeText(chatInstructions(preparedRequest!));}
     }
     await saveWorkspace(workspace);
     busy = ''; render(); if (action === 'copy-instructions' && preparedRequest) toast('指示文をコピーしました', chatInstructions(preparedRequest));
