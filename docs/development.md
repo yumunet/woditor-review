@@ -142,6 +142,39 @@ AIレビュー依頼画面の英訳ZIPは、初回チェック・コメントへ
 
 ## 検証
 
+### 開発ツールの準備
+
+Node.js 24.15以降の24系（または26系以降）、Python 3.10以降を使用する。整形・lintツールのバージョンは `package-lock.json` と `requirements-dev.txt` で固定する。アプリと配布用Pythonスクリプトには開発ツールを含めない。
+
+```powershell
+npm ci
+python -m venv .venv
+.venv/Scripts/python.exe -m pip install -r requirements-dev.txt
+```
+
+macOS/Linuxでは最後の実行ファイルを `.venv/bin/python` に置き換える。npmのPython整形・lintコマンドはこのvenvを直接使用するため、activateは不要。
+
+| コマンド               | 内容                                                             |
+| ---------------------- | ---------------------------------------------------------------- |
+| `npm run format`       | PrettierとRuffで対象全体を整形                                   |
+| `npm run format:check` | 書き換えずに整形状態を検査                                       |
+| `npm run lint`         | ESLint・Stylelint・Ruff。警告も失敗として扱う                    |
+| `npm run lint:fix`     | 安全な自動修正。残る指摘は内容を確認して修正                     |
+| `npm run typecheck`    | TypeScriptの型検査                                               |
+| `npm run check`        | 上記品質チェック、単体テスト、ルート配置のビルド・PC/モバイルE2E |
+
+変更ファイルだけを整形する例は `npx prettier --write src/main.ts`、Pythonは `node scripts/python-quality.mjs format python/review_adapter.py`。Pythonの安全な修正は `node scripts/python-quality.mjs check --fix python/review_adapter.py`。全体の `lint:fix` は指摘が残る段階で失敗することがあるので、その層を修正して再実行する。Ruffの `--unsafe-fixes` は使用しない。
+
+### 基準と自動実行
+
+Web側は2スペース、Pythonは4スペース、UTF-8/LF。行長は100桁を目安とし、長い文字列・正規表現・URLのためだけに内容を変えない。Markdownの段落改行を維持し、埋め込み言語は自動整形しない。私有データ、生成物、画像、TXT/CSVなどのバイトを保持すべきデータは対象外とする。設定は `.prettierrc.json`・`.prettierignore`・`pyproject.toml`・`.editorconfig`・`.gitattributes` を参照。
+
+ESLintは推奨ルールと型情報によるPromise検査を使用する。DOMの非同期コールバックを許可するが、内部の未処理Promiseは検査する。`node:test` の登録処理はrunnerが失敗を回収するため、その呼び出しだけを許可する。オブジェクトのrest抽出で除いたプロパティは未使用扱いにしない。RuffはE4/E7/E9/F/I/UP/Bを検査し、意図した再公開importは明示的な別名で保持する。Stylelintは推奨検査を使用するが、既存の `src/styles.css` に限り、意図的な上書きの重複・詳細度順を許可する。
+
+Codexは `AGENTS.md` の指示に従い、作業完了時に整形・安全な修正・検査を行う。`AGENTS.md` 自体がツールを起動するわけではない。保存時設定やGitフックは設けない。CIはPR・mainへのpush・手動実行で整形・lint・型検査・Python 3.10/TypeScript単体・ルートビルドを検査し、品質チェックの成功後だけPagesへ公開する。CIでは自動修正を行わない。PC/モバイルとPagesオフラインのブラウザーテストは以下の手順で実行する。
+
+### 動作確認
+
 ```powershell
 npm run test:python
 npm test

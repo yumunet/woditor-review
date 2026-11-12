@@ -11,7 +11,7 @@ npm run build
 npm run test:e2e
 ```
 
-`npm run check` はPython・TypeScript単体、本番ビルド、ルート配置のE2Eを順に実行する。サブパスの確認は別の本番ビルドを使い、先に起動したpreviewサーバーを停止してから実行する。
+`npm run check` は整形チェック・lint・型検査、Python・TypeScript単体、本番ビルド、ルート配置のE2Eを順に実行する。事前に [development.md](development.md#開発ツールの準備) の開発用venvを用意する。サブパスの確認は別の本番ビルドを使い、先に起動したpreviewサーバーを停止してから実行する。
 
 ```powershell
 $env:BASE_PATH='/woditor-review/'
