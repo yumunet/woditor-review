@@ -1,0 +1,17 @@
+# Dependencies, generated output, private data and local tools.
+node_modules/
+dist/
+.reference/
+.tools/
+.venv/
+.ruff_cache/
+__pycache__/
+test-results/
+playwright-report/
+public/pyodide/
+.env*
+# Images and byte-oriented fixtures must remain unchanged.
+docs/screenshots/
+public/icons/
+**/*.{png,jpg,jpeg,gif,webp,ico,svg,zip,txt,csv}
+package-lock.json

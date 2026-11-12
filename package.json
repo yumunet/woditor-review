@@ -12,7 +12,12 @@
     "test:python": "node scripts/python-tests.mjs",
     "test:e2e": "playwright test",
     "test:pages": "playwright test --config playwright.pages.config.ts",
-    "check": "npm run test:python && npm test && npm run build && npm run test:e2e"
+    "format": "prettier --write . && node scripts/python-quality.mjs format .",
+    "format:check": "prettier --check . && node scripts/python-quality.mjs format --check .",
+    "lint": "eslint . --max-warnings 0 && stylelint \"src/**/*.css\" --max-warnings 0 && node scripts/python-quality.mjs check .",
+    "lint:fix": "eslint . --fix --max-warnings 0 && stylelint \"src/**/*.css\" --fix --max-warnings 0 && node scripts/python-quality.mjs check --fix .",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test:python && npm test && npm run build && npm run test:e2e"
   },
   "dependencies": {
     "diff": "8.0.4",
@@ -20,10 +25,18 @@
     "pyodide": "0.28.3"
   },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
     "@playwright/test": "1.56.1",
     "@types/node": "^24.0.0",
+    "eslint": "10.14.0",
+    "eslint-config-prettier": "10.1.8",
+    "globals": "17.14.0",
+    "prettier": "3.10.1",
+    "stylelint": "18.0.0",
+    "stylelint-config-recommended": "19.0.0",
     "tsx": "^4.20.0",
     "typescript": "^5.9.0",
+    "typescript-eslint": "8.72.2",
     "vite": "^7.2.0"
   }
 }

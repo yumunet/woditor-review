@@ -1,0 +1,12 @@
+* text=auto eol=lf
+
+# Byte fixtures and images are not source text.
+*.txt -text
+*.csv -text
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.zip binary

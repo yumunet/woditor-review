@@ -1,0 +1,2 @@
+# Development only; distributed Python tools use the standard library alone.
+ruff==0.17.5
