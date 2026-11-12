@@ -1,8 +1,9 @@
 import {captureUi} from './screenshots';
 import {test, expect, type Page, type BrowserContext} from '@playwright/test';
-import {existsSync, readFileSync} from 'node:fs';
+import {readFileSync} from 'node:fs';
+import {loadFixture,sourcePath} from './helpers';
 import {zipSync, gzipSync, gunzipSync} from 'fflate';
-const path = 'MapData/SampleMapA/Event_0000.txt', corpus = existsSync(`.reference/ja-JP/texts/${path}`);
+const path = sourcePath;
 const clientId = '123-test.apps.googleusercontent.com';
 interface StoredFile {id:string;modifiedTime:string;appProperties:Record<string,string>;raw:Buffer}
 class MockDrive {
@@ -38,14 +39,9 @@ class MockDrive {
   }
   latest(){return JSON.parse(Buffer.from(gunzipSync(this.files.at(-1)!.raw)).toString('utf8'));}
 }
-async function loadReal(page:Page) {
-  await page.goto('/');await page.getByRole('button',{name:'ファイルを読み込む',exact:true}).click();
-  for(const [name,lang]of [['ja','ja-JP'],['en','en-US']])await page.locator(`input[name=${name}]`).setInputFiles({name:`${lang}.zip`,mimeType:'application/zip',buffer:Buffer.from(zipSync({[`${lang}/texts/${path}`]:readFileSync(`.reference/${lang}/texts/${path}`)}))});
-  await page.getByRole('button',{name:'読み込む',exact:true}).click();await expect(page.locator('.busy')).toHaveCount(0,{timeout:90000});
-  if(await page.getByRole('button',{name:'閉じる',exact:true}).count())await page.getByRole('button',{name:'閉じる',exact:true}).click();await openFile(page);
-}
+
 async function openFile(page:Page) {
-  for(const folder of ['MapData','MapData/SampleMapA']){const row=page.locator(`.file-row[data-value="${folder}"]`);if(await row.getAttribute('aria-expanded')==='false')await row.click();}
+  for(const folder of ['MapData','MapData/TestMap']){const row=page.locator(`.file-row[data-value="${folder}"]`);if(await row.getAttribute('aria-expanded')==='false')await row.click();}
   await page.locator(`.file-row[data-value="${path}"]`).click();
 }
 async function comment(page:Page,text:string) {
@@ -61,8 +57,8 @@ async function connect(page:Page) {
 async function sync(page:Page,expected:string){await page.getByRole('button',{name:'今すぐ同期',exact:true}).click();await expect(page.locator('.drive-status')).toContainText(expected);}
 
 test('Drive exchanges real reviews between devices, preserves conflicts, and downloads the pre-sync recovery copy',async({page,context,browser},info)=>{
-  test.skip(!corpus,'Private reference files not available');const server=new MockDrive();await server.route(context);
-  await loadReal(page);await comment(page,'PC original');await connect(page);
+  const server=new MockDrive();await server.route(context);
+  await loadFixture(page);await comment(page,'PC original');await connect(page);
   const scopes=await page.evaluate(()=>(window as any).requestedScopes);expect(scopes).toContain('drive.appdata');expect(scopes).not.toContain('auth/drive ');
   await sync(page,'Driveに保存しました');expect(server.files).toHaveLength(1);await closeSheet(page);
   const secondContext=await browser.newContext({baseURL:new URL(page.url()).origin,viewport:page.viewportSize()!,isMobile:info.project.name==='mobile',hasTouch:info.project.name==='mobile'});
@@ -85,7 +81,7 @@ test('Drive exchanges real reviews between devices, preserves conflicts, and dow
 });
 
 test('Drive recovers from network failures, auto-syncs while open, and requests reconnect after expiry or popup cancellation',async({page,context})=>{
-  test.skip(!corpus,'Private reference files not available');const server=new MockDrive();await server.route(context);await loadReal(page);await comment(page,'Kept locally');await page.clock.install();await connect(page);
+  const server=new MockDrive();await server.route(context);await loadFixture(page);await comment(page,'Kept locally');await page.clock.install();await connect(page);
   server.failing=true;await sync(page,'通信に失敗');expect(server.files).toHaveLength(0);server.failing=false;await sync(page,'Driveに保存しました');expect(server.files).toHaveLength(1);
   await page.getByLabel('アプリを開いている間、1分ごとに自動同期').check();await closeSheet(page);await comment(page,'Automatic edit');await page.clock.fastForward(61000);await expect.poll(()=>server.files.length).toBe(2);expect(JSON.stringify(server.latest().workspace)).toContain('Automatic edit');
   server.unauthorized=true;await openDrive(page);await sync(page,'有効期限');await expect(page.getByRole('button',{name:'Googleに接続',exact:true})).toBeVisible();server.unauthorized=false;

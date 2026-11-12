@@ -6,10 +6,7 @@ from woditor_parser import catalog,cell_for_key,masked_csv
 from woditor_review_tool import build,apply_files
 
 
-def fixture(name='名前', value='最初の行\r\n二行目'):
-    return ('TYPE_ID=0\r\nITEM_NUM=2\r\nDATANAME_LOAD_TYPE=0\r\nITEMNAME0=説明\r\nITEMNAME1=数\r\n'
-            '<<--CSV_START-->>\r\n"説明","数",\r\n'
-            f'"{value.replace(chr(34),chr(34)*2)}",123,<<!--DATANAME--!>>{name},\r\n"",5,<<!--DATANAME--!>>次,\r\n<<--CSV_END-->>\r\n')
+from fixtures import csv_fixture as fixture, PAIRS, text
 
 
 class DatabaseMemoTests(unittest.TestCase):
@@ -107,16 +104,11 @@ class DatabaseCsvTests(unittest.TestCase):
             result=raw.decode('utf-8-sig');self.assertEqual(cell_for_key(result,slot['key'])['value'],after)
             self.assertEqual(masked_csv(data['enText'],catalog(data['enText'])),masked_csv(result,catalog(result)))
 
-    @unittest.skipUnless(Path('.reference/ja-JP/texts').exists(),'Private corpus unavailable')
-    def test_all_real_database_csv_strings_round_trip_without_touching_protected_cells(self):
-        count=0
-        for path in Path('.reference/ja-JP/texts/BasicData').rglob('*.txt'):
-            ja=path.read_bytes()
-            if not ja.decode('utf-8-sig').startswith('TYPE_ID='):continue
-            en=(Path('.reference/en-US/texts')/path.relative_to('.reference/ja-JP/texts')).read_bytes()
-            data=pair_file(str(path),ja,en)
-            with self.subTest(path=str(path)):
-                self.assertFalse(data['errors']);self.assertEqual(render_file(data['enText'],data['slots'])['text'],data['enText'])
+    def test_database_strings_round_trip_without_touching_protected_cells(self):
+        for name in ('database', 'unused'):
+            source, english = text(name, 'ja'), text(name, 'en')
+            data = pair_file(PAIRS[name]['path'], source.encode(), english.encode())
+            with self.subTest(name=name):
+                self.assertFalse(data['errors'])
+                self.assertEqual(render_file(english, data['slots'])['text'], english)
                 self.assertTrue(all(s['source'] or s.get('sourceMissing') for s in data['slots'] if s['kind']=='database_csv'))
-                count+=sum(s['kind']=='database_csv' for s in data['slots'])
-        self.assertGreater(count,500)

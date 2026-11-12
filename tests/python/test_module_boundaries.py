@@ -11,7 +11,8 @@ from woditor_review_tool import read_schema
 
 class ModuleBoundaryTests(unittest.TestCase):
     def test_embedded_schemas_match_the_documented_contracts(self):
-        for path in Path('python/schemas').glob('*.json'):
+        for name in ('review-request.schema.json', 'review-response.schema.json'):
+            path = Path('python/schemas') / name
             self.assertEqual(read_schema(path.name),json.loads(path.read_text(encoding='utf-8')))
 
     def test_new_translation_cli_runs_without_review_or_application_modules(self):

@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 
 from review_adapter import pair_file
 from woditor_review_tool import build, validate, apply_files
-from test_database import fixture as csv_fixture
+from fixtures import csv_fixture
 
 
 class InitialReviewEditTests(unittest.TestCase):

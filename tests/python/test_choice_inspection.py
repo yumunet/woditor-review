@@ -111,7 +111,7 @@ class ChoiceInspectionTests(unittest.TestCase):
             self.assertFalse(any(slot['source']=='残存' for slot in paired['slots']))
 
     def test_malformed_active_settings_are_errors_and_cleanup_never_guesses(self):
-        cases=[fixture('common',1,('一つ',),('0','1','2')),fixture('common',1,(),('0','1')),
+        cases=[fixture('common',1,('一つ',),('0','1','2')),fixture('common',1,('一つ','二つ'),('0','1','2')),fixture('common',1,(),('0','1')),
                fixture('common',2,('一つ',),('0','1')),fixture('database',1,(),('0',)),
                fixture('database',1,('一つ','二つ'),('0',)),fixture('database',2,('一つ',),('0','1','2')),
                fixture(name_count=3),fixture().replace('CHOICE_STR_0_NUM=2','CHOICE_STR_0_NUM=invalid'),
@@ -170,22 +170,15 @@ class ChoiceInspectionTests(unittest.TestCase):
             self.assertIn('"Line ""one""\nLine two",',result)
             self.assertIn('CHOICE_VAL_0_NUM=2\n',result);self.assertEqual((root/'source.txt').read_bytes(),text.encode())
 
-    @unittest.skipUnless(Path('.reference/ja-JP/texts').exists(),'Private corpus unavailable')
-    def test_corpus_cleanup_is_idempotent_and_never_modifies_commands_or_csv(self):
-        errors=[];removed=0
-        from woditor_parser import file_type,decode
-        for language in ('ja-JP','en-US'):
-            for path in Path('.reference',language,'texts').rglob('*.txt'):
-                text,_=decode(path.read_bytes())
-                try: kind=file_type(text)
-                except ValueError: continue
-                if kind not in ('common','database'): continue
-                report=inspect_choices(text)
-                if report['counts']['error']:
-                    errors.append(path.as_posix());continue
-                revised,_=clean_unused_choices(text);removed+=len(report['unused'])
-                self.assertEqual(clean_unused_choices(revised)[0],revised)
-                marker='WoditorEvCOMMAND_START' if kind=='common' else '<<--CSV_START-->>'
-                if marker in text: self.assertEqual(text[text.index(marker):],revised[revised.index(marker):])
-        self.assertGreater(removed,8000)
-        self.assertEqual(errors,['.reference/ja-JP/texts/BasicData/CommonEvent/026.txt'])
+    def test_cleanup_is_idempotent_and_never_modifies_command_or_csv_bodies(self):
+        for kind, mode in [('common', 0), ('common', 1), ('common', 2), ('database', 0), ('database', 1), ('database', 2), ('database', 3)]:
+            names = ('Folder',) if kind == 'database' and mode == 1 else ('有効', '残存')
+            values = ('0',) if len(names) == 1 else ('0', '1')
+            source = fixture(kind, mode, names, values, name_count=1, value_count=1)
+            if mode == 1 and kind == 'common' or mode == 2 and kind == 'database':
+                source = fixture(kind, mode, ('無', '未', '不明', '残存'), ('1', '2', '3', '4'))
+            with self.subTest(kind=kind, mode=mode):
+                revised, _ = clean_unused_choices(source)
+                self.assertEqual(clean_unused_choices(revised)[0], revised)
+                boundary = 'WoditorEvCOMMAND_START' if kind == 'common' else '<<--CSV_START-->>'
+                self.assertEqual(source[source.index(boundary):], revised[revised.index(boundary):])

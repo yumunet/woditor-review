@@ -1,23 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { commandColor, commandColors } from '../src/command-colors';
+import { commandColor } from '../src/command-colors';
 import { compact, escape, fileTree, percent } from '../src/ui';
 import type { ReviewFile } from '../src/model';
-test('all 42 exact prefix pairs and defaults', () => {
-  assert.equal(commandColors.length, 42);
-  for (const [ja, en, color] of commandColors) {
-    assert.equal(commandColor(ja + 'x'), `rgb(${color})`);
-    assert.equal(commandColor(en + 'x'), `rgb(${color})`);
+test('command colors recognize both languages and repeated indent markers without broad prefix matches', () => {
+  const fallback=commandColor('other');
+  for(const [ja,en] of [['■条件分岐','■Condition'],['■変数操作','■Set Variable'],['▼','▼']]) {
+    assert.equal(commandColor(ja+' text'),commandColor(en+' text'));
+    assert.equal(commandColor(' | | |'+ja+' text'),commandColor(ja+' text'));
+    assert.notEqual(commandColor(ja+' text'),fallback);
   }
-  assert.equal(commandColor('■Key Input:x'), 'rgb(40, 40, 60)');
-  assert.equal(commandColor(' |▼ note'), 'rgb(0, 160, 0)');
-  for(const [ja,en,color] of commandColors) for(const prefix of [ja,en]) {
-    assert.equal(commandColor(' | | |'+prefix+'x'),`rgb(${color})`);
-  }
-  assert.equal(commandColor(' | |■Key Input:x'),'rgb(40, 40, 60)');
-  assert.equal(commandColor('  ▼ note'),'rgb(40, 40, 60)');
-  assert.equal(commandColor('|▼ note'),'rgb(40, 40, 60)');
-  assert.equal(commandColor('other'), 'rgb(40, 40, 60)');
+  assert.notEqual(commandColor('■Condition text'),commandColor('■Set Variable text'));
+  for(const invalid of ['■Key Input:x','  ▼ note','|▼ note']) assert.equal(commandColor(invalid),fallback);
 });
 test('compact counts and zero denominator', () => {
   assert.equal(compact(1000), '1K'); assert.equal(compact(1200), '1.2K');

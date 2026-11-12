@@ -4,14 +4,20 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from review_adapter import pair_file, render_file, digest
 from woditor_review_tool import build, validate, apply_files
+from fixtures import PAIRS, text
 
 
-@unittest.skipUnless(Path('.reference/ja-JP/texts').exists(), 'Private corpus not available')
 class ReviewToolTests(unittest.TestCase):
     def setUp(self):
-        self.path = 'MapData/SampleMapA/Event_0000.txt'
-        self.raw = (Path('.reference/en-US/texts') / self.path).read_bytes()
-        self.f = pair_file(self.path, (Path('.reference/ja-JP/texts') / self.path).read_bytes(), self.raw)
+        temporary = TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.english_root = Path(temporary.name)
+        target = self.english_root / PAIRS['map']['path']
+        target.parent.mkdir(parents=True)
+        target.write_bytes(text('map', 'en').encode())
+        self.path = PAIRS['map']['path']
+        self.raw = text('map', 'en').encode()
+        self.f = pair_file(self.path, text('map', 'ja').encode(), self.raw)
         s = self.f['slots'][0]
         self.request = {'schemaVersion': 1, 'requestId': 'request', 'createdAt': '2026-11-09', 'entries': [{
             'path': self.path, 'fileVersion': self.f['version'], 'itemId': self.f['items'][0]['id'],
@@ -46,7 +52,7 @@ class ReviewToolTests(unittest.TestCase):
         validate(request, build(request, {'suggestions': []}))
         with TemporaryDirectory() as directory:
             out = Path(directory) / 'out'
-            apply_files(request, response, Path('.reference/en-US/texts'), out)
+            apply_files(request, response, self.english_root, out)
             self.assertEqual((out / self.path).read_bytes(), self.raw)
 
     def test_initial_review_rejects_unknown_targets_and_allows_translation_changes(self):
@@ -56,7 +62,7 @@ class ReviewToolTests(unittest.TestCase):
         response = build(request, {'suggestions': [{'path': self.path, 'itemId': self.f['items'][0]['id'], 'reason': 'Issue', 'changes': self.decisions['responses'][0]['changes']}]})
         with TemporaryDirectory() as directory:
             out = Path(directory) / 'out'
-            apply_files(request, response, Path('.reference/en-US/texts'), out)
+            apply_files(request, response, self.english_root, out)
             self.assertIn(b'EVENT_NAME=Yuichi revised', (out / self.path).read_bytes())
 
     def test_pending_proposals_can_be_reassessed_without_applying_them(self):
@@ -65,7 +71,7 @@ class ReviewToolTests(unittest.TestCase):
         response = build(self.request, {'responses': [{'commentId': 'comment', 'decision': 'rejected', 'reason': 'Withdraw the previous proposal', 'changes': []}]})
         with TemporaryDirectory() as directory:
             out = Path(directory) / 'rejected'
-            apply_files(self.request, response, Path('.reference/en-US/texts'), out)
+            apply_files(self.request, response, self.english_root, out)
             self.assertEqual((out / self.path).read_bytes(), self.raw)
 
     def test_render_preserves_original_and_protected_sections(self):
@@ -75,15 +81,15 @@ class ReviewToolTests(unittest.TestCase):
         self.assertEqual(rendered['version'], digest(rendered['text']))
         marker = '[COMMAND_TEXT_START]'
         self.assertEqual(rendered['text'].split(marker)[1], self.f['enText'].split(marker)[1])
-        self.assertEqual((Path('.reference/en-US/texts') / self.path).read_bytes(), self.raw)
+        self.assertEqual((self.english_root / self.path).read_bytes(), self.raw)
 
     def test_apply_outputs_separate_file_and_refuses_overwrite(self):
         response = build(self.request, self.decisions)
         with TemporaryDirectory() as directory:
             out = Path(directory) / 'revised'
-            apply_files(self.request, response, Path('.reference/en-US/texts'), out)
+            apply_files(self.request, response, self.english_root, out)
             self.assertIn(b'EVENT_NAME=Yuichi revised', (out / self.path).read_bytes())
-            with self.assertRaises(ValueError): apply_files(self.request, response, Path('.reference/en-US/texts'), out)
+            with self.assertRaises(ValueError): apply_files(self.request, response, self.english_root, out)
 
 
 if __name__ == '__main__': unittest.main()

@@ -1,5 +1,4 @@
 import unittest
-from pathlib import Path
 
 from review_adapter import extract_source, pair_file, render_file
 
@@ -86,13 +85,3 @@ class DatabaseChoicePolicyTests(unittest.TestCase):
                 self.assertFalse(any('既定フォルダパスが日英で異なります' in warning for warning in data['warnings']))
                 expected='英語版だけの翻訳項目があります: 1件' if target_mode==3 else '英語版で使用対象外になった翻訳項目: 1件'
                 self.assertIn(expected,data['warnings'])
-
-    @unittest.skipUnless(Path('.reference/ja-JP/texts').exists(),'Private corpus unavailable')
-    def test_real_direct_input_leftovers_are_ignored_and_original_txt_stays_intact(self):
-        path=Path('BasicData/CDataBase/04.txt')
-        ja=(Path('.reference/ja-JP/texts')/path).read_bytes();en=(Path('.reference/en-US/texts')/path).read_bytes()
-        data=pair_file(str(path),ja,en)
-        self.assertFalse(data['errors']);self.assertFalse(self.choices(data))
-        self.assertTrue(any(w.startswith('未使用の選択肢設定を無視しました（日本語、行 ') and w.endswith(': 3800件') for w in data['warnings']))
-        self.assertFalse(any('翻訳項目' in warning or '対応する設定' in warning for warning in data['warnings']))
-        self.assertEqual(render_file(data['enText'],data['slots'])['text'],data['enText'])

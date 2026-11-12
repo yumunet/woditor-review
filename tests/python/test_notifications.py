@@ -48,3 +48,11 @@ class NotificationTests(unittest.TestCase):
         en=ja.replace('"データ",123','"Data",456')
         data=self.pair(ja,en)
         self.assertIn('翻訳対象外の設定値が日英で異なります（CSVの数値・非文字列）: 1件',data['warnings'])
+
+    def test_changed_database_operands_preserve_assignment_and_exclude_name_references(self):
+        data = self.pair('COMMON_ID=0\n[250][1,4]<0>(1)("代入文","タイプ名","データ名","項目名")\n',
+                         'COMMON_ID=0\n[250][1,4]<0>(2)("Assigned","Type","Data","Item")\n')
+        self.assertFalse(data['errors'])
+        self.assertIn('コマンド引数が日英で異なります: 1件', data['warnings'])
+        self.assertEqual([(s['position'], s['translation']) for s in data['slots']], [(1, 'Assigned')])
+        self.assertEqual([s['position'] for s in data['excluded']], [2, 3, 4])

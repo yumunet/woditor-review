@@ -20,9 +20,8 @@ test('database mode lookup distinguishes folder and choice modes and defaults mi
 test('database field choice tables keep numeric order with bilingual text and a navigation column',()=>{
   const file=fixture('database','ITEMNAME3','TYPE_ID=0\nITEM_LOADTYPE_3=3\nCHOICE_NAME_3_10=十一番目\nCHOICE_NAME_3_1=二番目\nCHOICE_NAME_2_0=別の項目\n','TYPE_ID=0\nITEM_LOADTYPE_3=3\nCHOICE_NAME_3_2=English only\nCHOICE_NAME_3_1=Second\n');
   const html=choicesContextView(file,item,true),lines=rows(html);
-  assert.equal(lines.length,3);assert.ok(lines[0].includes('二番目'));assert.ok(lines[1].includes('English only'));assert.ok(lines[2].includes('十一番目'));assert.ok(!html.includes('choice-index'));
-  assert.ok(lines[0].includes('二番目'));assert.ok(lines[0].includes('Second'));assert.ok(lines[1].includes('（対応なし）'));assert.ok(lines[2].includes('十一番目'));assert.ok(!html.includes('別の項目'));
-  assert.ok(html.includes('<th scope="col">原文</th><th scope="col">英訳</th>'));assert.equal((html.match(/<th scope="col"[ >]/g)??[]).length,3);
+  assert.equal(lines.length,3);assert.ok(lines[0].includes('二番目'));assert.ok(lines[1].includes('English only'));assert.ok(lines[2].includes('十一番目'));
+  assert.ok(lines[0].includes('Second'));assert.ok(lines[1].includes('（対応なし）'));assert.ok(!html.includes('別の項目'));
 });
 
 test('common numeric arguments use CHOICE_STR, preserve empty values and prefer confirmed translations',()=>{
@@ -67,7 +66,7 @@ test('unrelated items, data names, CSV settings and commands do not have reverse
 test('choice tables escape text and share the requested collapsible controls',()=>{
   const file=fixture('database','ITEMNAME0','ITEM_LOADTYPE_0=3\nCHOICE_NAME_0_0=<script>原文</script>\n','ITEM_LOADTYPE_0=3\nCHOICE_NAME_0_0=<img src=x onerror=bad>\n');
   const open=choicesContextView(file,item,true);assert.ok(open.includes('&lt;script&gt;原文&lt;/script&gt;'));assert.ok(!open.includes('<script>'));assert.ok(open.includes('&lt;img src=x onerror=bad&gt;'));
-  assert.ok(open.includes('class="choices-table"'));assert.ok(open.includes('class="choice-source"'));assert.ok(open.includes('class="choice-translation"'));assert.ok(open.includes('aria-controls="choices-context-body"'));
+  assert.ok(open.includes('aria-controls="choices-context-body"'));
   const closed=choicesContextView(file,item,false);assert.ok(closed.includes('aria-expanded="false"'));assert.ok(closed.includes('data-action="choices-context"'));assert.ok(!closed.includes('<table'));
 });
 

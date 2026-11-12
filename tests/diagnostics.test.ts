@@ -11,8 +11,8 @@ test('diagnostic tabs show only their own severity with counts and escaping',()=
   for (const active of ['error','warning','skip'] as const) {
     const html=diagnosticsView(diagnostics,active);
     assert.ok(html.includes(`id="diagnostic-tab-${active}"`));
-    assert.equal((html.match(/class="diagnostic /g)??[]).length,1);
     assert.ok(html.includes(diagnostics.find(d=>d.severity===active)!.message));
+    for(const other of diagnostics.filter(d=>d.severity!==active)) assert.ok(!html.includes(other.message));
   }
   assert.ok(diagnosticsView([],'error').includes('エラーはありません'));
 });
