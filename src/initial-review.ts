@@ -1,7 +1,8 @@
-import {sourceText, itemTitle, type ReviewRequest, type Workspace} from './model';
+import {sourceText, itemTitle, type ReviewRequest, type Workspace,type ReviewFile} from './model';
 import {now, uid} from './review-state';
 import {initialContext} from './ui';
 import type {ReviewResponse} from './exchange';
+import {propose,applyRevisedFiles} from './review-proposals';
 
 export function createInitialRequest(workspace: Workspace, selected: string[]): ReviewRequest {
   const targets = workspace.files.filter(f => selected.includes(f.path)).flatMap(file => file.items.map(item => {
@@ -19,13 +20,13 @@ export function createInitialRequest(workspace: Workspace, selected: string[]): 
 export function initialInstructions(request: ReviewRequest, responseName: string) {
   return `添付の依頼JSON（requestId: ${request.requestId}）のtargetsと英訳TXTを使い、原文と既存の英訳を比較してください。
 誤訳・訳抜け・不自然な英語・用語の不統一を探し、問題のある項目だけに日本語で指摘コメントを作成してください。既存のthreadsと重複する指摘は避け、不確実な点は断定しないでください。原文が空なら誤訳と断定せず、英語として判断できる問題だけ指摘してください。
-英訳は変更せず、採用・承認も行いません。pendingChangesは未確定の参考情報です。指摘には問題点・理由・必要なら改善例を記載してください。
-判断JSON: {"responses":[],"suggestions":[{"path":"対象のpath","itemId":"対象のitemId","reason":"指摘コメント"}]}。問題がなければsuggestions: []。
-提供の woditor_review_tool.py の build → validate で ${responseName} を作成してください。ID・相対パス・バージョンを保持し、修正済みTXTやZIPは作らないでください。`;
+reasonには日本語の問題点・修正理由だけを書き、修正後の英訳はchanges.afterに分けてください。不確実で修正案を作れない指摘はchanges: []。pendingChangesがあるSlotは変更せず、採用・承認はユーザーに任せてください。
+判断JSON: {"responses":[],"suggestions":[{"path":"対象のpath","itemId":"対象のitemId","reason":"指摘・修正理由","changes":[{"slotId":"対象ID","before":"slots.translation","after":"修正後の英訳"}]}]}。問題がなければsuggestions: []。同じSlotの修正は1件にまとめてください。
+提供の woditor_review_tool.py の build → validate で ${responseName} を作成し、修正案があれば apply で別フォルダに修正済み英訳TXTを出力してZIPも返してください。ID・相対パス・バージョン、コマンド構造・CSVの行列と数値・特殊文字列を保持してください。コマンドの改行と引用符は<\\n>・<dqrt>を使い、引用符付きCSV設定値には実際の改行を使えます。`;
 }
 
-export function importInitialResponse(workspace: Workspace, request: ReviewRequest, response: ReviewResponse, revisedProvided: boolean): Workspace {
-  if (response.responses.length || response.suggestions.some(s => s.changes.length) || revisedProvided) throw new Error('初回レビューは指摘コメントだけを取り込みます。英訳の変更・修正ZIPは指定できません');
+export function importInitialResponse(workspace: Workspace, request: ReviewRequest, response: ReviewResponse, revised?:ReviewFile[]): Workspace {
+  if (response.responses.length) throw new Error('初回レビューの修正案はsuggestionsに指定してください');
   if (!request.targets?.length || request.entries.length) throw new Error('初回レビュー依頼の形式が不正です');
   for (const target of request.targets) {
     const file = workspace.files.find(f => f.path === target.path), item = file?.items.find(i => i.id === target.itemId);
@@ -35,13 +36,22 @@ export function importInitialResponse(workspace: Workspace, request: ReviewReque
       if (!slot || sourceText(slot) !== expected.source || slot.translation !== expected.translation) throw new Error(`依頼後に原文・英訳が変わっています: ${target.path}`);
     }
   }
-  const next = structuredClone(workspace), seen = new Set(next.files.flatMap(f => f.items.flatMap(i => i.threads.map(t => t.id))));
+  const next = structuredClone(workspace), seen = new Set(next.files.flatMap(f => f.items.flatMap(i => i.threads.map(t => t.id)))),changed=new Set<string>(),touched=new Set<string>();
   for (const suggestion of response.suggestions) {
-    if (!request.targets.some(t => t.path === suggestion.path && t.itemId === suggestion.itemId && t.fileVersion === suggestion.fileVersion)) throw new Error('初回レビューの指摘先が依頼対象にありません');
+    const target=request.targets.find(t=>t.path===suggestion.path && t.itemId===suggestion.itemId && t.fileVersion===suggestion.fileVersion);
+    if (!target) throw new Error('初回レビューの指摘先が依頼対象にありません');
     if (seen.has(suggestion.id)) throw new Error('指摘コメントIDが重複しています'); seen.add(suggestion.id);
-    const item = next.files.find(f => f.path === suggestion.path)!.items.find(i => i.id === suggestion.itemId)!;
-    item.threads.push({id: suggestion.id, resolved: false, posts: [{id: uid(), author: 'ai', text: suggestion.reason, createdAt: now(), decision: 'needs_review', requestId: request.requestId}]});
+    const file=next.files.find(f=>f.path===suggestion.path)!,item=file.items.find(i=>i.id===suggestion.itemId)!,postId=uid();
+    for(const edit of suggestion.changes) {
+      const key=suggestion.path+'\0'+edit.slotId,expected=target.slots.find(slot=>slot.id===edit.slotId);
+      if(changed.has(key) || !target.slotIds.includes(edit.slotId) || !expected || expected.translation!==edit.before) throw new Error('初回レビューの修正案が重複・対象外、または変更前の英訳が一致しません');
+      if(item.changes.some(c=>c.slotId===edit.slotId && c.status==='pending')) throw new Error('既に保留中の変更があります');
+      changed.add(key);propose(file,item,edit,suggestion.id,'ai',postId);
+    }
+    item.threads.push({id: suggestion.id, resolved: false, posts: [{id: postId, author: 'ai', text: suggestion.reason, createdAt: now(), decision: 'needs_review', requestId: request.requestId}]});
+    touched.add(file.path);
     item.approved = false;
   }
+  if(revised) applyRevisedFiles(next,response,revised,touched,true);
   next.importedResponses.push(request.requestId); next.updatedAt = now(); return next;
 }

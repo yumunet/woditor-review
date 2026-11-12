@@ -521,6 +521,21 @@ def check_schema(data, schema: dict, root: dict | None = None, location: str = '
             check_schema(value, schema['items'], root, f'{location}[{i}]')
 
 
+def validate_edits(entry: dict, edits: list, changed: set, initial=False):
+    slots = {s['id']: s for s in entry['slots']}
+    pending = {c['slotId'] for c in entry.get('pendingChanges', [])}
+    for edit in edits:
+        key = (entry['path'], edit['slotId'])
+        slot = slots.get(edit['slotId'])
+        if key in changed or slot is None or edit['slotId'] not in entry['slotIds'] or slot['translation'] != edit['before']:
+            raise ValueError('Duplicate/unknown slot or changed before text')
+        if initial and edit['slotId'] in pending:
+            raise ValueError('Slot already has a pending change')
+        if '\0' in edit['after'] or (slot['kind'] != 'database_csv' or re.fullmatch(r'CSV_D\d+_NAME', slot['key'])) and any(c in edit['after'] for c in ('\r', '\n')):
+            raise ValueError('Use encoded newlines, not literal newlines')
+        changed.add(key)
+
+
 def validate(request: dict, response: dict):
     check_schema(request, read_schema('review-request.schema.json'))
     check_schema(response, read_schema('review-response.schema.json'))
@@ -529,15 +544,15 @@ def validate(request: dict, response: dict):
     if request.get('mode') == 'initial':
         if request['entries'] or not request.get('targets') or response['responses']:
             raise ValueError('Initial review requires targets and no comment responses')
-        seen = set()
+        seen, changed = set(), set()
         for suggestion in response['suggestions']:
             if suggestion['id'] in seen:
                 raise ValueError('Duplicate suggestion ID')
             seen.add(suggestion['id'])
-            if suggestion['changes']:
-                raise ValueError('Initial review is comments-only')
-            if not any(all(t[k] == suggestion[k] for k in ('path', 'itemId', 'fileVersion')) for t in request['targets']):
+            target = next((t for t in request['targets'] if all(t[k] == suggestion[k] for k in ('path', 'itemId', 'fileVersion'))), None)
+            if target is None:
                 raise ValueError('Unknown initial review target')
+            validate_edits(target, suggestion['changes'], changed, initial=True)
         return
     entries = {e['commentId']: e for e in request['entries']}
     if len(entries) != len(request['entries']):
@@ -552,14 +567,7 @@ def validate(request: dict, response: dict):
         for key in ('path', 'itemId', 'fileVersion'):
             if answer[key] != entry[key]:
                 raise ValueError(f'Mismatched {key}')
-        slots = {s['id']: s for s in entry['slots']}
-        for edit in answer['changes']:
-            key = (answer['path'], edit['slotId'])
-            if key in changed or edit['slotId'] not in slots or slots[edit['slotId']]['translation'] != edit['before']:
-                raise ValueError('Duplicate/unknown slot or changed before text')
-            if '\0' in edit['after'] or (slots[edit['slotId']]['kind']!='database_csv' or re.fullmatch(r'CSV_D\d+_NAME',slots[edit['slotId']]['key'])) and any(c in edit['after'] for c in ('\r', '\n')):
-                raise ValueError('Use encoded newlines, not literal newlines')
-            changed.add(key)
+        validate_edits(entry, answer['changes'], changed)
     if answers != set(entries):
         raise ValueError('Response is missing comment IDs')
     suggestions = set()
@@ -571,14 +579,7 @@ def validate(request: dict, response: dict):
         options = [e for e in entries.values() if all(e[k] == suggestion[k] for k in ('path', 'itemId', 'fileVersion'))]
         if not options:
             raise ValueError('Unknown suggestion item/version')
-        slots = {s['id']: s for s in options[0]['slots']}
-        for edit in suggestion['changes']:
-            key = (suggestion['path'], edit['slotId'])
-            if key in changed or edit['slotId'] not in slots or edit['before'] != slots[edit['slotId']]['translation']:
-                raise ValueError('Invalid suggestion edit')
-            if '\0' in edit['after'] or (slots[edit['slotId']]['kind']!='database_csv' or re.fullmatch(r'CSV_D\d+_NAME',slots[edit['slotId']]['key'])) and any(c in edit['after'] for c in ('\r', '\n')):
-                raise ValueError('Use encoded newlines, not literal newlines')
-            changed.add(key)
+        validate_edits(options[0], suggestion['changes'], changed)
 
 
 def build(request: dict, decisions: dict) -> dict:
@@ -605,19 +606,18 @@ def build(request: dict, decisions: dict) -> dict:
 
 def apply_files(request: dict, response: dict, english_root: Path, output_root: Path):
     validate(request, response)
-    if request.get('mode') == 'initial':
-        raise ValueError('Initial review is comments-only; apply is not supported')
     if output_root.exists():
         raise ValueError('Output directory already exists; choose a new directory')
     src, dst = english_root.resolve(), output_root.resolve()
     if dst == src or src in dst.parents or dst in src.parents:
         raise ValueError('Output must be separate from input')
     writes, csv_sections = {}, {}
+    entries = request['targets'] if request.get('mode') == 'initial' else request['entries']
     for answer in response['responses'] + response['suggestions']:
         path = PurePosixPath(answer['path'])
         if path.is_absolute() or '..' in path.parts or any(':' in p or '\\' in p for p in path.parts):
             raise ValueError('Unsafe relative path')
-        entry = next(e for e in request['entries'] if e['path'] == answer['path'] and e['itemId'] == answer['itemId'])
+        entry = next(e for e in entries if e['path'] == answer['path'] and e['itemId'] == answer['itemId'])
         target = (src / path).resolve()
         if src not in target.parents:
             raise ValueError('Input path escapes root')

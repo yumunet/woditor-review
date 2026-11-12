@@ -222,7 +222,7 @@ function sheetBody() {
   if (sheet === 'diagnostics') return diagnosticsView(workspace.diagnostics, diagnosticTab,workspace);
   if (sheet === 'comments') return commentsBody();
   if (sheet === 'restore') return '<form class="form" id="restore-form"><label>バックアップ JSON<input type="file" name="backup" accept=".json,application/json" required></label><button class="primary" type="submit">復元する</button></form>';
-  if (sheet === 'export') return `<fieldset class="review-mode"><legend>依頼内容</legend><label><input type="radio" name="review-mode" value="initial" ${reviewMode === 'initial' ? 'checked' : ''}>英訳をチェックして指摘を作る</label><label><input type="radio" name="review-mode" value="comments" ${reviewMode === 'comments' ? 'checked' : ''}>既存コメントに回答・修正する</label></fieldset>${exportRows()}<div class="sheet-foot"><div class="export-actions"><button class="primary" data-action="export-request" ${!exportSelection.size ? 'disabled' : ''}>JSONを出力</button><button class="text-act" data-action="english-zip" ${!exportSelection.size ? 'disabled' : ''}>英訳TXTを出力</button></div><div class="send-row"><button class="text-act" data-action="copy-instructions" ${!exportSelection.size ? 'disabled' : ''}>${icon('copy')}指示文をコピー</button></div></div>`;
+  if (sheet === 'export') return `<fieldset class="review-mode"><legend>依頼内容</legend><label><input type="radio" name="review-mode" value="initial" ${reviewMode === 'initial' ? 'checked' : ''}>英訳をチェックして指摘・修正案を作る</label><label><input type="radio" name="review-mode" value="comments" ${reviewMode === 'comments' ? 'checked' : ''}>既存コメントに回答・修正する</label></fieldset>${exportRows()}<div class="sheet-foot"><div class="export-actions"><button class="primary" data-action="export-request" ${!exportSelection.size ? 'disabled' : ''}>JSONを出力</button><button class="text-act" data-action="english-zip" ${!exportSelection.size ? 'disabled' : ''}>英訳TXTを出力</button></div><div class="send-row"><button class="text-act" data-action="copy-instructions" ${!exportSelection.size ? 'disabled' : ''}>${icon('copy')}指示文をコピー</button></div></div>`;
   if (sheet === 'response') return '<form class="form" id="response-form"><label>回答JSON<input type="file" name="answer" accept=".json,application/json" required></label><label>修正済み英訳 ZIP（任意）<input type="file" name="revised" accept=".zip,application/zip"></label><button class="primary" type="submit">回答を読み込む</button></form>';
   if (sheet === 'english') return `${exportRows()}<div class="sheet-foot"><button class="primary" data-action="english-zip" ${!exportSelection.size ? 'disabled' : ''}>英訳TXTを出力</button></div>`;
   return '<div class="sheet-body"><div class="empty">コメントはありません</div></div>';
@@ -404,7 +404,6 @@ root.addEventListener('submit', async event => {
     try {
       const answerValue = JSON.parse(await answer.text());
       const initialReview = workspace.requests.some(r => r.requestId === answerValue?.requestId && r.mode === 'initial');
-      if (initialReview && revised?.size) throw new Error('初回レビューでは指摘JSONだけを指定してください');
       let parsed: ReviewFile[] | undefined;
       let diagnostics: Workspace['diagnostics'] = [];
       let documents=workspace.diagnosticDocuments??[];
@@ -421,7 +420,7 @@ root.addEventListener('submit', async event => {
       workspaceRevision++;
       workspace.diagnostics.push(...diagnostics);
       workspace.diagnosticDocuments=documents;
-      await saveWorkspace(workspace); sheet = null; reconcileCurrent(); busy = ''; render(); toast(initialReview ? `AIの指摘を${answerValue.suggestions.length}件読み込みました` : '変更を読み込みました。再確認してください');
+      await saveWorkspace(workspace); sheet = null; reconcileCurrent(); busy = ''; render(); toast(initialReview ? `AIの指摘・修正案を${answerValue.suggestions.length}件読み込みました` : '変更を読み込みました。再確認してください');
     } catch (error) {busy = ''; render(); toast(String(error));} return;
   }
   if (form.id !== 'load-form') return;

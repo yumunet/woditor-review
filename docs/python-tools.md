@@ -11,6 +11,8 @@ Python 3.10以降、標準ライブラリだけで実行できます。各CLIと
 
 以下はリポジトリからの実行例です。持ち出した場合はスクリプトのパスを置き換えます。
 
+初回レビューも `woditor_review_tool.py` の `build` → `validate` → `apply` を使えます。`suggestions[].reason` に指摘理由、`changes` に `slotId`・`before`・`after` を指定し、修正済みTXTは別フォルダに出力します。指摘だけなら `changes` は省略できます。既に保留案があるSlotの修正はコメント回答モードで依頼してください。
+
 ## 選択肢の検査
 
 ```powershell

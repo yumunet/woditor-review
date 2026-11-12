@@ -1,10 +1,11 @@
-import type { Change, Decision, Item, ReviewFile, ReviewRequest, ReviewMode, Workspace } from './model';
+import type { Decision, Item, ReviewFile, ReviewRequest, ReviewMode, Workspace } from './model';
 import { sourceText, unresolved } from './model';
 import { now, uid } from './review-state';
 import { initialContext } from './ui';
 import { zipSync, strToU8 } from 'fflate';
 import { preserveGroups } from './grouping';
 import {createInitialRequest, initialInstructions, importInitialResponse} from './initial-review';
+import {propose,applyRevisedFiles} from './review-proposals';
 
 const pendingForThread = (item: Item, threadId: string) => item.changes.filter(c => c.threadId === threadId && c.status === 'pending').map(({id,slotId,before,after}) => ({id,slotId,before,after}));
 
@@ -51,23 +52,12 @@ export function validateResponse(value: unknown): asserts value is ReviewRespons
   for (const a of v.suggestions) if (!obj(a) || !keys(a, ['id','path','itemId','fileVersion','reason','changes']) || !text(a.id) || !text(a.path) || !text(a.itemId) || !/^[a-f0-9]{64}$/.test(a.fileVersion) || !text(a.reason) || !edits(a.changes)) return fail();
 }
 
-function propose(file: ReviewFile, item: Item, edit: Edit, threadId: string | null, origin: 'ai' | 'reload', aiPostId?: string) {
-  const slot = file.slots.find(s => s.id === edit.slotId);
-  if (!slot || !item.slotIds.includes(edit.slotId) || slot.translation !== edit.before) throw new Error(`翻訳単位・変更前の英訳が一致しません: ${edit.slotId}`);
-  if((slot.kind!=='database_csv'||/^CSV_D\d+_NAME$/.test(slot.key)) && /[\r\n]/.test(edit.after)) throw new Error('引用符付きCSV設定値以外はエンコードされた改行を使用してください');
-  if (edit.before === edit.after) return;
-  if (item.changes.some(c => c.slotId === edit.slotId && c.status === 'pending')) throw new Error(`既に保留中の変更があります: ${edit.slotId}`);
-  if (slot.kind === 'command_string' && /(?<!\\)"/.test(edit.after)) throw new Error('コマンド内の引用符は <dqrt> を使用してください');
-  const change: Change = {id: uid(), ...edit, threadId, origin, aiPostId, status: 'pending', createdAt: now()};
-  item.changes.push(change); item.approved = false;
-}
-
 export function importResponse(workspace: Workspace, value: unknown, revised?: ReviewFile[]): Workspace {
   validateResponse(value);
   const request = workspace.requests.find(r => r.requestId === value.requestId);
   if (!request) throw new Error('対応するレビュー依頼がありません');
   if (workspace.importedResponses.includes(value.requestId)) throw new Error('この回答は既に取り込み済みです');
-  if (request.mode === 'initial') return importInitialResponse(workspace, request, value, !!revised);
+  if (request.mode === 'initial') return importInitialResponse(workspace, request, value, revised);
   const seen = new Set<string>();
   if (value.responses.length !== request.entries.length) throw new Error('回答IDの欠落・件数不一致があります');
   const next = structuredClone(workspace);
@@ -111,29 +101,7 @@ export function importResponse(workspace: Workspace, value: unknown, revised?: R
     item.threads.push({id: a.id, resolved: false, posts: [{id: postId, author: 'ai', text: a.reason, createdAt: now(), decision: 'needs_review', requestId: value.requestId}]});
     item.approved = false;
   }
-  if (revised) {
-    for (const updated of revised) {
-      const file = next.files.find(f => f.path === updated.path);
-      if (!file || file.sourceVersion !== updated.sourceVersion) throw new Error('修正TXTの原文バージョンが一致しません');
-      for (const slot of updated.slots) {
-        const old = file.slots.find(s => s.id === slot.id && s.source === slot.source && s.fingerprint === slot.fingerprint);
-        if (!old) throw new Error('修正TXTの翻訳単位が一致しません');
-        old.enLine = slot.enLine;
-        const item = file.items.find(i => i.slotIds.includes(old.id))!;
-        const pending = item.changes.filter(c => c.slotId === old.id && c.status === 'pending').at(-1);
-        if (pending) {if ((pending.rejectedBy ? old.translation : pending.after) !== slot.translation) throw new Error('回答JSONと修正TXTの新訳が一致しません');}
-        else if (old.translation !== slot.translation) {
-          const answers = value.responses.filter(a => a.path === file.path && a.itemId === item.id);
-          const threadId = answers.length === 1 ? answers[0].commentId : uid();
-          let thread = item.threads.find(t => t.id === threadId);
-          if (!thread) {thread = {id: threadId, resolved: false, posts: [{id: uid(), author: 'ai', text: '修正TXTに回答JSONで説明されていない変更があります。新訳を確認してください。', createdAt: now(), decision: 'needs_review'}]}; item.threads.push(thread);}
-          propose(file, item, {slotId: old.id, before: old.translation, after: slot.translation}, threadId, 'ai', thread.posts.at(-1)!.id);
-        }
-      }
-      file.enText = updated.enText; file.enBom = updated.enBom; file.version = updated.version; file.commands = updated.commands;
-    }
-    for (const path of touched) if (!revised.some(f => f.path === path)) throw new Error(`修正TXTが不足しています: ${path}`);
-  }
+  if(revised) applyRevisedFiles(next,value,revised,touched);
   next.importedResponses.push(value.requestId); next.updatedAt = now(); return next;
 }
 

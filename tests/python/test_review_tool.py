@@ -45,15 +45,19 @@ class ReviewToolTests(unittest.TestCase):
         self.assertTrue(response['suggestions'][0]['id'])
         validate(request, build(request, {'suggestions': []}))
         with TemporaryDirectory() as directory:
-            with self.assertRaisesRegex(ValueError, 'comments-only'):
-                apply_files(request, response, Path('.reference/en-US/texts'), Path(directory) / 'out')
+            out = Path(directory) / 'out'
+            apply_files(request, response, Path('.reference/en-US/texts'), out)
+            self.assertEqual((out / self.path).read_bytes(), self.raw)
 
-    def test_initial_review_rejects_unknown_targets_and_translation_changes(self):
+    def test_initial_review_rejects_unknown_targets_and_allows_translation_changes(self):
         request = self.initial_request()
         with self.assertRaisesRegex(ValueError, 'Unknown'):
             build(request, {'suggestions': [{'path': self.path, 'itemId': 'unknown', 'reason': 'Issue'}]})
-        with self.assertRaisesRegex(ValueError, 'comments-only'):
-            build(request, {'suggestions': [{'path': self.path, 'itemId': self.f['items'][0]['id'], 'reason': 'Issue', 'changes': self.decisions['responses'][0]['changes']}]})
+        response = build(request, {'suggestions': [{'path': self.path, 'itemId': self.f['items'][0]['id'], 'reason': 'Issue', 'changes': self.decisions['responses'][0]['changes']}]})
+        with TemporaryDirectory() as directory:
+            out = Path(directory) / 'out'
+            apply_files(request, response, Path('.reference/en-US/texts'), out)
+            self.assertIn(b'EVENT_NAME=Yuichi revised', (out / self.path).read_bytes())
 
     def test_pending_proposals_can_be_reassessed_without_applying_them(self):
         slot = self.request['entries'][0]['slots'][0]

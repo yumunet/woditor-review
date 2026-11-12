@@ -716,7 +716,7 @@ test.describe('backup timestamps',()=>{
 test('initial AI review adds comments without changing translations and continues with a correction request',async({page})=>{
   test.skip(!corpus,'Private reference files not available');await loadReal(page);
   const original=await page.locator('.translation').innerText();
-  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'AIレビューを依頼',exact:true}).click();await expect(page.getByRole('radio',{name:'英訳をチェックして指摘を作る',exact:true})).toBeChecked();
+  await page.getByRole('button',{name:'メニュー',exact:true}).click();await page.getByRole('button',{name:'AIレビューを依頼',exact:true}).click();await expect(page.getByRole('radio',{name:'英訳をチェックして指摘・修正案を作る',exact:true})).toBeChecked();
   const event=page.waitForEvent('download');await page.getByRole('button',{name:'JSONを出力',exact:true}).click();const request=JSON.parse(readFileSync((await (await event).path())!,'utf8'));
   expect(request.mode).toBe('initial');expect(request.entries).toEqual([]);expect(request.targets.length).toBeGreaterThan(1);expect(request.targets[0].threads).toEqual([]);await closeReviewSheet(page);
   const target=request.targets[0],response={schemaVersion:1,requestId:request.requestId,responses:[],suggestions:[{id:'initial-ai-comment',path:target.path,itemId:target.itemId,fileVersion:target.fileVersion,reason:'名前表記を確認してください',changes:[]}]};
@@ -732,8 +732,8 @@ test('review mode stays selected after panel close, history and app restart',asy
   test.skip(!corpus,'Private reference files not available');await loadReal(page);
   const open=async(p:Page)=>{await p.getByRole('button',{name:'メニュー',exact:true}).click();await p.getByRole('button',{name:'AIレビューを依頼',exact:true}).click();};
   await open(page);await page.getByRole('radio',{name:'既存コメントに回答・修正する',exact:true}).check();await closeReviewSheet(page);await open(page);await expect(page.getByRole('radio',{name:'既存コメントに回答・修正する',exact:true})).toBeChecked();
-  await page.getByRole('radio',{name:'英訳をチェックして指摘を作る',exact:true}).check();await page.goBack();await expect(page.getByRole('dialog')).toHaveCount(0);await open(page);await expect(page.getByRole('radio',{name:'英訳をチェックして指摘を作る',exact:true})).toBeChecked();
-  await page.reload();await expect(page.locator('.busy')).toHaveCount(0);await open(page);await expect(page.getByRole('radio',{name:'英訳をチェックして指摘を作る',exact:true})).toBeChecked();await page.getByRole('radio',{name:'既存コメントに回答・修正する',exact:true}).check();await closeReviewSheet(page);
+  await page.getByRole('radio',{name:'英訳をチェックして指摘・修正案を作る',exact:true}).check();await page.goBack();await expect(page.getByRole('dialog')).toHaveCount(0);await open(page);await expect(page.getByRole('radio',{name:'英訳をチェックして指摘・修正案を作る',exact:true})).toBeChecked();
+  await page.reload();await expect(page.locator('.busy')).toHaveCount(0);await open(page);await expect(page.getByRole('radio',{name:'英訳をチェックして指摘・修正案を作る',exact:true})).toBeChecked();await page.getByRole('radio',{name:'既存コメントに回答・修正する',exact:true}).check();await closeReviewSheet(page);
   const next=await context.newPage();await next.goto('/');await expect(next.locator('.busy')).toHaveCount(0);await page.close();await open(next);await expect(next.getByRole('radio',{name:'既存コメントに回答・修正する',exact:true})).toBeChecked();
 });
 

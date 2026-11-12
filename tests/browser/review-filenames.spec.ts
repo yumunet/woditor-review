@@ -15,7 +15,7 @@ test('review ZIPs use neutral names with the same request ID in either mode and 
     const pending=page.waitForEvent('download');await page.getByRole('button',{name,exact:true}).click();const file=await pending;await expect(page.locator('.busy')).toHaveCount(0);return file;
   };
   let previous='';
-  for(const [index,label] of ['英訳をチェックして指摘を作る','既存コメントに回答・修正する'].entries()) {
+  for(const [index,label] of ['英訳をチェックして指摘・修正案を作る','既存コメントに回答・修正する'].entries()) {
     await page.getByRole('radio',{name:label,exact:true}).check();
     const first=index===0?await download('英訳TXTを出力'):await download('JSONを出力');
     const second=index===0?await download('JSONを出力'):await download('英訳TXTを出力');
