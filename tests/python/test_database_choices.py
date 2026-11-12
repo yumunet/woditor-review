@@ -1,6 +1,7 @@
 import unittest
 
-from review_adapter import extract_source, pair_file, render_file
+from review_adapter import extract_source, pair_file
+from woditor_parser import render_file
 
 
 def database(mode, names=(), values=None, declared=None, duplicate=False):

@@ -3,7 +3,8 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from review_adapter import pair_file, special_strings, translation_warnings
+from review_adapter import pair_file
+from woditor_parser import special_strings, translation_warnings
 from woditor_review_tool import apply_files, build
 
 

@@ -4,7 +4,8 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from fixtures import PAIRS, text
-from review_adapter import digest, pair_file, render_file
+from review_adapter import pair_file
+from woditor_parser import digest, render_file
 from woditor_review_tool import apply_files, build, validate
 
 

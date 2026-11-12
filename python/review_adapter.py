@@ -37,18 +37,6 @@ from woditor_parser import (
     text_cell,
     translation_warnings,
 )
-from woditor_parser import (
-    JP as JP,
-)
-from woditor_parser import (
-    metadata_allowed as metadata_allowed,
-)
-from woditor_parser import (
-    render_file as render_file,
-)
-from woditor_parser import (
-    special_strings as special_strings,
-)
 
 SCHEMA_VERSION = 1
 

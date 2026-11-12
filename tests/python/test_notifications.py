@@ -1,6 +1,7 @@
 import unittest
 
-from review_adapter import pair_file, render_file
+from review_adapter import pair_file
+from woditor_parser import render_file
 
 
 class NotificationTests(unittest.TestCase):

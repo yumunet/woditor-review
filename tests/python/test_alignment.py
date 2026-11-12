@@ -1,8 +1,8 @@
 import unittest
 
 from fixtures import PAIRS, pair, text
-from review_adapter import pair_file, render_file
-from woditor_parser import COMMAND, META, catalog, fields
+from review_adapter import pair_file
+from woditor_parser import COMMAND, META, catalog, fields, render_file
 
 
 class AlignmentTests(unittest.TestCase):

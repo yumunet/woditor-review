@@ -26,7 +26,8 @@ for name, code in [('woditor_parser', parser_code), ('review_adapter', adapter_c
     module = types.ModuleType(name)
     sys.modules[name] = module
     exec(compile(code, name + '.py', 'exec'), module.__dict__)
-from review_adapter import pair_file, file_type, decode, render_file
+from review_adapter import pair_file
+from woditor_parser import decode, file_type, render_file
 def supported(raw):
     text, _ = decode(bytes(raw))
     try:

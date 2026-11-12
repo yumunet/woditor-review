@@ -11,8 +11,8 @@ from time import perf_counter
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "python"))
 # The standalone script locates the sibling source modules before importing them.
-from review_adapter import decode, extract_source, pair_file  # noqa: E402
-from woditor_parser import file_type  # noqa: E402
+from review_adapter import extract_source, pair_file  # noqa: E402
+from woditor_parser import decode, file_type  # noqa: E402
 
 
 def main():

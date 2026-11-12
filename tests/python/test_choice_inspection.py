@@ -5,8 +5,8 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from review_adapter import pair_file, render_file
-from woditor_parser import clean_unused_choices, inspect_choices, translation_slots
+from review_adapter import pair_file
+from woditor_parser import clean_unused_choices, inspect_choices, render_file, translation_slots
 
 
 def fixture(
