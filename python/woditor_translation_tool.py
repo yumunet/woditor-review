@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Woditor new-translation extract/apply and context/usage CLI.
 
 Requires only woditor_parser.py alongside this script. Python 3.10+, stdlib.

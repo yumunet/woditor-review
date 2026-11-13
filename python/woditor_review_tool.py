@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Assemble and validate review JSON; write revised TXT only to a new folder.
 
 AI supplies decisions and translation edits. This helper only assembles,
