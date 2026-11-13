@@ -169,7 +169,7 @@ macOS/Linuxでは最後の実行ファイルを `.venv/bin/python` に置き換�
 
 Web側は2スペース、Pythonは4スペース、UTF-8/LF。行長は100桁を目安とし、長い文字列・正規表現・URLのためだけに内容を変えない。Markdownの段落改行を維持し、埋め込み言語は自動整形しない。私有データ、生成物、画像、TXT/CSVなどのバイトを保持すべきデータは対象外とする。設定は `.prettierrc.json`・`.prettierignore`・`pyproject.toml`・`.editorconfig`・`.gitattributes` を参照。
 
-ESLintは推奨ルールと型情報によるPromise検査を使用する。DOMの非同期コールバックを許可するが、内部の未処理Promiseは検査する。`node:test` の登録処理はrunnerが失敗を回収するため、その呼び出しだけを許可する。オブジェクトのrest抽出で除いたプロパティは未使用扱いにしない。
+ESLintは推奨ルールと型情報によるPromise検査に加え、`await-thenable`・`no-base-to-string`・`no-unnecessary-type-assertion`・`only-throw-error`・`prefer-promise-reject-errors` を使用する。型境界全体の整理を伴う `recommendedTypeChecked` の全面採用は別作業とする。`checksVoidReturn` の除外は `arguments: false` だけとし、DOMなどへ非同期コールバックを引数として渡すことは許可するが、変数・プロパティ・戻り値などの検査は有効にする。内部の未処理Promiseも検査する。`node:test` の登録処理はrunnerが失敗を回収するため、その呼び出しだけを許可する。オブジェクトのrest抽出で除いたプロパティは未使用扱いにしない。
 
 Ruffは固定バージョンの公式デフォルトを維持し、`extend-select` で既存のE4/E7/E9/F/I/UP/Bも有効にする。バージョン更新時は公式デフォルトの変更も確認する。翻訳JSONの不正な内容に対する従来の例外型 `ValueError` を維持するため、`TRY004` を該当する3行だけ理由付きで除外する。各機能は定義元から直接importする。Stylelintは推奨検査を使用するが、既存の `src/styles.css` に限り、意図的な上書きの重複・詳細度順を許可する。
 

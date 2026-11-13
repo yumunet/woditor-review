@@ -149,6 +149,6 @@ for (const common of [false, true])
     await page.getByRole('button', { name: '英訳TXTを出力', exact: true }).click();
     const download = page.waitForEvent('download');
     await page.getByRole('button', { name: '英訳TXTを出力', exact: true }).click();
-    const zip = unzipSync(readFileSync((await (await download).path())!));
+    const zip = unzipSync(readFileSync(await (await download).path()));
     expect(Buffer.from(zip[`en-US/texts/${path}`]).toString('utf8')).toBe(en);
   });

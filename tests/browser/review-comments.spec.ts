@@ -116,7 +116,7 @@ test('comments, reply preview, confirmations, persistence and backup restore', a
   await page.getByRole('button', { name: '閉じる', exact: true }).click();
   await page.getByRole('button', { name: 'メニュー', exact: true }).click();
   await page.getByRole('button', { name: 'バックアップを復元', exact: true }).click();
-  await page.locator('input[name=backup]').setInputFiles(backupPath!);
+  await page.locator('input[name=backup]').setInputFiles(backupPath);
   await page.getByRole('button', { name: '復元する', exact: true }).click();
   await page.getByRole('button', { name: '確定', exact: true }).click();
   await expect(page.locator('.file-row')).toContainText('MapData');
@@ -192,7 +192,7 @@ test('initial AI review adds comments without changing translations and continue
   ).toBeChecked();
   const event = page.waitForEvent('download');
   await page.getByRole('button', { name: 'JSONを出力', exact: true }).click();
-  const request = JSON.parse(readFileSync((await (await event).path())!, 'utf8'));
+  const request = JSON.parse(readFileSync(await (await event).path(), 'utf8'));
   expect(request.mode).toBe('initial');
   expect(request.entries).toEqual([]);
   expect(request.targets.length).toBeGreaterThan(1);

@@ -25,7 +25,7 @@ async function download(page: Page, label: string) {
   await page.getByRole('button', { name: label, exact: true }).click();
   const file = await pending;
   await expect(page.locator('.busy')).toHaveCount(0);
-  return readFileSync((await file.path())!);
+  return readFileSync(await file.path());
 }
 
 for (const withZip of [false, true])

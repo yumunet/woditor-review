@@ -167,7 +167,7 @@ test.describe('backup timestamps', () => {
     const backup = await file.path();
     await page.getByRole('button', { name: 'メニュー', exact: true }).click();
     await page.getByRole('button', { name: 'バックアップを復元', exact: true }).click();
-    await page.locator('input[name=backup]').setInputFiles(backup!);
+    await page.locator('input[name=backup]').setInputFiles(backup);
     await page.getByRole('button', { name: '復元する', exact: true }).click();
     await page.getByRole('button', { name: '確定', exact: true }).click();
     await expect(page.locator('.file-row')).toContainText('MapData');

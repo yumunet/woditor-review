@@ -69,14 +69,14 @@ test('generated mixed-format ZIPs parse in the worker, persist losslessly and re
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open('woditor-review');
       request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
+      request.onerror = () => reject(request.error ?? new Error('Test database open failed'));
     });
     try {
       return await new Promise<{ path: string; enText: string; type: string }[]>(
         (resolve, reject) => {
           const request = db.transaction('files').objectStore('files').getAll();
           request.onsuccess = () => resolve(request.result);
-          request.onerror = () => reject(request.error);
+          request.onerror = () => reject(request.error ?? new Error('Test database read failed'));
         },
       );
     } finally {

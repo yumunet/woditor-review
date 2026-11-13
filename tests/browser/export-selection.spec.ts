@@ -98,7 +98,7 @@ test('export checkbox Shift ranges select and deselect in both directions, inclu
     if (panel === 'AIレビューを依頼') {
       const download = page.waitForEvent('download');
       await page.getByRole('button', { name: 'JSONを出力', exact: true }).click();
-      const request = JSON.parse(readFileSync((await (await download).path())!, 'utf8'));
+      const request = JSON.parse(readFileSync(await (await download).path(), 'utf8'));
       expect(request.targets.map((target: any) => target.path)).toEqual(
         [1, 2, 3, 4, 5].map((n) => `A/0${n}.txt`),
       );

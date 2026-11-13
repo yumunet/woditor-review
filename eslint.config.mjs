@@ -27,9 +27,17 @@ export default [
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unused-vars': ['error', { ignoreRestSiblings: true }],
+      '@typescript-eslint/await-thenable': 'error',
+      '@typescript-eslint/no-base-to-string': 'error',
+      '@typescript-eslint/no-unnecessary-type-assertion': 'error',
+      '@typescript-eslint/only-throw-error': 'error',
+      '@typescript-eslint/prefer-promise-reject-errors': 'error',
       '@typescript-eslint/no-floating-promises': 'error',
-      // DOM listeners may return a Promise; their bodies must still handle failures.
-      '@typescript-eslint/no-misused-promises': ['error', { checksVoidReturn: false }],
+      // Allow async callbacks passed as arguments; check other void-return uses.
+      '@typescript-eslint/no-misused-promises': [
+        'error',
+        { checksVoidReturn: { arguments: false } },
+      ],
     },
   },
   {

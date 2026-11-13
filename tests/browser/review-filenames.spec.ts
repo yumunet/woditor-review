@@ -48,14 +48,14 @@ test('review ZIPs use neutral names with the same request ID in either mode and 
     const second = index === 0 ? await download('JSONを出力') : await download('英訳TXTを出力');
     const requestFile = index === 0 ? second : first,
       zipFile = index === 0 ? first : second;
-    const request = JSON.parse(readFileSync((await requestFile.path())!, 'utf8')),
+    const request = JSON.parse(readFileSync(await requestFile.path(), 'utf8')),
       id = request.requestId.replaceAll('-', '').slice(0, 12);
     expect(request.mode === 'initial').toBe(index === 0);
     expect(request.requestId).not.toBe(previous);
     previous = request.requestId;
     expect(requestFile.suggestedFilename()).toBe(`review_request_${id}.json`);
     expect(zipFile.suggestedFilename()).toBe(`en-US_${id}.zip`);
-    const files = unzipSync(readFileSync((await zipFile.path())!));
+    const files = unzipSync(readFileSync(await zipFile.path()));
     expect(Buffer.from(files['en-US/texts/' + path]).toString('utf8')).toBe(en);
     expect((await download('英訳TXTを出力')).suggestedFilename()).toBe(zipFile.suggestedFilename());
   }

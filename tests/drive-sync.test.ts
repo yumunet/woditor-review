@@ -170,7 +170,7 @@ test('Drive API restricts appData scope and follows pagination, resumable upload
   const data = snapshot(emptyWorkspace()),
     calls: { url: string; init: RequestInit }[] = [];
   const fake: typeof fetch = async (input, init = {}) => {
-    const url = String(input);
+    const url = input instanceof Request ? input.url : input.toString();
     calls.push({ url, init });
     if (url.includes('pageToken=next')) return Response.json({ files: [] });
     if (url.includes('/drive/v3/files?')) {

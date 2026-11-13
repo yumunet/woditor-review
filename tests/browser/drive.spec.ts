@@ -195,7 +195,7 @@ test('Drive exchanges real reviews between devices, preserves conflicts, and dow
     await page
       .getByRole('button', { name: '同期前の端末データをバックアップ保存', exact: true })
       .click();
-    const recovery = readFileSync((await (await event).path())!, 'utf8');
+    const recovery = readFileSync(await (await event).path(), 'utf8');
     expect(recovery).toContain('PC parallel edit');
     expect(recovery).not.toContain('Phone edit');
     await closeSheet(page);
@@ -205,7 +205,7 @@ test('Drive exchanges real reviews between devices, preserves conflicts, and dow
       const db = await new Promise<IDBDatabase>((resolve, reject) => {
         const r = indexedDB.open('woditor-review');
         r.onsuccess = () => resolve(r.result);
-        r.onerror = () => reject(r.error);
+        r.onerror = () => reject(r.error ?? new Error('Test database open failed'));
       });
       return await new Promise<string>((resolve, reject) => {
         const r = db.transaction('meta').objectStore('meta').getAll();
@@ -213,7 +213,7 @@ test('Drive exchanges real reviews between devices, preserves conflicts, and dow
           db.close();
           resolve(JSON.stringify(r.result));
         };
-        r.onerror = () => reject(r.error);
+        r.onerror = () => reject(r.error ?? new Error('Test database read failed'));
       });
     });
     expect(saved).not.toContain('test-token-in-memory');

@@ -26,7 +26,7 @@ test('review JSON and revised TXT round trip, AI resolve/reopen and persistence'
   const downloadEvent = page.waitForEvent('download');
   await page.getByRole('button', { name: 'JSONを出力', exact: true }).click();
   const downloaded = await downloadEvent;
-  const request = JSON.parse(readFileSync((await downloaded.path())!, 'utf8'));
+  const request = JSON.parse(readFileSync(await downloaded.path(), 'utf8'));
   expect(request.entries).toHaveLength(1);
   await expect(page.getByLabel('ChatGPT向け指示文')).toHaveCount(0);
   const row = request.entries[0];
@@ -83,7 +83,7 @@ test('review JSON and revised TXT round trip, AI resolve/reopen and persistence'
   await page.getByRole('button', { name: '英訳TXTを出力', exact: true }).click();
   const zipEvent = page.waitForEvent('download');
   await page.getByRole('button', { name: '英訳TXTを出力', exact: true }).click();
-  const zipped = unzipSync(readFileSync((await (await zipEvent).path())!));
+  const zipped = unzipSync(readFileSync(await (await zipEvent).path()));
   const exported = Buffer.from(zipped[`en-US/texts/${sourcePath}`]).toString('utf8');
   expect(exported).toContain('EVENT_NAME=Revised Name');
   const original = fixtureTextAt(sourcePath, 'en');
@@ -127,7 +127,7 @@ test('corrected English positions survive JSON export, revised TXT and approved 
   await page.getByRole('button', { name: 'AIレビューを依頼', exact: true }).click();
   let event = page.waitForEvent('download');
   await page.getByRole('button', { name: 'JSONを出力', exact: true }).click();
-  const request = JSON.parse(readFileSync((await (await event).path())!, 'utf8')),
+  const request = JSON.parse(readFileSync(await (await event).path(), 'utf8')),
     row = request.entries[0],
     slot = row.slots[0];
   const original = fixtureTextAt(path, 'en'),
@@ -192,7 +192,7 @@ test('corrected English positions survive JSON export, revised TXT and approved 
   await page.getByRole('button', { name: '英訳TXTを出力', exact: true }).click();
   event = page.waitForEvent('download');
   await page.getByRole('button', { name: '英訳TXTを出力', exact: true }).click();
-  const zip = unzipSync(readFileSync((await (await event).path())!)),
+  const zip = unzipSync(readFileSync(await (await event).path())),
     output = Buffer.from(zip[`en-US/texts/${path}`]).toString('utf8');
   expect(output).toBe(revised);
 });
@@ -248,7 +248,7 @@ test('rejected reassessment ZIP imports and discarded proposals stay discarded a
   await page.getByRole('button', { name: '英訳TXTを出力', exact: true }).click();
   const zipEvent = page.waitForEvent('download');
   await page.getByRole('button', { name: '英訳TXTを出力', exact: true }).click();
-  const zip = readFileSync((await (await zipEvent).path())!);
+  const zip = readFileSync(await (await zipEvent).path());
   expect(Buffer.from(unzipSync(zip)[`en-US/texts/${sourcePath}`]).toString('utf8')).toContain(
     `EVENT_NAME=${slot.translation}`,
   );
@@ -313,7 +313,7 @@ test('database CSV multiline strings round trip through AI approval, ZIP and Eng
   await page.getByRole('button', { name: '英訳TXTを出力', exact: true }).click();
   const event = page.waitForEvent('download');
   await page.getByRole('button', { name: '英訳TXTを出力', exact: true }).click();
-  const zip = readFileSync((await (await event).path())!);
+  const zip = readFileSync(await (await event).path());
   const output = Buffer.from(unzipSync(zip)[`en-US/texts/${path}`]).toString('utf8');
   const original = fixtureTextAt(path, 'en');
   expect(output).toBe(

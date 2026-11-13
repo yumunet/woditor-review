@@ -33,7 +33,7 @@ test('offline restart, local Python rendering, and saved review operations', asy
   await page.getByRole('button', { name: 'AIレビューを依頼', exact: true }).click();
   const downloaded = page.waitForEvent('download');
   await page.getByRole('button', { name: 'JSONを出力', exact: true }).click();
-  const request = JSON.parse(readFileSync((await (await downloaded).path())!, 'utf8'));
+  const request = JSON.parse(readFileSync(await (await downloaded).path(), 'utf8'));
   expect(request.entries[0].posts[0].text).toContain('オフライン');
   await page.getByRole('button', { name: '閉じる', exact: true }).click();
   await page.reload();

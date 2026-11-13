@@ -70,6 +70,6 @@ test('common choice settings classify ignored rows, active value differences and
   await page.getByRole('button', { name: '英訳TXTを出力', exact: true }).click();
   const pending = page.waitForEvent('download');
   await page.getByRole('button', { name: '英訳TXTを出力', exact: true }).click();
-  const files = unzipSync(readFileSync((await (await pending).path())!));
+  const files = unzipSync(readFileSync(await (await pending).path()));
   expect(Buffer.from(files['en-US/texts/' + path]).toString('utf8')).toBe(en);
 });

@@ -88,7 +88,7 @@ export async function exportCurrentRequest(page: Page) {
   const pending = page.waitForEvent('download');
   await page.getByRole('button', { name: 'JSONを出力', exact: true }).click();
   const file = await pending,
-    request = JSON.parse(readFileSync((await file.path())!, 'utf8'));
+    request = JSON.parse(readFileSync(await file.path(), 'utf8'));
   expect(file.suggestedFilename()).toBe(
     `review_request_${request.requestId.replace(/-/g, '').slice(0, 12)}.json`,
   );

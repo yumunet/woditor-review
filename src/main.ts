@@ -1083,7 +1083,9 @@ root.addEventListener('submit', async (event) => {
   if (form.id === 'drive-config-form') {
     event.preventDefault();
     try {
-      await drive.configure(String(new FormData(form).get('clientId') ?? ''));
+      const clientId = new FormData(form).get('clientId') ?? '';
+      if (typeof clientId !== 'string') throw new Error('クライアントIDが文字列ではありません');
+      await drive.configure(clientId);
     } catch (error) {
       toast(String(error));
     }
@@ -1098,7 +1100,12 @@ root.addEventListener('submit', async (event) => {
       updateManualSources(
         file,
         item,
-        new Map([...new FormData(form)].map(([id, text]) => [id, String(text)])),
+        new Map(
+          [...new FormData(form)].map(([id, text]) => {
+            if (typeof text !== 'string') throw new Error('原文の入力が文字列ではありません');
+            return [id, text];
+          }),
+        ),
       );
       persist(file.path);
       closeSheet();
@@ -1165,7 +1172,7 @@ root.addEventListener('submit', async (event) => {
       if (revised?.size) {
         const zip = sourceZip(workspace);
         const result = await parseArchives(
-          zip.buffer as ArrayBuffer,
+          zip.buffer,
           await revised.arrayBuffer(),
           updateBusy,
           true,
@@ -1217,9 +1224,7 @@ root.addEventListener('submit', async (event) => {
   sheet = null;
   render();
   try {
-    const original = englishOnly
-      ? (sourceZip(workspace).buffer as ArrayBuffer)
-      : await ja.arrayBuffer();
+    const original = englishOnly ? sourceZip(workspace).buffer : await ja.arrayBuffer();
     const result = await parseArchives(original, await en.arrayBuffer(), updateBusy, englishOnly);
     diagnosticTab = 'error';
     const documents = replaceDiagnosticDocuments(

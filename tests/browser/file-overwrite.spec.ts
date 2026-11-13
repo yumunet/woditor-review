@@ -45,7 +45,7 @@ async function saved(page: Page) {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open('woditor-review');
       request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
+      request.onerror = () => reject(request.error ?? new Error('Test database open failed'));
     });
     const files: any[] = await new Promise((resolve) => {
       const request = db.transaction('files').objectStore('files').getAll();
@@ -128,7 +128,7 @@ test('overwrite confirmation cancels safely, defaults to preserving approval, an
   await page.getByRole('button', { name: '英訳TXTを出力', exact: true }).click();
   const downloading = page.waitForEvent('download');
   await page.getByRole('button', { name: '英訳TXTを出力', exact: true }).click();
-  const output = unzipSync(readFileSync((await (await downloading).path())!));
+  const output = unzipSync(readFileSync(await (await downloading).path()));
   expect(Buffer.from(output['en-US/texts/' + path]).toString('utf8')).toBe(revised);
   await page.getByRole('button', { name: '閉じる', exact: true }).click();
   await beginImport(page, revised.replace('Externally reviewed', 'Another external revision'));
@@ -171,7 +171,7 @@ test('overwriting one AI proposal preserves conversations and untouched proposal
   await page.getByRole('button', { name: 'AIレビューを依頼', exact: true }).click();
   const downloading = page.waitForEvent('download');
   await page.getByRole('button', { name: 'JSONを出力', exact: true }).click();
-  const request = JSON.parse(readFileSync((await (await downloading).path())!, 'utf8'));
+  const request = JSON.parse(readFileSync(await (await downloading).path(), 'utf8'));
   await page.getByRole('button', { name: '閉じる', exact: true }).click();
   const response = {
     schemaVersion: 1,

@@ -103,7 +103,7 @@ test('project Pages assets, install scope, and offline Python work under the sub
   await page.getByRole('button', { name: 'AIレビューを依頼', exact: true }).click();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'JSONを出力', exact: true }).click();
-  const request = JSON.parse(readFileSync((await (await download).path())!, 'utf8'));
+  const request = JSON.parse(readFileSync(await (await download).path(), 'utf8'));
   expect(request.entries[0].posts[0].text).toBe('Pages offline review');
   await page.reload();
   await expect(page.locator('.file-row')).toHaveCount(1);

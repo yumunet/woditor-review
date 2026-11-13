@@ -84,7 +84,7 @@ test('database memo displays encoded line breaks and multiline previews without 
   await page.getByRole('button', { name: '英訳TXTを出力', exact: true }).click();
   const event = page.waitForEvent('download');
   await page.getByRole('button', { name: '英訳TXTを出力', exact: true }).click();
-  const zip = unzipSync(readFileSync((await (await event).path())!));
+  const zip = unzipSync(readFileSync(await (await event).path()));
   expect(
     Buffer.from(zip[`en-US/texts/${path}`]).equals(Buffer.from(fixtureTextAt(path, 'en'))),
   ).toBe(true);
@@ -128,7 +128,7 @@ test('message line breaks and message and comment quotes are readable while TXT 
   await page.getByRole('button', { name: '英訳TXTを出力', exact: true }).click();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: '英訳TXTを出力', exact: true }).click();
-  const zip = unzipSync(readFileSync((await (await download).path())!));
+  const zip = unzipSync(readFileSync(await (await download).path()));
   expect(Buffer.from(zip[`en-US/texts/${path}`]).toString('utf8')).toBe(en);
 });
 
@@ -231,7 +231,7 @@ test('database CSV columns start at item zero and only mode zero exposes explici
   await page.getByRole('button', { name: '英訳TXTを出力', exact: true }).click();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: '英訳TXTを出力', exact: true }).click();
-  const zip = unzipSync(readFileSync((await (await download).path())!));
+  const zip = unzipSync(readFileSync(await (await download).path()));
   expect(Buffer.from(zip[`en-US/texts/${entries[0].path}`]).toString('utf8')).toBe(
     entries[0].en.replace('<<!--DATANAME--!>>Explicit name,', `<<!--DATANAME--!>>${after},`),
   );
@@ -272,7 +272,7 @@ test('empty original database data cells are omitted from review while English-o
   await page.getByRole('button', { name: '英訳TXTを出力', exact: true }).click();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: '英訳TXTを出力', exact: true }).click();
-  const zip = unzipSync(readFileSync((await (await download).path())!));
+  const zip = unzipSync(readFileSync(await (await download).path()));
   expect(Buffer.from(zip[`en-US/texts/${path}`]).toString('utf8')).toBe(en);
 });
 

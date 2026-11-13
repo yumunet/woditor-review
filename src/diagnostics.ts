@@ -151,7 +151,7 @@ export function diagnosticLocation(
   if (line && !enLine) {
     const nearest = file.commands
       .filter((c) => c.line > 0 && c.enLine)
-      .sort((a, b) => Math.abs(a.line - line!) - Math.abs(b.line - line!))[0];
+      .sort((a, b) => Math.abs(a.line - line) - Math.abs(b.line - line))[0];
     enLine = nearest?.enLine ?? undefined;
   }
   return {

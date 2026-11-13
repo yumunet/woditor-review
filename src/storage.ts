@@ -10,13 +10,13 @@ const open = () =>
       request.result.createObjectStore('meta');
     };
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+    request.onerror = () => reject(request.error ?? new Error('データベースを開けませんでした'));
     request.onblocked = () => reject(new Error('別のタブを閉じて保存を再試行してください'));
   });
 const value = <T>(req: IDBRequest<T>) =>
   new Promise<T>((resolve, reject) => {
     req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onerror = () => reject(req.error ?? new Error('データベースを読み込めませんでした'));
   });
 export async function loadWorkspace(): Promise<Workspace | null> {
   const db = await open();
@@ -50,8 +50,8 @@ export async function writeSetting(key: string, data: unknown): Promise<void> {
       const tx = db.transaction('meta', 'readwrite');
       tx.objectStore('meta').put(data, key);
       tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-      tx.onabort = () => reject(tx.error);
+      tx.onerror = () => reject(tx.error ?? new Error('設定を保存できませんでした'));
+      tx.onabort = () => reject(tx.error ?? new Error('設定の保存が中断されました'));
     });
   } finally {
     db.close();
@@ -74,7 +74,7 @@ export function saveWorkspace(workspace: Workspace, changedPath?: string): Promi
         snapshot.files.forEach((f) => store.put(f));
         tx.objectStore('meta').put(snapshot.meta, 'workspace');
         tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
+        tx.onerror = () => reject(tx.error ?? new Error('保存に失敗しました'));
         tx.onabort = () => reject(tx.error ?? new Error('保存が中断されました'));
       });
     } finally {
