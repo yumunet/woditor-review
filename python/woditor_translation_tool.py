@@ -67,20 +67,21 @@ def apply(a: argparse.Namespace) -> None:
             f"{len(unhandled)} Japanese lines were not recognized (first at line {unhandled[0][0]})"
         )
     data = json.loads(Path(a.translations).read_text(encoding="utf-8-sig"))
+    # Malformed document contents keep the public ValueError validation contract.
     if not isinstance(data, dict):
-        raise ValueError("Translation JSON must be an object")
+        raise ValueError("Translation JSON must be an object")  # noqa: TRY004
     entries = data.get("entries")
     if not isinstance(entries, list) or len(entries) != len(slots):
         raise ValueError("Translation entry count does not match extracted entries")
     changes: list[tuple[Slot, str]] = []
     for s, obj in zip(slots, entries, strict=True):
         if not isinstance(obj, dict):
-            raise ValueError(f"Entry {s.id} is not an object")
+            raise ValueError(f"Entry {s.id} is not an object")  # noqa: TRY004
         for key, expected in (("id", s.id), ("source", s.source)):
             if obj.get(key) != expected:
                 raise ValueError(f"Entry {s.id}: original {key} was modified")
         if not isinstance(obj.get("translation"), str):
-            raise ValueError(f"Entry {s.id} has no translation")
+            raise ValueError(f"Entry {s.id} has no translation")  # noqa: TRY004
         val = normalize_translation(obj["translation"], s.kind)
         if special_strings(s.source) != special_strings(val):
             raise ValueError(
@@ -91,13 +92,13 @@ def apply(a: argparse.Namespace) -> None:
     for s, val in changes:
         key = s.id.split(":", 1)[1]
         edits.append(
-            dict(
-                line=s.line,
-                key=key,
-                kind=s.kind,
-                translation=val,
-                position=int(key[1:]) if s.kind == "command_string" else None,
-            )
+            {
+                "line": s.line,
+                "key": key,
+                "kind": s.kind,
+                "translation": val,
+                "position": int(key[1:]) if s.kind == "command_string" else None,
+            }
         )
     result = render_file(text, edits)["text"]
     output_bytes = bom + result.encode(enc)
@@ -159,7 +160,7 @@ def usage(a: argparse.Namespace) -> None:
     # Identify usage with encoded numeric operands to avoid ambiguities in
     # displayed labels. Show the matching human-readable commands instead.
     num = re.compile(rf"(?<!\d){1600000 + index}(?!\d)")
-    special = re.compile(rf"\\cself\[{index}\]", re.I)
+    special = re.compile(rf"\\cself\[{index}\]", re.IGNORECASE)
     hits = [
         raw_line
         for raw_line, _, _ in pairs

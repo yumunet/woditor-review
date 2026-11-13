@@ -683,7 +683,7 @@ def pair_file(path: str, ja_raw: bytes, en_raw: bytes) -> dict:
             if s["key"].startswith("CSELF_NAME_"):
                 index = int(s["key"].split("_")[-1])
                 num = re.compile(rf"(?<!\d){1600000 + index}(?!\d)")
-                special = re.compile(rf"\\cself\[{index}\]", re.I)
+                special = re.compile(rf"\\cself\[{index}\]", re.IGNORECASE)
                 usages[s["id"]] = [
                     c["line"]
                     for c in commands

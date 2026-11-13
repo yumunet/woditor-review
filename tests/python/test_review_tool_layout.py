@@ -32,6 +32,7 @@ class ReviewToolLayoutTests(unittest.TestCase):
                 def run(*arguments, tools=tools, work=work):
                     return subprocess.run(
                         [sys.executable, str(tools / "woditor_review_tool.py"), *arguments],
+                        check=False,
                         cwd=work,
                         capture_output=True,
                         text=True,

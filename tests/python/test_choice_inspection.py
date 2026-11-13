@@ -45,7 +45,7 @@ class ChoiceInspectionTests(unittest.TestCase):
         source = "COMMON_ID=0\nVALINPUT_NUM=0\nLOADTYPE0=1\nCHOICE_VAL_0_NUM=3\nCHOICE_VAL_0_0=1\nCHOICE_VAL_0_1=4\nCHOICE_VAL_0_2=0\n"
         expected = "COMMON_ID=0\nVALINPUT_NUM=0\nLOADTYPE0=0\nCHOICE_VAL_0_NUM=0\n"
         report = inspect_choices(source)
-        self.assertEqual(report["counts"], dict(error=0, warning=0, automatic=1))
+        self.assertEqual(report["counts"], {"error": 0, "warning": 0, "automatic": 1})
         self.assertEqual(len(report["unused"]), 3)
         self.assertIn("入力形式を0へ補正", report["diagnostics"][0]["message"])
         revised, _ = clean_unused_choices(source)
@@ -68,7 +68,7 @@ class ChoiceInspectionTests(unittest.TestCase):
         )
         revised, report = clean_unused_choices(source)
         self.assertEqual(revised, expected)
-        self.assertEqual(report["counts"], dict(error=0, warning=0, automatic=3))
+        self.assertEqual(report["counts"], {"error": 0, "warning": 0, "automatic": 3})
         self.assertEqual(report["unused"], [])
         self.assertEqual(
             {d["key"] for d in report["diagnostics"]}, {"LOADTYPE1", "LOADTYPE2", "LOADTYPE4"}
@@ -110,6 +110,7 @@ class ChoiceInspectionTests(unittest.TestCase):
             def run(*args):
                 result = subprocess.run(
                     [sys.executable, cli, *args],
+                    check=False,
                     cwd=root,
                     capture_output=True,
                     text=True,
@@ -119,7 +120,7 @@ class ChoiceInspectionTests(unittest.TestCase):
                 return result
 
             report = json.loads(run("inspect-choices", "input.txt").stdout)
-            self.assertEqual(report["counts"], dict(error=0, warning=0, automatic=1))
+            self.assertEqual(report["counts"], {"error": 0, "warning": 0, "automatic": 1})
             self.assertIn(
                 "adjusted 2 count/mode settings",
                 run("clean-choices", "input.txt", "--out", "cleaned.txt").stdout,
@@ -147,7 +148,9 @@ class ChoiceInspectionTests(unittest.TestCase):
                 text = fixture(kind, mode, names, values)
                 report = inspect_choices(text)
                 self.assertEqual(
-                    report["counts"], dict(error=0, warning=0, automatic=0), report["diagnostics"]
+                    report["counts"],
+                    {"error": 0, "warning": 0, "automatic": 0},
+                    report["diagnostics"],
                 )
                 self.assertEqual(clean_unused_choices(text)[0], text)
 
@@ -243,6 +246,7 @@ class ChoiceInspectionTests(unittest.TestCase):
             def run(*args):
                 return subprocess.run(
                     [sys.executable, cli, *args],
+                    check=False,
                     cwd=root,
                     capture_output=True,
                     text=True,
@@ -289,6 +293,7 @@ class ChoiceInspectionTests(unittest.TestCase):
             def run(*args):
                 result = subprocess.run(
                     [sys.executable, cli, *args],
+                    check=False,
                     cwd=root,
                     capture_output=True,
                     text=True,

@@ -334,17 +334,17 @@ def text_cell(cell):
 
 
 def catalog(text):
-    start = re.search(r"^<<--CSV_START-->>\r?$", text, re.M)
+    start = re.search(r"^<<--CSV_START-->>\r?$", text, re.MULTILINE)
     if not start:
         return None
-    end = re.search(r"^<<--CSV_END-->>\r?$", text[start.end() :], re.M)
+    end = re.search(r"^<<--CSV_END-->>\r?$", text[start.end() :], re.MULTILINE)
     if not end:
         raise ValueError("CSV_ENDがありません")
     finish = start.end() + end.start()
     begin = start.end() + (1 if text[start.end() :].startswith("\n") else 0)
-    count = re.search(r"^ITEM_NUM=(\d+)\r?$", text[: start.start()], re.M)
+    count = re.search(r"^ITEM_NUM=(\d+)\r?$", text[: start.start()], re.MULTILINE)
     count = int(count[1]) if count else None
-    mode = re.search(r"^DATANAME_LOAD_TYPE=(\d+)\r?$", text[: start.start()], re.M)
+    mode = re.search(r"^DATANAME_LOAD_TYPE=(\d+)\r?$", text[: start.start()], re.MULTILINE)
     mode = int(mode[1]) if mode else None
     rows, cells, i = [], [], begin
     line = len(re.findall(r"\r\n|\r|\n", text[:begin])) + 1
@@ -387,7 +387,14 @@ def catalog(text):
                 i += 1
             b, value = i, text[a:i]
         cells.append(
-            dict(start=a, end=b, value=value, quoted=quoted, line=cell_line, dataName=data_name)
+            {
+                "start": a,
+                "end": b,
+                "value": value,
+                "quoted": quoted,
+                "line": cell_line,
+                "dataName": data_name,
+            }
         )
         if i < finish and text[i] == ",":
             i += 1
@@ -406,15 +413,15 @@ def catalog(text):
         if i == cell_start:
             raise ValueError("CSVの解析が進みません")
     if not rows:
-        return dict(
-            start=start.start(),
-            begin=begin,
-            end=finish,
-            rows=[],
-            fields={},
-            header=[],
-            nameMode=mode,
-        )
+        return {
+            "start": start.start(),
+            "begin": begin,
+            "end": finish,
+            "rows": [],
+            "fields": {},
+            "header": [],
+            "nameMode": mode,
+        }
     header, data = rows[0], rows[1:]
     if count is None:
         count = len(header)
@@ -442,15 +449,15 @@ def catalog(text):
                 "position": count + 1,
                 "csv": {"row": row, "item": None, "dataName": True},
             }
-    return dict(
-        start=start.start(),
-        begin=begin,
-        end=finish,
-        rows=data,
-        fields=fields,
-        header=header,
-        nameMode=mode,
-    )
+    return {
+        "start": start.start(),
+        "begin": begin,
+        "end": finish,
+        "rows": data,
+        "fields": fields,
+        "header": header,
+        "nameMode": mode,
+    }
 
 
 def cell_for_key(text, key, section=None):
@@ -728,7 +735,7 @@ def choice_record_active(kind, key, meta):
     choice = choice_key(kind, key)
     if not choice:
         return True
-    family, group, index = choice
+    _, group, index = choice
     if choice_mode(kind, meta, group) in (None, 0):
         return False
     if index == "NUM":
@@ -769,15 +776,15 @@ def choice_records(text):
             break
         if match := META.fullmatch(line):
             result.append(
-                dict(
-                    key=match[1],
-                    value=match[2],
-                    line=number,
-                    start=offset,
-                    end=offset + len(complete),
-                    valueStart=offset + match.start(2),
-                    valueEnd=offset + match.end(2),
-                )
+                {
+                    "key": match[1],
+                    "value": match[2],
+                    "line": number,
+                    "start": offset,
+                    "end": offset + len(complete),
+                    "valueStart": offset + match.start(2),
+                    "valueEnd": offset + match.end(2),
+                }
             )
         offset += len(complete)
     return result
@@ -801,13 +808,13 @@ def inspect_choices(text):
 
     def issue(severity, message, record, group):
         diagnostics.append(
-            dict(
-                severity=severity,
-                message=f"{message}（{'数値引数' if kind == 'common' else '項目'} {group}、行 {record['line']}）",
-                line=record["line"],
-                key=record["key"],
-                group=group,
-            )
+            {
+                "severity": severity,
+                "message": f"{message}（{'数値引数' if kind == 'common' else '項目'} {group}、行 {record['line']}）",
+                "line": record["line"],
+                "key": record["key"],
+                "group": group,
+            }
         )
 
     for record in records:
@@ -962,16 +969,16 @@ def inspect_choices(text):
                 ignored[0] if ignored else anchor,
                 group,
             )
-    return dict(
-        type=kind,
-        diagnostics=diagnostics,
-        unused=unused,
-        changes=changes,
-        counts={
+    return {
+        "type": kind,
+        "diagnostics": diagnostics,
+        "unused": unused,
+        "changes": changes,
+        "counts": {
             severity: sum(d["severity"] == severity for d in diagnostics)
             for severity in ("error", "warning", "automatic")
         },
-    )
+    }
 
 
 def clean_unused_choices(text):

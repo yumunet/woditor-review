@@ -30,6 +30,7 @@ class ModuleBoundaryTests(unittest.TestCase):
             def run(*args):
                 result = subprocess.run(
                     [sys.executable, str(tool / "woditor_translation_tool.py"), *args],
+                    check=False,
                     cwd=work,
                     capture_output=True,
                     text=True,

@@ -518,13 +518,12 @@ def check_schema(data, schema: dict, root: dict | None = None, location: str = "
         raise ValueError(f"{location}: invalid constant")
     if "enum" in schema and data not in schema["enum"]:
         raise ValueError(f"{location}: unknown value")
-    if isinstance(data, str):
-        if (
-            len(data) < schema.get("minLength", 0)
-            or "pattern" in schema
-            and not re.search(schema["pattern"], data)
-        ):
-            raise ValueError(f"{location}: invalid string")
+    if isinstance(data, str) and (
+        len(data) < schema.get("minLength", 0)
+        or "pattern" in schema
+        and not re.search(schema["pattern"], data)
+    ):
+        raise ValueError(f"{location}: invalid string")
     if isinstance(data, int) and data < schema.get("minimum", data):
         raise ValueError(f"{location}: below minimum")
     if isinstance(data, dict):

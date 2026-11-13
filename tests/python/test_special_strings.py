@@ -88,6 +88,5 @@ class SpecialStringTests(unittest.TestCase):
             (r"\udb[3:\v[4]:\self[1]]", r"\udb[3:\v[5]:\self[1]]"),
             (r"\E", r"\N"),
         ]:
-            with self.subTest(before=before):
-                with self.assertRaisesRegex(ValueError, "special strings"):
-                    self.apply(before, after)
+            with self.subTest(before=before), self.assertRaisesRegex(ValueError, "special strings"):
+                self.apply(before, after)
