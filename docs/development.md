@@ -83,7 +83,7 @@ english.zip
 - JSONと英訳TXTの出力ボタンは同じ行。指示文はインライン表示せず、コピー通知の確認ボタンから中央ダイアログで全文を表示する。コピー拒否時も全文を手動コピーできる。Escapeで閉じ、Tabのフォーカスはダイアログ内に制限する。
 - 原文・英訳・新訳ボックスは白。不採用案の説明と破棄ボタンは同じpair領域に置き、ボックスとの間に余白を設ける。承認ボタンは円で囲ったチェックアイコン。
 - 依頼・回答のファイル名は `review_request_<短縮ID>.json` / `review_response_<短縮ID>.json`。UUIDのハイフンを除いた先頭12文字をファイル名に使用し、JSON内部のrequestIdは完全なUUIDを保持する。同じ出力シート内では依頼・コピー指示文でIDを共有する。
-- バックアップ名は woditor-review-backup_YYYY-MM-DD_HH-mm-ss.json。端末のローカル日時で生成し、UTCへ変換しない。
+- バックアップ名は woditor-review-backup_YYYY-MM-DD_HH-mm-ss.zip。内部に同じ日時のインデントなしUTF-8 JSONを1件格納する。端末のローカル日時で生成し、UTCへ変換しない。通常保存とDrive復旧用のダウンロードに共通で、旧JSONも復元できる。
 
 ## JSON形式とPython補助ツール
 
@@ -98,6 +98,8 @@ Python補助ツールの初回レビュー用build入力は `{"responses":[],"su
 - [review-request.schema.json](../python/schemas/review-request.schema.json)：依頼ID、相対パス、版（UTF-8 BOMを除いたテキストのSHA-256）、項目ID、Slot ID・英語側の位置・原文・現訳、コメントID・全投稿、周辺コマンド、再審用の保留案 `pendingChanges`。内部では日本語側の `line` と英語側の `enLine` を分離し、依頼JSONの `line` は英語側の行番号です。
 - [review-response.schema.json](../python/schemas/review-response.schema.json)：各コメントへの判断・理由・Slot別変更と新規改善案。既存IDと版をそのまま返します。
 - バックアップ：`schemaVersion`、全ファイル、原文・英訳・BOM、Slot、グループ、コメント、保留／確定変更、依頼履歴、取り込み済み回答ID、診断情報を含みます。復元時に参照関係を検証します。
+
+バックアップZIPはJSON1件の通常ZIP（保存またはDEFLATE、暗号化・ZIP64なし）として読み、ヘッダー・CRC・実際の展開量を確認してから既存の参照検証を行う。JSONの上限は従来と同じ256Mi UTF-16コード単位で、UTF-8の展開量はその3倍＋BOM分まで。展開を16KiBずつ入力し、展開後の巨大なバイト配列を一括保持しない。旧JSONにも同じ文字数上限を適用する。ダウンロード用URLはバックアップだけ1秒後に解放し、他の出力は従来の30秒を維持する。
 
 回答例（実際にはエクスポートしたIDと64桁の版を使います）：
 

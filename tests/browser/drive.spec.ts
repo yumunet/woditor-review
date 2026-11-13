@@ -2,7 +2,7 @@ import { captureUi } from './screenshots';
 import { test, expect, type Page, type BrowserContext } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { loadFixture, sourcePath } from './helpers';
-import { gzipSync, gunzipSync } from 'fflate';
+import { gzipSync, gunzipSync, unzipSync, strFromU8 } from 'fflate';
 const path = sourcePath;
 const clientId = '123-test.apps.googleusercontent.com';
 interface StoredFile {
@@ -195,7 +195,8 @@ test('Drive exchanges real reviews between devices, preserves conflicts, and dow
     await page
       .getByRole('button', { name: '同期前の端末データをバックアップ保存', exact: true })
       .click();
-    const recovery = readFileSync(await (await event).path(), 'utf8');
+    const recoveryZip = unzipSync(readFileSync(await (await event).path()));
+    const recovery = strFromU8(Object.values(recoveryZip)[0]);
     expect(recovery).toContain('PC parallel edit');
     expect(recovery).not.toContain('Phone edit');
     await closeSheet(page);

@@ -1,5 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { captureUi } from './screenshots';
+import { readFileSync } from 'node:fs';
+import { unzipSync, strFromU8 } from 'fflate';
 import {
   loadFixture,
   loadNavigationFiles,
@@ -163,11 +165,34 @@ test.describe('backup timestamps', () => {
     const event = page.waitForEvent('download');
     await page.getByRole('button', { name: '状態をバックアップ', exact: true }).click();
     const file = await event;
-    expect(file.suggestedFilename()).toBe('woditor-review-backup_2026-11-09_19-06-07.json');
+    expect(file.suggestedFilename()).toBe('woditor-review-backup_2026-11-09_19-06-07.zip');
     const backup = await file.path();
+    const entries = unzipSync(readFileSync(backup));
+    expect(Object.keys(entries)).toEqual(['woditor-review-backup_2026-11-09_19-06-07.json']);
+    const text = strFromU8(Object.values(entries)[0]);
+    expect(text).not.toContain('\n');
+    await postReviewComment(page, 'Keep after canceled restore');
     await page.getByRole('button', { name: 'メニュー', exact: true }).click();
     await page.getByRole('button', { name: 'バックアップを復元', exact: true }).click();
     await page.locator('input[name=backup]').setInputFiles(backup);
+    await page.getByRole('button', { name: '復元する', exact: true }).click();
+    await page.getByRole('button', { name: 'キャンセル', exact: true }).click();
+    await expect(page.locator('.float-preview')).toHaveText('Keep after canceled restore');
+    await page.locator('input[name=backup]').setInputFiles({
+      name: 'broken.zip',
+      mimeType: 'application/zip',
+      buffer: Buffer.from('PKbroken'),
+    });
+    await page.getByRole('button', { name: '復元する', exact: true }).click();
+    await expect(page.locator('.toast')).toContainText('バックアップZIP');
+    await expect(page.getByRole('alertdialog')).toHaveCount(0);
+    await expect(page.locator('.float-preview')).toHaveText('Keep after canceled restore');
+    // An older, indented JSON backup remains compatible too.
+    await page.locator('input[name=backup]').setInputFiles({
+      name: 'legacy.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify(JSON.parse(text), null, 2)),
+    });
     await page.getByRole('button', { name: '復元する', exact: true }).click();
     await page.getByRole('button', { name: '確定', exact: true }).click();
     await expect(page.locator('.file-row')).toContainText('MapData');

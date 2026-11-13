@@ -40,14 +40,8 @@ import {
   setResolved,
   undoApproval,
 } from './review-state';
-import {
-  backupFileName,
-  backupJson,
-  download,
-  loadWorkspace,
-  restoreJson,
-  saveWorkspace,
-} from './storage';
+import { download, loadWorkspace, saveWorkspace } from './storage';
+import { createBackup, readBackup } from './backup-archive';
 import {
   chatInstructions,
   createRequest,
@@ -588,7 +582,7 @@ function sheetBody() {
     return diagnosticsView(workspace.diagnostics, diagnosticTab, workspace);
   if (sheet === 'comments') return commentsBody();
   if (sheet === 'restore')
-    return '<form class="form" id="restore-form"><label>バックアップ JSON<input type="file" name="backup" accept=".json,application/json" required></label><button class="primary" type="submit">復元する</button></form>';
+    return '<form class="form" id="restore-form"><label>バックアップ ZIP / JSON<input type="file" name="backup" accept=".zip,.json,application/zip,application/json" required></label><button class="primary" type="submit">復元する</button></form>';
   if (sheet === 'export')
     return `<fieldset class="review-mode"><legend>依頼内容</legend><label><input type="radio" name="review-mode" value="initial" ${reviewMode === 'initial' ? 'checked' : ''}>英訳をチェックして指摘・修正案を作る</label><label><input type="radio" name="review-mode" value="comments" ${reviewMode === 'comments' ? 'checked' : ''}>既存コメントに回答・修正する</label></fieldset>${exportRows()}<div class="sheet-foot"><div class="export-actions"><button class="primary" data-action="export-request" ${!exportSelection.size ? 'disabled' : ''}>JSONを出力</button><button class="text-act" data-action="english-zip" ${!exportSelection.size ? 'disabled' : ''}>英訳TXTを出力</button></div><div class="send-row"><button class="text-act" data-action="copy-instructions" ${!exportSelection.size ? 'disabled' : ''}>${icon('copy')}指示文をコピー</button></div></div>`;
   if (sheet === 'response')
@@ -758,7 +752,7 @@ root.addEventListener('click', (event) => {
     return;
   }
   if (action === 'drive-recovery' && drive.state.recovery) {
-    download(backupFileName(), backupJson(drive.state.recovery));
+    void exportBackup(drive.state.recovery);
     return;
   }
   if (action === 'drive-use-local' || action === 'drive-use-remote') {
@@ -1002,8 +996,7 @@ root.addEventListener('click', (event) => {
     );
     return;
   } else if (action === 'backup') {
-    download(backupFileName(), backupJson(workspace));
-    toast('バックアップを出力しました');
+    void exportBackup(workspace);
     return;
   } else if (['export-request', 'copy-instructions', 'english-zip'].includes(action!)) {
     void exportReview(action!);
@@ -1079,6 +1072,10 @@ root.addEventListener('change', (event) => {
   }
 });
 root.addEventListener('submit', async (event) => {
+  if (busy) {
+    event.preventDefault();
+    return;
+  }
   const form = event.target as HTMLFormElement;
   if (form.id === 'drive-config-form') {
     event.preventDefault();
@@ -1138,7 +1135,7 @@ root.addEventListener('submit', async (event) => {
     event.preventDefault();
     const file = new FormData(form).get('backup') as File;
     try {
-      const restored = restoreJson(await file.text());
+      const restored = await readBackup(file);
       ask('現在の作業状態をバックアップで置き換えますか？', async () => {
         await saveWorkspace(restored);
         workspace = restored;
@@ -1295,6 +1292,25 @@ root.addEventListener('submit', async (event) => {
   busy = '';
   render();
 });
+async function exportBackup(data: Workspace) {
+  if (busy) return;
+  if (drive.state.working) {
+    toast('同期が終わってからバックアップしてください');
+    return;
+  }
+  busy = 'バックアップを準備中…';
+  render();
+  try {
+    const { name, blob } = await createBackup(data);
+    download(name, blob, 'application/zip', 1000);
+    toast('バックアップを出力しました');
+  } catch (error) {
+    toast(String(error));
+  } finally {
+    busy = '';
+    render();
+  }
+}
 async function exportReview(action: string) {
   const forRequest = sheet === 'export';
   busy = '出力を準備中…';

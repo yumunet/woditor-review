@@ -347,26 +347,58 @@ export function validateWorkspace(data: unknown): asserts data is Workspace {
   if (!data.importedResponses.every(str)) return fail();
 }
 export function backupJson(workspace: Workspace) {
-  return JSON.stringify(workspace, null, 2);
+  return JSON.stringify(workspace);
 }
 export function backupFileName(date = new Date()) {
   const pad = (n: number) => String(n).padStart(2, '0');
   const day = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
   const time = `${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}`;
-  return `woditor-review-backup_${day}_${time}.json`;
+  return `woditor-review-backup_${day}_${time}.zip`;
 }
+export const backupTextLimit = 256 * 1024 * 1024;
 export function restoreJson(text: string): Workspace {
-  if (text.length > 256 * 1024 * 1024) throw new Error('バックアップが大きすぎます');
+  if (text.length > backupTextLimit) throw new Error('バックアップが大きすぎます');
   const data: unknown = JSON.parse(text);
   validateWorkspace(data);
   return data;
 }
-export function download(name: string, data: string | Uint8Array, type = 'application/json') {
-  const blob = new Blob([typeof data === 'string' ? data : new Uint8Array(data)], { type });
+const downloads = new Set<() => void>();
+if (typeof window !== 'undefined')
+  window.addEventListener('pagehide', () => {
+    for (const release of downloads) release();
+  });
+export function download(
+  name: string,
+  data: string | Uint8Array | Blob,
+  type = 'application/json',
+  releaseAfter = 30_000,
+) {
+  const part =
+    typeof data === 'string' || data instanceof Blob
+      ? data
+      : data.buffer instanceof ArrayBuffer
+        ? new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
+        : new Uint8Array(data);
+  const blob = data instanceof Blob ? data : new Blob([part], { type });
   const url = URL.createObjectURL(blob),
     a = document.createElement('a');
   a.href = url;
   a.download = name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  const release = () => {
+    clearTimeout(timer);
+    URL.revokeObjectURL(url);
+    downloads.delete(release);
+  };
+  const timer = setTimeout(release, releaseAfter);
+  downloads.add(release);
+  try {
+    document.body.append(a);
+    a.click();
+  } catch (error) {
+    release();
+    throw error;
+  } finally {
+    a.removeAttribute('href');
+    a.remove();
+  }
 }
