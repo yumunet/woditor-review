@@ -159,8 +159,56 @@ test('review mode stays selected after panel close, history and app restart', as
 test.describe('backup timestamps', () => {
   test.use({ timezoneId: 'Pacific/Honolulu' });
   test('backup download uses the device local date and time and can restore', async ({ page }) => {
+    await page.addInitScript(() => {
+      const stats = { active: 0, pending: 0, maxPending: 0, maxBytes: 0, urls: new Set<string>() };
+      Object.assign(window, { backupStats: stats });
+      const NativeWorker = window.Worker;
+      window.Worker = class extends NativeWorker {
+        tracked: boolean;
+        stopped = false;
+        constructor(url: string | URL, options?: WorkerOptions) {
+          super(url, options);
+          this.tracked = String(url).includes('backup.worker');
+          if (this.tracked) {
+            stats.active++;
+            this.addEventListener('message', ({ data }) => {
+              if (data.type === 'ack') stats.pending--;
+            });
+          }
+        }
+        override postMessage(
+          message: any,
+          options: Transferable[] | StructuredSerializeOptions = [],
+        ) {
+          if (this.tracked) {
+            stats.pending++;
+            stats.maxPending = Math.max(stats.maxPending, stats.pending);
+            stats.maxBytes = Math.max(stats.maxBytes, message.data?.byteLength ?? 0);
+          }
+          if (Array.isArray(options)) super.postMessage(message, options);
+          else super.postMessage(message, options);
+        }
+        override terminate() {
+          if (this.tracked && !this.stopped) stats.active--;
+          this.stopped = true;
+          super.terminate();
+        }
+      };
+      const create = URL.createObjectURL.bind(URL),
+        revoke = URL.revokeObjectURL.bind(URL);
+      URL.createObjectURL = (blob) => {
+        const url = create(blob);
+        if (blob instanceof Blob && blob.type === 'application/zip') stats.urls.add(url);
+        return url;
+      };
+      URL.revokeObjectURL = (url) => {
+        stats.urls.delete(url);
+        revoke(url);
+      };
+    });
     await loadFixture(page);
     await page.clock.setFixedTime(new Date('2026-11-10T05:06:07Z'));
+    await postReviewComment(page, '分割境界😀'.repeat(20000));
     await page.getByRole('button', { name: 'メニュー', exact: true }).click();
     const event = page.waitForEvent('download');
     await page.getByRole('button', { name: '状態をバックアップ', exact: true }).click();
@@ -171,6 +219,33 @@ test.describe('backup timestamps', () => {
     expect(Object.keys(entries)).toEqual(['woditor-review-backup_2026-11-09_19-06-07.json']);
     const text = strFromU8(Object.values(entries)[0]);
     expect(text).not.toContain('\n');
+    expect(
+      await page.evaluate(() => {
+        const { active, pending, maxPending, maxBytes } = (window as any).backupStats;
+        return { active, pending, maxPending, maxBytes };
+      }),
+    ).toEqual({ active: 0, pending: 0, maxPending: 1, maxBytes: 65536 });
+    await expect.poll(() => page.evaluate(() => (window as any).backupStats.urls.size)).toBe(0);
+    await page.evaluate(() => {
+      const NativeWorker = window.Worker;
+      window.Worker = class extends NativeWorker {
+        constructor(url: string | URL, options?: WorkerOptions) {
+          super(url, options);
+          if (String(url).includes('backup.worker'))
+            queueMicrotask(() =>
+              this.dispatchEvent(new ErrorEvent('error', { message: 'Compression failure test' })),
+            );
+        }
+      };
+    });
+    let downloads = 0;
+    page.on('download', () => downloads++);
+    await page.getByRole('button', { name: 'メニュー', exact: true }).click();
+    await page.getByRole('button', { name: '状態をバックアップ', exact: true }).click();
+    await expect(page.locator('.toast')).toContainText('Compression failure test');
+    await expect(page.locator('.busy')).toHaveCount(0);
+    expect(downloads).toBe(0);
+    expect(await page.evaluate(() => (window as any).backupStats.active)).toBe(0);
     await postReviewComment(page, 'Keep after canceled restore');
     await page.getByRole('button', { name: 'メニュー', exact: true }).click();
     await page.getByRole('button', { name: 'バックアップを復元', exact: true }).click();

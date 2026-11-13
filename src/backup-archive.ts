@@ -1,6 +1,8 @@
-import { Inflate, zipSync } from 'fflate';
+import { Inflate } from 'fflate';
 import type { Workspace } from './model';
-import { backupFileName, backupJson, backupTextLimit, restoreJson } from './storage';
+import { backupFileName, backupTextLimit, restoreJson } from './storage';
+import { backupChunks } from './backup-json';
+import { compressBackup, type BackupCompressor } from './backup-compression';
 
 const badZip = () => new Error('バックアップZIPが破損しているか、対応していない形式です');
 const tooLarge = () => new Error('バックアップが大きすぎます');
@@ -8,15 +10,13 @@ const crcTable = Uint32Array.from({ length: 256 }, (_, value) => {
   for (let bit = 0; bit < 8; bit++) value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
   return value >>> 0;
 });
-export async function createBackup(workspace: Workspace, date = new Date()) {
-  const name = backupFileName(date),
-    text = backupJson(workspace);
-  if (text.length > backupTextLimit) throw tooLarge();
-  const bytes = zipSync(
-    { [name.replace(/\.zip$/, '.json')]: new TextEncoder().encode(text) },
-    { level: 6 },
-  );
-  return { name, blob: new Blob([bytes], { type: 'application/zip' }) };
+export async function createBackup(
+  workspace: Workspace,
+  date = new Date(),
+  compress: BackupCompressor = compressBackup,
+) {
+  const name = backupFileName(date);
+  return { name, blob: await compress(name.replace(/\.zip$/, '.json'), backupChunks(workspace)) };
 }
 
 async function view(blob: Blob) {

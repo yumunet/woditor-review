@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { fixtureText, sourcePath } from '../helpers/woditor';
-import { zipSync } from 'fflate';
+import { zipSync, unzipSync, strFromU8 } from 'fflate';
 const base = '/woditor-review/',
   path = sourcePath;
 test('project Pages assets, install scope, and offline Python work under the subpath', async ({
@@ -105,6 +105,12 @@ test('project Pages assets, install scope, and offline Python work under the sub
   await page.getByRole('button', { name: 'JSONを出力', exact: true }).click();
   const request = JSON.parse(readFileSync(await (await download).path(), 'utf8'));
   expect(request.entries[0].posts[0].text).toBe('Pages offline review');
+  await page.getByRole('button', { name: '閉じる', exact: true }).click();
+  await page.getByRole('button', { name: 'メニュー', exact: true }).click();
+  const backup = page.waitForEvent('download');
+  await page.getByRole('button', { name: '状態をバックアップ', exact: true }).click();
+  const entries = unzipSync(readFileSync(await (await backup).path()));
+  expect(JSON.parse(strFromU8(Object.values(entries)[0])).files).toHaveLength(1);
   await page.reload();
   await expect(page.locator('.file-row')).toHaveCount(1);
   expect(paths.every((p) => p.startsWith(base))).toBeTruthy();

@@ -5,6 +5,17 @@ import { createBackup, readBackup } from '../src/backup-archive';
 import { backupJson } from '../src/storage';
 import { emptyWorkspace } from '../src/model';
 import { reviewFile } from './helpers/review-fixtures';
+import { BackupZip } from '../src/backup-zip';
+import { backupChunks } from '../src/backup-json';
+import type { BackupCompressor } from '../src/backup-compression';
+
+const inlineCompression: BackupCompressor = async (name, chunks) => {
+  const parts: Uint8Array<ArrayBuffer>[] = [],
+    archive = new BackupZip(name, (data) => parts.push(data));
+  for (const data of chunks) archive.push(data);
+  archive.push(new Uint8Array(), true);
+  return new Blob(parts, { type: 'application/zip' });
+};
 
 function workspace() {
   return {
@@ -28,7 +39,11 @@ test('backup ZIP contains one compact UTF-8 JSON and round trips the full review
   const original = workspace(),
     before = structuredClone(original),
     expected = JSON.parse(JSON.stringify(original));
-  const { name, blob } = await createBackup(original, new Date(2026, 10, 13, 12, 34, 56));
+  const { name, blob } = await createBackup(
+    original,
+    new Date(2026, 10, 13, 12, 34, 56),
+    inlineCompression,
+  );
   assert.equal(name, 'woditor-review-backup_2026-11-13_12-34-56.zip');
   const files = unzipSync(new Uint8Array(await blob.arrayBuffer()));
   assert.deepEqual(Object.keys(files), [name.replace('.zip', '.json')]);
@@ -36,6 +51,30 @@ test('backup ZIP contains one compact UTF-8 JSON and round trips the full review
   assert.equal(backupJson(original), JSON.stringify(original));
   assert.deepEqual(await readBackup(blob), expected);
   assert.deepEqual(original, before);
+});
+test('bounded JSON chunks preserve escapes, Unicode pairs, lone surrogates and optional values', () => {
+  const values = [
+    'a'.repeat(4095) + '😀',
+    '日本語\\\r\n\t"'.repeat(14000),
+    '\ud800' + 'z'.repeat(4095) + '\udc00',
+  ];
+  const input = {
+    values,
+    [values[0]]: 'key boundary',
+    omitted: undefined,
+    array: [undefined, null, true, false, NaN, Infinity, -0, 123],
+  };
+  const pieces = [...backupChunks(input)];
+  assert.ok(pieces.every((p) => p.length <= 65536));
+  assert.equal(Buffer.concat(pieces).toString('utf8'), JSON.stringify(input));
+  assert.deepEqual(
+    JSON.parse(Buffer.concat(pieces).toString('utf8')),
+    JSON.parse(JSON.stringify(input)),
+  );
+  assert.throws(() => [...backupChunks(input, 10)], /大きすぎ/);
+  const cycle: { child?: unknown } = {};
+  cycle.child = cycle;
+  assert.throws(() => [...backupChunks(cycle)], /循環/);
 });
 test('legacy indented JSON including BOM still restores', async () => {
   const original = workspace();
@@ -87,6 +126,15 @@ test('actual decoded size and declared expansion limits are enforced', async () 
   await assert.rejects(readBackup(new Blob([text]), text.length - 1), /大きすぎ/);
   await assert.rejects(readBackup(zip(text), text.length - 1), /大きすぎ/);
   const bytes = zipSync({ 'state.json': new TextEncoder().encode(text) });
+  await assert.rejects(
+    readBackup(
+      mutate(bytes, (v, c) => {
+        v.setUint32(22, 1, true);
+        v.setUint32(c + 24, 1, true);
+      }),
+    ),
+    /大きすぎ/,
+  );
   await assert.rejects(
     readBackup(
       mutate(bytes, (v, c) => v.setUint32(c + 24, 10000, true)),

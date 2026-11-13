@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { captureUi } from './screenshots';
 import { loadFixture } from './helpers';
+import { unzipSync, strFromU8 } from 'fflate';
 
 test('offline restart, local Python rendering, and saved review operations', async ({
   page,
@@ -36,6 +37,11 @@ test('offline restart, local Python rendering, and saved review operations', asy
   const request = JSON.parse(readFileSync(await (await downloaded).path(), 'utf8'));
   expect(request.entries[0].posts[0].text).toContain('オフライン');
   await page.getByRole('button', { name: '閉じる', exact: true }).click();
+  await page.getByRole('button', { name: 'メニュー', exact: true }).click();
+  const backup = page.waitForEvent('download');
+  await page.getByRole('button', { name: '状態をバックアップ', exact: true }).click();
+  const entries = unzipSync(readFileSync(await (await backup).path()));
+  expect(strFromU8(Object.values(entries)[0])).toContain('オフラインで保存したコメント');
   await page.reload();
   for (const name of ['MapData', 'TestMap', 'Event_0000.txt'])
     await page

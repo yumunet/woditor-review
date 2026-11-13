@@ -22,6 +22,8 @@ Remove-Item Env:BASE_PATH
 
 サブパスの検証後に通常の開発へ戻る場合は、通常の `npm run build` で成果物を戻す。UI変更時だけ、既存の `UPDATE_SCREENSHOTS` による撮影手順を使用する。テストを移動しただけの場合は画像を更新しない。
 
+バックアップのメモリ比較はWindows/Edgeで `node scripts/benchmark-backup.mjs` を実行する。専用のViteサーバー（127.0.0.1:4175）とブラウザーを起動し、私有データを使わず160ファイル・10,240項目を生成する。旧JSON出力と分割ZIP出力を各3回計測し、全ブラウザープロセスのPrivate Bytes・Working Set（Worker・ネイティブBlobを含む）、出力サイズ・時間、URL解放とGC後の保持を `.tools/quality-audit/backup-memory.json` に記録する。出力先は第1引数で変更できる。旧処理のURL解放を待つため数分かかる。計測中は別のテストを並行実行しない。OSの予約メモリと生存オブジェクトを区別し、単なるメイン画面のヒープ減少だけで改善と判断しない。
+
 ## 検証の分担
 
 | 層              | 主な保証                                                                                                                                                           |
@@ -29,7 +31,7 @@ Remove-Item Env:BASE_PATH
 | TypeScript単体  | レビュー状態・AI回答の原子的な拒否と確定/再開/破棄、上書き時の保全、バックアップの参照検証、ZIPパス、検索・並び順・移動、同期の競合・認証/API処理                  |
 | Python単体・CLI | TXT/CSV解析、抽出対象、日英の対応付けと位置、特殊文字列、未使用設定の検出・安全な削除、無変更往復、文字コード/BOM/改行、別フォルダへの出力、単体配布と内包スキーマ |
 | PC・モバイルE2E | ZIPから実際のPyodide解析・表示・保存・再起動・出力、AIレビューの往復、キャンセルと履歴、フィルター・選択・関連項目、設定保持、Driveの端末間同期、操作可能性        |
-| Pages E2E       | サブパスのアセット・Manifest・Service Workerと、オフラインで初めてPythonを起動する解析・保存・JSON出力                                                             |
+| Pages E2E       | サブパスのアセット・Manifest・Service Workerと、オフラインで初めてPythonを起動する解析・保存・JSON出力・バックアップ圧縮Worker                                     |
 
 タッチのドラッグ選択・スワイプはモバイルだけで実行する。キーボード表示はVisualViewportの縮小・移動で再現し、入力欄の収まりと外側スクロール防止を確認する。実端末のキーパッドやiOSの挙動まで保証するものではない。Driveの認証・APIはモックであり、実アカウントの認可は [google-drive.md](google-drive.md) の手順で別途確認する。
 

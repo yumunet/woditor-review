@@ -246,6 +246,13 @@ test('Drive exchanges real reviews between devices, preserves conflicts, and dow
     await openDrive(page);
     await page.getByRole('button', { name: '今すぐ同期', exact: true }).click();
     await expect.poll(() => server.downloading).toBeTruthy();
+    await page
+      .getByRole('button', { name: '同期前の端末データをバックアップ保存', exact: true })
+      .click();
+    await expect(page.locator('.toast')).toContainText(
+      '同期が終わってからバックアップしてください',
+    );
+    await expect(page.locator('.busy')).toHaveCount(0);
     await closeSheet(page);
     await comment(page, 'Local edit during download');
     release();

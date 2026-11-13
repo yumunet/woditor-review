@@ -4,7 +4,7 @@
 
 ## 実行環境と配信
 
-UIはTypeScript、解析はWeb Worker上のPython / Pyodide、状態保存はIndexedDB。サーバーDBは使用しない。Google Drive同期を有効にした場合だけGoogleの認証・Drive APIを使用する。初回は同一ホストから約12MBのPyodideランタイムを取得する。本番ビルドは14ローカルリソースを含むPWAを生成する。
+UIはTypeScript、解析はWeb Worker上のPython / Pyodide、状態保存はIndexedDB。サーバーDBは使用しない。Google Drive同期を有効にした場合だけGoogleの認証・Drive APIを使用する。初回は同一ホストから約12MBのPyodideランタイムを取得する。本番ビルドは必要なローカルリソースをキャッシュするPWAを生成する。
 
 静的公開は `dist/` 一式をHTTPSで配信する。`BASE_PATH` 環境変数で配置パスを指定でき、未指定は `/`。`file://` での直接起動は非対応。インストールとオフライン確認は `npm run build` と `npm run preview` を使用する。
 
@@ -100,6 +100,10 @@ Python補助ツールの初回レビュー用build入力は `{"responses":[],"su
 - バックアップ：`schemaVersion`、全ファイル、原文・英訳・BOM、Slot、グループ、コメント、保留／確定変更、依頼履歴、取り込み済み回答ID、診断情報を含みます。復元時に参照関係を検証します。
 
 バックアップZIPはJSON1件の通常ZIP（保存またはDEFLATE、暗号化・ZIP64なし）として読み、ヘッダー・CRC・実際の展開量を確認してから既存の参照検証を行う。JSONの上限は従来と同じ256Mi UTF-16コード単位で、UTF-8の展開量はその3倍＋BOM分まで。展開を16KiBずつ入力し、展開後の巨大なバイト配列を一括保持しない。旧JSONにも同じ文字数上限を適用する。ダウンロード用URLはバックアップだけ1秒後に解放し、他の出力は従来の30秒を維持する。
+
+ダウンロード時は `backup-json.ts` が文字列のエスケープを分割し、小さなキー・記号を数KiBごとにまとめて `TextEncoder.encodeInto` で出力先へ直接書き込む。最大64KiBのUTF-8チャンクを `backup.worker.ts` に転送する。WorkerはfflateのDEFLATEレベル6で圧縮し、処理完了の返事を待って次のチャンクを送る。全JSON文字列・ワークスペースの複製・圧縮結果の結合バッファは作らず、圧縮片から直接Blobを作る。同期的な `backupJson` APIはインデントなしJSONを返すが、ダウンロードには使わない。Driveの通信形式・保存形式は変更しない。
+
+生成中は既存の処理中表示で編集・二重実行・自動同期を止める。Drive同期中はバックアップを開始しない。成功・例外・ページ終了時にWorkerを終了し、一時配列を解放する。圧縮後のBlobと入力モデル自体は必要なため、大容量データのメモリ使用量が一定になる保証ではない。
 
 回答例（実際にはエクスポートしたIDと64桁の版を使います）：
 
