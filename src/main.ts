@@ -52,7 +52,7 @@ import {
   type FileImportSummary,
 } from './exchange';
 import { importConfirmationView } from './import-confirmation';
-import { characterDiff } from './diff';
+import { wordDiff } from './diff';
 import { displaySlotText } from './display-text';
 import { databaseContextView } from './database-context';
 import { choicesContextView } from './choices-context';
@@ -523,7 +523,7 @@ function review(file: ReviewFile) {
     const pending = item.changes.filter((c) => c.status === 'pending');
     const oldText = slots.map((s) => displaySlotText(file, s, s.translation)).join('\n');
     const diff = pending.length
-      ? characterDiff(
+      ? wordDiff(
           oldText,
           slots
             .map((s) =>

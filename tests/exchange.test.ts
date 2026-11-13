@@ -18,7 +18,7 @@ import {
   setResolved,
 } from '../src/review-state';
 import { backupJson, restoreJson } from '../src/storage';
-import { characterDiff } from '../src/diff';
+import { wordDiff } from '../src/diff';
 import { canMerge, mergeGroup, splitGroup } from '../src/grouping';
 import { updateManualSources } from '../src/source-edit';
 
@@ -202,16 +202,21 @@ function setup() {
   };
   return { workspace, file, item, thread, response };
 }
-test('character-level difference preserves whitespace, Unicode, and escapes markup', () => {
-  const d = characterDiff('cat 😺 <x>\n', 'cut 😺 <y>\n');
+test('word-level difference highlights whole words and preserves whitespace, Unicode and markup', () => {
+  const d = wordDiff('cat 😺 <x>\n', 'cut 😺 <y>\n');
   assert.equal(
     d.before,
-    'c<span class="diff-deleted">a</span>t 😺 &lt;<span class="diff-deleted">x</span>&gt;\n',
+    '<span class="diff-deleted">cat</span> 😺 &lt;<span class="diff-deleted">x</span>&gt;\n',
   );
   assert.equal(
     d.after,
-    'c<span class="diff-added">u</span>t 😺 &lt;<span class="diff-added">y</span>&gt;\n',
+    '<span class="diff-added">cut</span> 😺 &lt;<span class="diff-added">y</span>&gt;\n',
   );
+  const before = '  same\twords\r\nnext  ',
+    after = ' same  words\nnext\t';
+  const whitespace = wordDiff(before, after);
+  assert.equal(whitespace.before.replace(/<[^>]*>/g, ''), before);
+  assert.equal(whitespace.after.replace(/<[^>]*>/g, ''), after);
 });
 
 test('each request names its response uniquely and gives concise portable review instructions', () => {

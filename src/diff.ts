@@ -1,7 +1,7 @@
-import { diffChars } from 'diff';
+import { diffWordsWithSpace } from 'diff';
 import { escape } from './ui';
-export function characterDiff(before: string, after: string): { before: string; after: string } {
-  const parts = diffChars(before, after);
+export function wordDiff(before: string, after: string): { before: string; after: string } {
+  const parts = diffWordsWithSpace(before, after);
   return {
     before: parts
       .filter((p) => !p.added)

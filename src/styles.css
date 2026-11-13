@@ -841,7 +841,6 @@ h2 {
 .diff-deleted {
   background: #ffe1e3;
   color: #9f2831;
-  text-decoration: line-through;
 }
 .diff-added {
   background: #d9f6e5;

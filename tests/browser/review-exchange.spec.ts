@@ -67,8 +67,11 @@ test('review JSON and revised TXT round trip, AI resolve/reopen and persistence'
   });
   await page.getByRole('button', { name: '回答を読み込む', exact: true }).click();
   await expect(page.locator('.translation-after')).toHaveText('Revised Name');
-  await expect(page.locator('.diff-added')).not.toHaveCount(0);
-  await expect(page.locator('.diff-deleted')).not.toHaveCount(0);
+  await expect(page.locator('.diff-added')).toHaveText('Revised Name');
+  await expect(page.locator('.diff-deleted')).toHaveText(row.slots[0].translation);
+  expect(
+    await page.locator('.diff-deleted').evaluate((el) => getComputedStyle(el).textDecorationLine),
+  ).toBe('none');
   await page
     .getByRole('button', { name: /コメント/ })
     .first()
